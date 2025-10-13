@@ -1,0 +1,27 @@
+# Development Requirements
+# Install with: pip install -r requirements-dev.txt
+
+# Include production requirements
+-r requirements.txt
+
+# Code Quality
+black>=24.0.0
+flake8>=7.0.0
+isort>=5.13.0
+pylint>=3.0.0
+
+# Type Checking
+mypy>=1.8.0
+
+# Documentation
+sphinx>=7.2.0
+sphinx-rtd-theme>=2.0.0
+
+# Jupyter (for notebook development)
+jupyter>=1.0.0
+ipykernel>=6.29.0
+notebook>=7.0.0
+
+# Additional Development Tools
+ipdb>=0.13.13  # Debugger
+pre-commit>=3.6.0  # Git hooks

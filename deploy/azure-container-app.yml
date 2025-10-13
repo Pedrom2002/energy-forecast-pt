@@ -1,0 +1,62 @@
+# Azure Container Apps Configuration
+# Deploy com: az containerapp create --resource-group <RG> --name energy-forecast-api --yaml deploy/azure-container-app.yml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: energy-forecast-api
+  labels:
+    app: energy-forecast-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: energy-forecast-api
+  template:
+    metadata:
+      labels:
+        app: energy-forecast-api
+    spec:
+      containers:
+      - name: api
+        image: <ACR_NAME>.azurecr.io/energy-forecast-api:latest
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: energy-forecast-api-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+  selector:
+    app: energy-forecast-api
