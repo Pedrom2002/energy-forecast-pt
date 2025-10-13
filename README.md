@@ -255,13 +255,41 @@ energy-forecast-pt/
 
 ## 🔧 Testing the API
 
-### Option 1: Included test script
+### Option 1: PowerShell Script (Windows) ⭐
+
+```powershell
+# Run comprehensive test suite
+.\test_api.ps1
+```
+
+Or test a single endpoint:
+
+```powershell
+# Simple one-liner
+Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -ContentType "application/json" -Body '{"timestamp":"2025-01-15T14:00:00","region":"Lisboa","temperature":18.5,"humidity":65.0,"wind_speed":12.3,"precipitation":0.0,"cloud_cover":40.0,"pressure":1015.0}'
+
+# Or more readable format
+$body = @{
+    timestamp = "2025-01-15T14:00:00"
+    region = "Lisboa"
+    temperature = 18.5
+    humidity = 65.0
+    wind_speed = 12.3
+    precipitation = 0.0
+    cloud_cover = 40.0
+    pressure = 1015.0
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -ContentType "application/json" -Body $body
+```
+
+### Option 2: Python Script
 
 ```bash
 python test_api.py
 ```
 
-### Option 2: cURL
+### Option 3: cURL (Linux/Mac/Git Bash)
 
 ```bash
 curl -X POST "http://localhost:8000/predict" \
@@ -278,7 +306,9 @@ curl -X POST "http://localhost:8000/predict" \
   }'
 ```
 
-### Option 3: Python
+**Note for Windows PowerShell users:** Use `curl.exe` instead of `curl` for the traditional curl syntax.
+
+### Option 4: Python Code
 
 ```python
 import requests
