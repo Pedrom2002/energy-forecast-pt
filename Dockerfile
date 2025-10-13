@@ -24,20 +24,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser
+
+# Copy Python dependencies from builder to appuser's home
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
 # Copy application code
-COPY src/ ./src/
-COPY data/ ./data/
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser data/ ./data/
 
-# Make sure scripts are in PATH
-ENV PATH=/root/.local/bin:$PATH
-
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+# Switch to non-root user
 USER appuser
+
+# Make sure scripts are in PATH for appuser
+ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Expose port
 EXPOSE 8000
