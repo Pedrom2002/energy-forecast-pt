@@ -5,8 +5,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Pedrom2002/energy-forecast-pt/blob/master/LICENSE)
 [![XGBoost](https://img.shields.io/badge/ML-XGBoost%20%7C%20CatBoost%20%7C%20LightGBM-orange.svg)]()
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![React 19](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-61DAFB.svg)]()
 
-Energy consumption forecasting system for Portugal by region using gradient-boosted tree models (CatBoost, XGBoost, LightGBM).
+Full-stack energy consumption forecasting system for Portugal by region. Gradient-boosted tree models (CatBoost, XGBoost, LightGBM) with a modern React 19 frontend.
 
 Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter tuning, permutation-importance feature selection, conformal prediction calibration, and file-based experiment tracking.
 
@@ -96,6 +97,18 @@ uvicorn src.api.main:app --reload
 - API: **http://localhost:8000**
 - Interactive docs: **http://localhost:8000/docs**
 - Health check: **http://localhost:8000/health**
+
+### 5. Run Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- Frontend: **http://localhost:3000**
+- Pages: Dashboard, Predict, Batch, Forecast, Monitoring, Explain
+- Features: Dark mode, toast notifications, CSV export, virtualized tables
 
 The API auto-loads models from `data/models/checkpoints/` and selects the best available: advanced > with_lags > no_lags.
 
@@ -237,11 +250,23 @@ energy-forecast-pt/
 │   ├── index.json                   # Summary of all runs
 │   └── <run_id>.json               # Full experiment record per run
 │
-├── tests/                            # 649 tests (pytest)
-│   ├── test_api.py
-│   ├── test_feature_engineering.py
-│   ├── test_model_registry.py
-│   └── ...
+├── frontend/                        # React 19 + TypeScript + Vite
+│   ├── src/
+│   │   ├── pages/                  # 6 pages (Dashboard, Predict, Batch, Forecast, Monitoring, Explain)
+│   │   ├── components/             # Card, Layout, Toast, ChartSkeleton, ErrorBoundary, etc.
+│   │   ├── hooks/                  # useTheme, useDebounce
+│   │   ├── utils/                  # Formatting utilities (formatMW, exportCSV, etc.)
+│   │   └── api/                    # Type-safe API client
+│   ├── vitest.config.ts            # Frontend test configuration
+│   └── package.json                # React 19, Tailwind CSS v4, Recharts
+│
+├── tests/                            # 745+ tests (pytest)
+│   ├── test_api.py                 # API endpoint tests
+│   ├── test_full_integration.py    # End-to-end integration (44 tests)
+│   ├── test_property_based.py      # Hypothesis property-based (21 tests)
+│   ├── test_load.py                # Load/performance tests (18 tests)
+│   ├── test_stress.py              # Stress tests (13 tests)
+│   └── ...                         # 19 more test files
 │
 ├── docs/
 │   ├── ML_PIPELINE.md              # Complete ML pipeline reference (12 steps)
@@ -278,17 +303,32 @@ energy-forecast-pt/
 
 ## Testing
 
+### Backend (Python)
+
 ```bash
-# Run all 649 tests
+# Run all 745+ tests
 pytest -v
 
 # With coverage report
 pytest --cov=src --cov-report=html --cov-fail-under=85
 
-# Specific test suites
-pytest tests/test_api.py -v
-pytest tests/test_feature_engineering.py -v
-pytest tests/test_model_registry.py -v
+# By category
+pytest -m integration       # End-to-end integration tests
+pytest -m property_based    # Hypothesis property-based tests
+pytest -m load              # Performance/load tests
+pytest -m stress            # Stress tests
+
+# Mutation testing
+bash scripts/run_mutation_tests.sh
+```
+
+### Frontend (React)
+
+```bash
+cd frontend
+npm test                    # Run all 71 tests (Vitest)
+npm run test:coverage       # With coverage report
+npm run test:watch          # Watch mode
 ```
 
 ## Docker Deployment
@@ -390,11 +430,13 @@ Expected behaviour — auto-regressive feedback accumulates error. For horizons 
 | Category | Technologies |
 |----------|--------------|
 | **ML** | CatBoost, XGBoost, LightGBM, scikit-learn, Optuna |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS v4, Recharts |
 | **API** | FastAPI, Uvicorn, Pydantic |
 | **Data** | Pandas, NumPy, Parquet |
 | **Reproducibility** | DVC, file-based experiment tracker, global seeds |
 | **Monitoring** | Prometheus, conformal coverage tracking, drift detection |
 | **DevOps** | Docker, GitHub Actions, Trivy, pip-audit, bandit |
+| **Testing** | pytest, Hypothesis, pytest-benchmark, Vitest, Testing Library |
 | **Cloud** | AWS ECS, Azure Container Apps, GCP Cloud Run |
 
 ## Hardware Requirements

@@ -28,10 +28,10 @@ graph TB
     end
 
     subgraph "Client Layer"
-        H --> L[REST API<br/>/predict, /batch]
-        L --> M[Web Clients]
+        H --> L[REST API<br/>/predict, /batch, /explain]
+        L --> M[React Frontend<br/>6 pages, dark mode]
         L --> N[Python SDK]
-        L --> O[Dashboard]
+        L --> O[External Clients]
     end
 
     subgraph "DevOps Layer"
@@ -171,13 +171,18 @@ sequenceDiagram
 - Handle errors gracefully
 
 **Endpoints:**
-- `GET /` - Health check and info
-- `GET /health` - Model status
+- `GET /` - API info
+- `GET /health` - Liveness probe (version, uptime, model status, coverage alert)
 - `GET /regions` - Available regions
-- `POST /predict` - Single prediction
-- `POST /predict/batch` - Batch predictions (max 1000)
-- `GET /model/info` - Model metadata
-- `GET /limitations` - Current limitations
+- `POST /predict` - Single prediction with 90% CI
+- `POST /predict/batch` - Batch predictions (max 1000, vectorised)
+- `POST /predict/sequential` - Lag-aware auto-regressive forecast
+- `POST /predict/explain` - Prediction + top-N feature importance
+- `GET /model/info` - Model metadata and checksums
+- `GET /model/drift` - Feature distribution baselines
+- `POST /model/drift/check` - Live drift detection (z-score)
+- `GET /model/coverage` - Sliding-window empirical CI coverage
+- `POST /admin/reload-models` - Hot-reload models (ADMIN_API_KEY)
 
 **Design Patterns:**
 - **Singleton**: Model loaded once on startup
@@ -398,14 +403,20 @@ graph LR
 - [x] Reproducibility module
 - [x] Comprehensive ML pipeline documentation
 
+### Completed in v2.1
+- [x] React frontend with 6 pages (Dashboard, Predict, Batch, Forecast, Monitoring, Explain)
+- [x] Dark mode with design system and semantic color tokens
+- [x] Comprehensive test suite (integration, load, stress, property-based, frontend)
+- [x] Mutation testing setup (mutmut)
+- [x] Model explainability (SHAP/global importance via /predict/explain)
+- [x] Error boundaries and 404 page handling
+- [x] Production build optimization (code splitting)
+
 ### Remaining
-- [ ] Model explainability (SHAP values in API)
 - [ ] A/B testing framework
-- [ ] Streamlit dashboard
 - [ ] Automated retraining pipeline (Airflow/Prefect)
 - [ ] Real-time streaming predictions
 - [ ] pandera / Great Expectations data validation
-- [ ] MLflow integration (for team collaboration)
 
 ---
 

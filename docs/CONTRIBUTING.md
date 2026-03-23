@@ -73,6 +73,21 @@ pytest tests/test_conformal.py -v
 The coverage threshold is **85 %** — the CI pipeline enforces this via
 `--cov-fail-under=85`.
 
+### Frontend tests
+
+```bash
+cd frontend
+npm test                    # Run all tests (Vitest)
+npm run test:watch          # Watch mode during development
+npm run test:coverage       # With v8 coverage report
+```
+
+Frontend tests use **Vitest** with **Testing Library** and cover:
+- Utility functions (format.ts)
+- Custom hooks (useTheme, useDebounce)
+- Components (Toast, Card, ChartSkeleton, RegionSelect)
+- API client (fetch mocking)
+
 ---
 
 ## Lint and type checking
@@ -148,6 +163,7 @@ docs(contributing): add branch conventions and PR checklist
    - [ ] `CHANGELOG.md` updated under `[Unreleased]`
    - [ ] Docstrings updated for public API changes
    - [ ] `.env.example` updated if new environment variables were added
+   - [ ] Frontend tests added if UI components were changed (`cd frontend && npm test`)
 7. At least **one reviewer approval** is required before merging.
 
 ---

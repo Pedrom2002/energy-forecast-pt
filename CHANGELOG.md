@@ -9,6 +9,42 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+#### Frontend
+- **Complete React 19 frontend** with 6 pages: Dashboard, Predict, Batch, Forecast, Monitoring, Explain
+- **Design system** with semantic color tokens, 4-tier elevation scale, Inter typography
+- **Dark mode** with `useTheme` hook, localStorage persistence, and flash-free initial load
+- **Toast notification system** with imperative API (`toast.success/error/info`), auto-dismiss, dark mode support
+- **ChartSkeleton** component for loading states with axis placeholders and shimmer animation
+- **ErrorBoundary** component with recovery UI and error details
+- **404 NotFound page** with back/dashboard navigation
+- **Virtualized tables** for batch results (>50 rows), sortable columns, CSV export
+- **Interactive chart legend** with series toggle for forecast visualization
+- **Accessibility**: skip links, ARIA labels, focus management, reduced motion support, 44px touch targets
+- **Responsive sidebar** with mobile overlay and backdrop blur
+- **Staggered entry animations** and skeleton shimmer effects
+- **Production build** with Vite code splitting (react-vendor, chart-vendor)
+
+#### Testing
+- **44 integration tests** (`test_full_integration.py`): end-to-end pipeline testing (feature engineering -> model prediction -> coverage tracking -> drift detection -> admin operations)
+- **21 property-based tests** (`test_property_based.py`): Hypothesis tests for mathematical invariants (RMSE >= MAE, R2 <= 1), schema validation, and API contracts
+- **18 load tests** (`test_load.py`): latency benchmarks, concurrent request simulation (10-100 threads), throughput measurement, percentile reporting (p50/p95/p99)
+- **13 stress tests** (`test_stress.py`): max batch (1000 items), rapid-fire requests, memory stability (tracemalloc), error recovery, parallel region testing
+- **71 frontend tests** with Vitest + Testing Library: format utilities (16), hooks (11), components (34), API client (10)
+- **Mutation testing** setup with mutmut: config, helper script, pyproject.toml integration
+- New pytest markers: `load`, `stress`, `property_based`
+
+#### Dependencies
+- `hypothesis>=6.98.0` for property-based testing
+- `mutmut>=2.4.0` for mutation testing
+- Frontend: `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`, `jsdom`, `@vitest/coverage-v8`
+
+### Changed
+- ML training params: `n_jobs=2` (from -1) for predictable resource usage
+- Optuna trials: 30 (from 50) for faster iteration
+- Dark mode classes added to all error/alert components across pages
+
 ---
 
 ## [2.0.0] — 2026-03-22

@@ -1,29 +1,23 @@
-# 📚 Energy Forecast PT - Documentation Index
+# Energy Forecast PT - Documentation Index
 
 Complete technical documentation for the Energy Forecast PT project.
 
 ---
 
-## 🌐 Language Selection / Seleção de Idioma
+## Documentation
 
-### 🇬🇧 English Documentation (Main)
+### Technical Reference
+- **[ML_PIPELINE.md](ML_PIPELINE.md)** - Complete 12-step ML pipeline reference
+- **[DATA_DICTIONARY.md](DATA_DICTIONARY.md)** - All data schemas, features, metadata formats
+- **[MODEL_CARD.md](MODEL_CARD.md)** - Model capabilities, limitations, ethical considerations
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and component design
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Docker + cloud deployment guides (AWS, Azure, GCP)
+- **[MONITORING.md](MONITORING.md)** - Production monitoring and alerting
+- **[SECURITY.md](SECURITY.md)** - Security architecture and threat model
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Branch conventions, PR checklist, development setup
 
-**Quick Start**:
-- **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY_EN.md)** - Complete overview in 30 pages ⭐ **START HERE**
-- **[README.md](README_EN.md)** - Detailed navigation guide
-
-**Full Documentation** (Portuguese with English code/examples):
-- [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) - Full project overview
-- [FEATURE_ENGINEERING.md](FEATURE_ENGINEERING.md) - 68+ features explained
-- [MODELS_AND_METHODOLOGY.md](MODELS_AND_METHODOLOGY.md) - ML models and methodology
-- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) - REST API complete guide
-- [NOTEBOOKS_GUIDE.md](NOTEBOOKS_GUIDE.md) - 11 Jupyter notebooks guide
-
-> **Note**: The detailed technical docs above are in Portuguese, but all code examples, API endpoints, and technical terms are in English. Use **EXECUTIVE_SUMMARY.md** for a complete English overview, or use Google Translate/DeepL for the full Portuguese docs.
-
-### 🇵🇹 Documentação em Português
-
-Toda a documentação técnica detalhada está disponível em português nos arquivos acima.
+### Overview
+- **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)** - Complete technical overview
 
 ---
 
@@ -32,21 +26,18 @@ Toda a documentação técnica detalhada está disponível em português nos arq
 ### Project Metrics
 
 ```
-Model Performance:
-  - MAPE: 0.86%        (Excellent - world class)
-  - R²: 0.9995         (Explains 99.95% variance)
-  - MAE: 10.65 MW
-  - RMSE: 20.25 MW
+Model Performance (3 variants):
+  - MAPE: 4.33% - 4.49%
+  - R²: 0.9908 - 0.9913
+  - RMSE: 81.00 - 82.93 MW
+  - 90% conformal prediction intervals
 
-API Performance:
-  - Latency: <50ms (p99)
-  - Throughput: 200+ req/s
-  - Model Size: 65MB
-
-Technology:
-  - ML: XGBoost, Python 3.11+
+Stack:
+  - ML: CatBoost + XGBoost + LightGBM, Python 3.11+
   - API: FastAPI + Uvicorn
-  - Features: 68+ engineered
+  - Frontend: React 19 + TypeScript + Tailwind CSS v4
+  - Features: 71 engineered
+  - Tests: 745+ backend + 71 frontend
   - Deployment: Docker, AWS/Azure/GCP ready
 ```
 
