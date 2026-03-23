@@ -80,7 +80,7 @@ jobs:
         run: black --check src/ tests/
 
       - name: Check imports (isort)
-        run: isort --check-only --profile=black --line-length=120 src/ tests/
+        run: isort --check-only src/ tests/
 
       - name: Lint (ruff)
         run: ruff check src/ tests/

@@ -14,12 +14,7 @@ Verifies that:
 
 import pytest
 
-from src.api.prediction import (
-    Z_SCORE_90,
-    _compute_ci_half_width,
-    _hour_scale_factor,
-    _scaled_rmse,
-)
+from src.api.prediction import Z_SCORE_90, _compute_ci_half_width, _hour_scale_factor, _scaled_rmse
 
 
 class TestComputeCIHalfWidth:

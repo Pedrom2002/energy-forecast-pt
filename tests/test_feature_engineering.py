@@ -6,11 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.features.feature_engineering import (
-    STANDARD_PRESSURE_HPA,
-    _compute_easter,
-    get_portuguese_holidays,
-)
+from src.features.feature_engineering import STANDARD_PRESSURE_HPA, _compute_easter, get_portuguese_holidays
 
 
 class TestTemporalFeatures:

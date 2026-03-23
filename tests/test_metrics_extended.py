@@ -4,12 +4,7 @@ Extended tests for src/utils/metrics.py to improve coverage.
 
 import numpy as np
 
-from src.utils.metrics import (
-    calculate_coverage,
-    calculate_metrics,
-    mean_absolute_scaled_error,
-    print_metrics,
-)
+from src.utils.metrics import calculate_coverage, calculate_metrics, mean_absolute_scaled_error, print_metrics
 
 
 class TestCalculateCoverage:
