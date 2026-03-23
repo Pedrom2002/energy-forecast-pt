@@ -81,9 +81,9 @@ export default function Predict() {
         {/* Result */}
         <div className="lg:col-span-3 space-y-4">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 animate-fade-in-up" role="alert">
-              <p className="text-sm text-red-700 font-medium">Erro: {error}</p>
-              <p className="text-xs text-red-500 mt-1">Verifique os parametros e tente novamente.</p>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 animate-fade-in-up" role="alert">
+              <p className="text-sm text-red-700 dark:text-red-200 font-medium">Erro: {error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">Verifique os parametros e tente novamente.</p>
             </div>
           )}
 

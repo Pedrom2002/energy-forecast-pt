@@ -212,11 +212,11 @@ export default function Forecast() {
       </Card>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
           <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800">Erro no forecast</p>
-            <p className="text-sm text-red-600 mt-0.5">{error}</p>
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">Erro no forecast</p>
+            <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{error}</p>
             <div className="flex gap-3 mt-3">
               <button
                 type="button"

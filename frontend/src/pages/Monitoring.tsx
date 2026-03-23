@@ -66,11 +66,11 @@ export default function Monitoring() {
       </div>
 
       {error && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
           <AlertTriangle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <p className="text-sm font-medium text-yellow-800">Dados limitados</p>
-            <p className="text-sm text-yellow-600 mt-0.5">{error}</p>
+            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Dados limitados</p>
+            <p className="text-sm text-yellow-600 dark:text-yellow-300 mt-0.5">{error}</p>
           </div>
         </div>
       )}
