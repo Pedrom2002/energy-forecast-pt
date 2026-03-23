@@ -72,7 +72,7 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "colsample_bytree": 0.8,
         "min_child_weight": 3,
         "random_state": 42,
-        "n_jobs": -1,
+        "n_jobs": 2,
         "verbosity": 0,
     },
     "lightgbm": {
@@ -83,7 +83,7 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "colsample_bytree": 0.8,
         "min_child_weight": 3,
         "random_state": 42,
-        "n_jobs": -1,
+        "n_jobs": 2,
         "verbosity": -1,
     },
     "catboost": {
@@ -99,7 +99,7 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "max_depth": 30,
         "min_samples_split": 5,
         "min_samples_leaf": 2,
-        "n_jobs": -1,
+        "n_jobs": 2,
         "random_state": 42,
     },
 }
@@ -348,7 +348,7 @@ def get_search_space(trial: Any, model_key: str) -> dict[str, Any]:
 
 # Default Optuna tuning configuration
 OPTUNA_DEFAULTS: dict[str, Any] = {
-    "n_trials": 50,
+    "n_trials": 30,
     "n_cv_folds": 5,
     "timeout_seconds": 3600,
     "sampler": "TPE",

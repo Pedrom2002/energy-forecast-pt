@@ -143,7 +143,7 @@ def rank_by_permutation_importance(
         n_repeats=n_repeats,
         random_state=random_state,
         scoring=scoring,
-        n_jobs=-1,
+        n_jobs=2,
     )
 
     importances = []
