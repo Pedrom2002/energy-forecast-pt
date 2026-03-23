@@ -1,5 +1,11 @@
 # Energy Forecast PT
 
+[![CI/CD Pipeline](https://github.com/Pedrom2002/energy-forecast-pt/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Pedrom2002/energy-forecast-pt/actions/workflows/ci-cd.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/Pedrom2002/energy-forecast-pt/blob/master/LICENSE)
+[![XGBoost](https://img.shields.io/badge/ML-XGBoost%20%7C%20CatBoost%20%7C%20LightGBM-orange.svg)]()
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+
 Energy consumption forecasting system for Portugal by region using gradient-boosted tree models (CatBoost, XGBoost, LightGBM).
 
 Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter tuning, permutation-importance feature selection, conformal prediction calibration, and file-based experiment tracking.
