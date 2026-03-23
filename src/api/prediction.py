@@ -25,6 +25,7 @@ Design decisions
   :class:`~src.api.store.ModelStore` by reference but never mutate it.
   They can be safely called from ``asyncio.to_thread``.
 """
+
 from __future__ import annotations
 
 import logging
@@ -69,15 +70,16 @@ SEQUENTIAL_TIMEOUT_PER_STEP_S = float(os.environ.get("SEQUENTIAL_TIMEOUT_PER_STE
 # ``region_cv_scales`` is present in the model metadata JSON
 # (see :attr:`~src.api.store.ModelStore.region_uncertainty_scale`).
 REGION_UNCERTAINTY_SCALE: dict[str, float] = {
-    "Norte": 1.15,      # Highest consumption & variance (industrial + urban north)
-    "Lisboa": 1.10,     # Dense urban, high peak variability
-    "Centro": 1.00,     # Baseline reference region
-    "Alentejo": 0.90,   # Low-density, agricultural — lower variance
-    "Algarve": 0.85,    # Lowest baseline, seasonal tourism pattern
+    "Norte": 1.15,  # Highest consumption & variance (industrial + urban north)
+    "Lisboa": 1.10,  # Dense urban, high peak variability
+    "Centro": 1.00,  # Baseline reference region
+    "Alentejo": 0.90,  # Low-density, agricultural — lower variance
+    "Algarve": 0.85,  # Lowest baseline, seasonal tourism pattern
 }
 
 
 # ── CI helpers ────────────────────────────────────────────────────────────────
+
 
 def _hour_scale_factor(hour: int) -> float:
     """Return the hour-of-day uncertainty multiplier (0–23).
@@ -91,10 +93,10 @@ def _hour_scale_factor(hour: int) -> float:
     - **Night** (22:00–05:59): −15 % — low baseline load, more predictable.
     """
     if 8 <= hour < 20:
-        return 1.15    # Peak — more volatile
+        return 1.15  # Peak — more volatile
     if 6 <= hour < 8 or 20 <= hour < 22:
-        return 1.0     # Transition hours
-    return 0.85        # Night — more stable
+        return 1.0  # Transition hours
+    return 0.85  # Night — more stable
 
 
 def _scaled_rmse(
@@ -164,7 +166,11 @@ def _build_prediction_response(
     construction that is identical across single, batch, and sequential paths.
     """
     half_width, ci_method = _compute_ci_half_width(
-        rmse, region, hour, conformal_q90, scale_dict,
+        rmse,
+        region,
+        hour,
+        conformal_q90,
+        scale_dict,
     )
     ci_lower = prediction - half_width
     ci_upper = prediction + half_width
@@ -183,6 +189,7 @@ def _build_prediction_response(
 
 
 # ── Single prediction ─────────────────────────────────────────────────────────
+
 
 def _make_single_prediction(
     data: EnergyData,
@@ -205,17 +212,21 @@ def _make_single_prediction(
         ValueError: No model could produce a valid prediction.
     """
     ts = pd.Timestamp(data.timestamp)
-    df = pd.DataFrame([{
-        "timestamp": ts,
-        "region": data.region,
-        "temperature": data.temperature,
-        "humidity": data.humidity,
-        "wind_speed": data.wind_speed,
-        "precipitation": data.precipitation,
-        "cloud_cover": data.cloud_cover,
-        "pressure": data.pressure,
-        "consumption_mw": 0,
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "timestamp": ts,
+                "region": data.region,
+                "temperature": data.temperature,
+                "humidity": data.humidity,
+                "wind_speed": data.wind_speed,
+                "precipitation": data.precipitation,
+                "cloud_cover": data.cloud_cover,
+                "pressure": data.pressure,
+                "consumption_mw": 0,
+            }
+        ]
+    )
 
     prediction: float | None = None
     model_name: str | None = None
@@ -238,7 +249,9 @@ def _make_single_prediction(
         except Exception:
             logger.warning(
                 "Advanced model failed for region=%s ts=%s — falling back",
-                data.region, data.timestamp, exc_info=True,
+                data.region,
+                data.timestamp,
+                exc_info=True,
             )
 
     # ── With-lags model ───────────────────────────────────────────────────────
@@ -257,7 +270,9 @@ def _make_single_prediction(
         except Exception:
             logger.warning(
                 "With-lags model failed for region=%s ts=%s — falling back",
-                data.region, data.timestamp, exc_info=True,
+                data.region,
+                data.timestamp,
+                exc_info=True,
             )
 
     # ── No-lags fallback ──────────────────────────────────────────────────────
@@ -289,22 +304,25 @@ def _make_single_prediction(
     # Structured audit log for compliance, CI recalibration, and debugging.
     logger.info(
         "prediction_made",
-        extra={"extra_fields": {
-            "region": data.region,
-            "timestamp": data.timestamp,
-            "predicted_mw": round(prediction, 2),
-            "ci_lower": round(response.confidence_interval_lower, 2),
-            "ci_upper": round(response.confidence_interval_upper, 2),
-            "ci_width": round(response.confidence_interval_upper - response.confidence_interval_lower, 2),
-            "ci_lower_clipped": response.ci_lower_clipped,
-            "model": model_name,
-            "ci_method": response.ci_method,
-        }},
+        extra={
+            "extra_fields": {
+                "region": data.region,
+                "timestamp": data.timestamp,
+                "predicted_mw": round(prediction, 2),
+                "ci_lower": round(response.confidence_interval_lower, 2),
+                "ci_upper": round(response.confidence_interval_upper, 2),
+                "ci_width": round(response.confidence_interval_upper - response.confidence_interval_lower, 2),
+                "ci_lower_clipped": response.ci_lower_clipped,
+                "model": model_name,
+                "ci_method": response.ci_method,
+            }
+        },
     )
     return response
 
 
 # ── Batch prediction ──────────────────────────────────────────────────────────
+
 
 def _make_batch_predictions_vectorized(
     data_list: list[EnergyData],
@@ -371,20 +389,23 @@ def _make_batch_predictions_vectorized(
         if not np.isfinite(pred) or pred < 0:
             raise ValueError(f"Batch model returned invalid prediction at index {i}: {pred}")
         ts = pd.Timestamp(data.timestamp)
-        results.append(_build_prediction_response(
-            timestamp=data.timestamp,
-            region=data.region,
-            prediction=pred,
-            model_name=model_name,
-            rmse=rmse,
-            hour=ts.hour,
-            conformal_q90=batch_conformal_q90,
-            scale_dict=store.region_uncertainty_scale,
-        ))
+        results.append(
+            _build_prediction_response(
+                timestamp=data.timestamp,
+                region=data.region,
+                prediction=pred,
+                model_name=model_name,
+                rmse=rmse,
+                hour=ts.hour,
+                conformal_q90=batch_conformal_q90,
+                scale_dict=store.region_uncertainty_scale,
+            )
+        )
     return results
 
 
 # ── Sequential (lag-aware) prediction ────────────────────────────────────────
+
 
 def _make_sequential_predictions(
     request: SequentialForecastRequest,
@@ -462,22 +483,24 @@ def _make_sequential_predictions(
     results: list[PredictionResponse] = []
     for future in request.forecast:
         ts = pd.Timestamp(future.timestamp)
-        future_row = pd.DataFrame([{
-            "timestamp": ts,
-            "region": future.region,
-            "temperature": future.temperature,
-            "humidity": future.humidity,
-            "wind_speed": future.wind_speed,
-            "precipitation": future.precipitation,
-            "cloud_cover": future.cloud_cover,
-            "pressure": future.pressure,
-            "consumption_mw": 0.0,
-        }])
+        future_row = pd.DataFrame(
+            [
+                {
+                    "timestamp": ts,
+                    "region": future.region,
+                    "temperature": future.temperature,
+                    "humidity": future.humidity,
+                    "wind_speed": future.wind_speed,
+                    "precipitation": future.precipitation,
+                    "cloud_cover": future.cloud_cover,
+                    "pressure": future.pressure,
+                    "consumption_mw": 0.0,
+                }
+            ]
+        )
 
         df_combined = pd.concat([df_history, future_row], ignore_index=True)
-        df_features = store.feature_engineer.create_all_features(
-            df_combined, use_advanced=use_advanced
-        )
+        df_features = store.feature_engineer.create_all_features(df_combined, use_advanced=use_advanced)
 
         if len(df_features) == 0:
             raise ValueError(
@@ -496,16 +519,18 @@ def _make_sequential_predictions(
         future_row_with_pred["consumption_mw"] = pred
         df_history = pd.concat([df_history, future_row_with_pred], ignore_index=True)
 
-        results.append(_build_prediction_response(
-            timestamp=future.timestamp,
-            region=future.region,
-            prediction=pred,
-            model_name=model_name,
-            rmse=rmse,
-            hour=ts.hour,
-            conformal_q90=seq_conformal_q90,
-            scale_dict=store.region_uncertainty_scale,
-        ))
+        results.append(
+            _build_prediction_response(
+                timestamp=future.timestamp,
+                region=future.region,
+                prediction=pred,
+                model_name=model_name,
+                rmse=rmse,
+                hour=ts.hour,
+                conformal_q90=seq_conformal_q90,
+                scale_dict=store.region_uncertainty_scale,
+            )
+        )
 
     return SequentialForecastResponse(
         predictions=results,
@@ -516,6 +541,7 @@ def _make_sequential_predictions(
 
 
 # ── Explanation ───────────────────────────────────────────────────────────────
+
 
 def _explain_prediction(
     data: EnergyData,
@@ -557,17 +583,21 @@ def _explain_prediction(
         feature_names = store.feature_names_no_lags or []
 
     ts = pd.Timestamp(data.timestamp)
-    df = pd.DataFrame([{
-        "timestamp": ts,
-        "region": data.region,
-        "temperature": data.temperature,
-        "humidity": data.humidity,
-        "wind_speed": data.wind_speed,
-        "precipitation": data.precipitation,
-        "cloud_cover": data.cloud_cover,
-        "pressure": data.pressure,
-        "consumption_mw": 0.0,
-    }])
+    df = pd.DataFrame(
+        [
+            {
+                "timestamp": ts,
+                "region": data.region,
+                "temperature": data.temperature,
+                "humidity": data.humidity,
+                "wind_speed": data.wind_speed,
+                "precipitation": data.precipitation,
+                "cloud_cover": data.cloud_cover,
+                "pressure": data.pressure,
+                "consumption_mw": 0.0,
+            }
+        ]
+    )
 
     explanation_method = "feature_importance"
     importances: list[float] | None = None
@@ -583,6 +613,7 @@ def _explain_prediction(
 
         try:
             import shap  # type: ignore[import]
+
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X)
             if hasattr(shap_values, "__iter__"):
@@ -595,7 +626,9 @@ def _explain_prediction(
             # because we have a valid fallback path.
             logger.warning(
                 "SHAP explanation failed for region=%s ts=%s — falling back to feature_importances_",
-                data.region, data.timestamp, exc_info=True,
+                data.region,
+                data.timestamp,
+                exc_info=True,
             )
 
         if importances is None:

@@ -17,6 +17,7 @@ Design decisions:
   limiter hits before each test so individual tests never see carry-over state
   from a prior test that made many API requests.
 """
+
 import time
 from collections import defaultdict
 
@@ -110,17 +111,19 @@ def sample_energy_data():
     rng = np.random.RandomState(42)
     end = pd.Timestamp("2024-06-30 00:00:00")
     dates = pd.date_range(end=end, periods=500, freq="h")
-    return pd.DataFrame({
-        "timestamp": dates,
-        "consumption_mw": rng.uniform(1000, 3000, 500),
-        "temperature": rng.uniform(5, 35, 500),
-        "humidity": rng.uniform(30, 90, 500),
-        "wind_speed": rng.uniform(0, 25, 500),
-        "precipitation": rng.uniform(0, 10, 500),
-        "cloud_cover": rng.uniform(0, 100, 500),
-        "pressure": rng.uniform(1000, 1025, 500),
-        "region": ["Lisboa"] * 500,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": dates,
+            "consumption_mw": rng.uniform(1000, 3000, 500),
+            "temperature": rng.uniform(5, 35, 500),
+            "humidity": rng.uniform(30, 90, 500),
+            "wind_speed": rng.uniform(0, 25, 500),
+            "precipitation": rng.uniform(0, 10, 500),
+            "cloud_cover": rng.uniform(0, 100, 500),
+            "pressure": rng.uniform(1000, 1025, 500),
+            "region": ["Lisboa"] * 500,
+        }
+    )
 
 
 @pytest.fixture
@@ -138,17 +141,21 @@ def multi_region_data():
 
     frames = []
     for region in regions:
-        frames.append(pd.DataFrame({
-            "timestamp": dates,
-            "consumption_mw": rng.uniform(500, 4000, 100),
-            "temperature": rng.uniform(5, 40, 100),
-            "humidity": rng.uniform(20, 95, 100),
-            "wind_speed": rng.uniform(0, 30, 100),
-            "precipitation": rng.uniform(0, 15, 100),
-            "cloud_cover": rng.uniform(0, 100, 100),
-            "pressure": rng.uniform(995, 1030, 100),
-            "region": [region] * 100,
-        }))
+        frames.append(
+            pd.DataFrame(
+                {
+                    "timestamp": dates,
+                    "consumption_mw": rng.uniform(500, 4000, 100),
+                    "temperature": rng.uniform(5, 40, 100),
+                    "humidity": rng.uniform(20, 95, 100),
+                    "wind_speed": rng.uniform(0, 30, 100),
+                    "precipitation": rng.uniform(0, 15, 100),
+                    "cloud_cover": rng.uniform(0, 100, 100),
+                    "pressure": rng.uniform(995, 1030, 100),
+                    "region": [region] * 100,
+                }
+            )
+        )
 
     df = pd.concat(frames, ignore_index=True)
     return df.sort_values("timestamp").reset_index(drop=True)
@@ -178,14 +185,16 @@ def minimal_time_series():
     rng = np.random.RandomState(7)
     end = pd.Timestamp("2024-06-30 00:00:00")
     dates = pd.date_range(end=end, periods=60, freq="h")
-    return pd.DataFrame({
-        "timestamp": dates,
-        "consumption_mw": rng.uniform(800, 2500, 60),
-        "temperature": rng.uniform(8, 30, 60),
-        "humidity": rng.uniform(35, 85, 60),
-        "wind_speed": rng.uniform(0, 20, 60),
-        "precipitation": np.zeros(60),
-        "cloud_cover": rng.uniform(0, 100, 60),
-        "pressure": rng.uniform(1005, 1020, 60),
-        "region": ["Norte"] * 60,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": dates,
+            "consumption_mw": rng.uniform(800, 2500, 60),
+            "temperature": rng.uniform(8, 30, 60),
+            "humidity": rng.uniform(35, 85, 60),
+            "wind_speed": rng.uniform(0, 20, 60),
+            "precipitation": np.zeros(60),
+            "cloud_cover": rng.uniform(0, 100, 60),
+            "pressure": rng.uniform(1005, 1020, 60),
+            "region": ["Norte"] * 60,
+        }
+    )

@@ -16,11 +16,12 @@ selects the best by time-series cross-validated RMSE, evaluates on a
 held-out test set, computes conformal prediction quantiles, and saves
 with generic filenames.
 """
+
 import json
 import logging
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -41,7 +42,6 @@ from src.models.model_registry import (
     create_model,
     fit_model,
     get_search_space,
-    train_and_select_best,
 )
 from src.utils.metrics import mean_absolute_scaled_error
 from src.utils.reproducibility import (
@@ -82,6 +82,7 @@ logger = logging.getLogger(__name__)
 
 # ── Data loading & splitting ─────────────────────────────────────────────────
 
+
 def load_and_prepare_data() -> pd.DataFrame:
     """Load raw data and apply corrected feature engineering."""
     print("Loading data...")
@@ -120,11 +121,16 @@ def temporal_split(
 
 # Legacy alias columns created by FeatureEngineer for backward compatibility
 _ALIAS_COLUMNS: set[str] = {
-    "sin_hour", "cos_hour",
-    "sin_day_of_week", "cos_day_of_week",
-    "day_of_week_sin", "day_of_week_cos",
-    "sin_month", "cos_month",
-    "sin_day_of_year", "cos_day_of_year",
+    "sin_hour",
+    "cos_hour",
+    "sin_day_of_week",
+    "cos_day_of_week",
+    "day_of_week_sin",
+    "day_of_week_cos",
+    "sin_month",
+    "cos_month",
+    "sin_day_of_year",
+    "cos_day_of_year",
 }
 
 
@@ -140,6 +146,7 @@ def get_feature_columns(
 
 
 # ── Model selection ──────────────────────────────────────────────────────────
+
 
 def cross_validate_model_selection(
     X_trainval: np.ndarray,
@@ -169,10 +176,7 @@ def cross_validate_model_selection(
             rmse = float(np.sqrt(np.mean((y_vl - y_pred) ** 2)))
             cv_scores[key].append(rmse)
 
-        fold_summary = ", ".join(
-            f"{DISPLAY_NAMES.get(k, k)}: {cv_scores[k][-1]:.2f}"
-            for k in model_keys
-        )
+        fold_summary = ", ".join(f"{DISPLAY_NAMES.get(k, k)}: {cv_scores[k][-1]:.2f}" for k in model_keys)
         print(f"  Fold {fold}/{n_splits} — {fold_summary}")
 
     print("\n--- CV RESULTS (mean ± std RMSE) ---")
@@ -187,6 +191,7 @@ def cross_validate_model_selection(
 
 
 # ── Optuna hyperparameter optimisation ───────────────────────────────────────
+
 
 def optuna_tune(
     model_key: str,
@@ -213,6 +218,7 @@ def optuna_tune(
         Dictionary with best_params, best_cv_rmse, n_trials_completed.
     """
     import optuna
+
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
     tscv = TimeSeriesSplit(n_splits=n_cv_folds)
@@ -253,6 +259,7 @@ def optuna_tune(
 
 # ── Conformal prediction ────────────────────────────────────────────────────
 
+
 def compute_conformal_q90(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """Compute the 90th percentile of absolute residuals for conformal CI."""
     residuals = np.abs(y_true - y_pred)
@@ -262,6 +269,7 @@ def compute_conformal_q90(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 # ── Main training pipeline ──────────────────────────────────────────────────
+
 
 def _train_variant(
     df: pd.DataFrame | None,
@@ -341,9 +349,12 @@ def _train_variant(
     regions_trainval = None
     regions_test_arr = None
     if "region" in train.columns:
-        regions_trainval = np.concatenate([
-            train["region"].values, val["region"].values,
-        ])
+        regions_trainval = np.concatenate(
+            [
+                train["region"].values,
+                val["region"].values,
+            ]
+        )
         regions_test_arr = test["region"].values
 
     baseline_results = evaluate_all_baselines(
@@ -356,8 +367,10 @@ def _train_variant(
     print("\nBaseline results:")
     for name, metrics in baseline_results.items():
         display = metrics.get("display_name", name)
-        print(f"  {display:30s}: RMSE={metrics['rmse']:.2f}, MAE={metrics['mae']:.2f}, "
-              f"MAPE={metrics['mape']:.2f}%, R²={metrics['r2']:.4f}")
+        print(
+            f"  {display:30s}: RMSE={metrics['rmse']:.2f}, MAE={metrics['mae']:.2f}, "
+            f"MAPE={metrics['mape']:.2f}%, R²={metrics['r2']:.4f}"
+        )
 
     # Step 6: Model selection via time-series CV
     X_trainval = np.concatenate([X_train, X_val])
@@ -448,18 +461,19 @@ def _train_variant(
 
     # Feature importance
     if hasattr(best_model, "feature_importances_"):
-        importance_df = pd.DataFrame({
-            "feature": selected_feature_cols,
-            "importance": best_model.feature_importances_
-        }).sort_values("importance", ascending=False)
+        importance_df = pd.DataFrame(
+            {"feature": selected_feature_cols, "importance": best_model.feature_importances_}
+        ).sort_values("importance", ascending=False)
         print("\n--- TOP 15 FEATURES ---")
         for _, row in importance_df.head(15).iterrows():
             print(f"  {row['feature']:40s} {row['importance']:.4f}")
     else:
-        importance_df = pd.DataFrame({
-            "feature": selected_feature_cols,
-            "importance": [0] * len(selected_feature_cols),
-        })
+        importance_df = pd.DataFrame(
+            {
+                "feature": selected_feature_cols,
+                "importance": [0] * len(selected_feature_cols),
+            }
+        )
 
     # Compute feature statistics for drift monitoring
     feature_stats = {}
@@ -495,7 +509,7 @@ def _train_variant(
         "best_model_key": best_key,
         "model_file": model_filename,
         "n_features": len(selected_feature_cols),
-        "training_date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "pipeline_version": "v5",
         "random_seed": RANDOM_STATE,
         "data_hash": data_hash,
@@ -566,9 +580,7 @@ def _train_variant(
     print(f"  Experiment logged: {run_id}")
 
     # Print improvement over baselines
-    best_baseline_rmse = min(
-        m["rmse"] for m in baseline_results.values()
-    )
+    best_baseline_rmse = min(m["rmse"] for m in baseline_results.values())
     improvement = (1 - test_metrics["rmse"] / best_baseline_rmse) * 100
     print(f"\n  ML model RMSE improvement over best baseline: {improvement:.1f}%")
 
@@ -699,10 +711,9 @@ def train_multistep_models(run_optuna: bool = False) -> dict[str, dict[str, floa
     meta_dir.mkdir(parents=True, exist_ok=True)
     multistep_meta = {
         "horizons": {
-            f"{h}h": {k: round(float(v), 4) for k, v in m.items()}
-            for h, m in zip(horizons, all_metrics.values())
+            f"{h}h": {k: round(float(v), 4) for k, v in m.items()} for h, m in zip(horizons, all_metrics.values())
         },
-        "training_date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         "pipeline_version": "v5",
         "random_seed": RANDOM_STATE,
     }
@@ -721,15 +732,18 @@ if __name__ == "__main__":
         description="Retrain energy forecasting models (pipeline v5)",
     )
     parser.add_argument(
-        "--skip-advanced", action="store_true",
+        "--skip-advanced",
+        action="store_true",
         help="Skip the advanced variant (faster iteration)",
     )
     parser.add_argument(
-        "--skip-optuna", action="store_true",
+        "--skip-optuna",
+        action="store_true",
         help="Skip Optuna hyperparameter tuning (use default params)",
     )
     parser.add_argument(
-        "--multistep", action="store_true",
+        "--multistep",
+        action="store_true",
         help="Also train horizon-specific models (1h, 6h, 12h, 24h)",
     )
     args = parser.parse_args()

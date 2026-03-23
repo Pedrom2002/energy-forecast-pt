@@ -1,15 +1,15 @@
 """
 Tests for Feature Engineering module.
 """
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from src.features.feature_engineering import (
-    FeatureEngineer,
-    get_portuguese_holidays,
-    _compute_easter,
     STANDARD_PRESSURE_HPA,
+    _compute_easter,
+    get_portuguese_holidays,
 )
 
 
@@ -72,32 +72,36 @@ class TestHolidayFeatures:
         assert "days_to_nearest_holiday" in result.columns
 
     def test_new_year_detected(self, feature_engineer):
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2024-01-01 12:00:00"]),
-            "region": ["Lisboa"],
-            "consumption_mw": [1500.0],
-            "temperature": [15.0],
-            "humidity": [60.0],
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2024-01-01 12:00:00"]),
+                "region": ["Lisboa"],
+                "consumption_mw": [1500.0],
+                "temperature": [15.0],
+                "humidity": [60.0],
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         result = feature_engineer.create_holiday_features(df)
         assert result["is_holiday"].iloc[0] == 1
 
     def test_regular_day_not_holiday(self, feature_engineer):
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2024-03-15 12:00:00"]),
-            "region": ["Lisboa"],
-            "consumption_mw": [1500.0],
-            "temperature": [15.0],
-            "humidity": [60.0],
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2024-03-15 12:00:00"]),
+                "region": ["Lisboa"],
+                "consumption_mw": [1500.0],
+                "temperature": [15.0],
+                "humidity": [60.0],
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         result = feature_engineer.create_holiday_features(df)
         assert result["is_holiday"].iloc[0] == 0
 
@@ -152,11 +156,13 @@ class TestRollingFeatures:
 
     def test_rolling_mean_excludes_current_value(self, feature_engineer):
         """Verify that the rolling mean at row i uses values from rows < i only."""
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2024-01-01", periods=5, freq="h"),
-            "consumption_mw": [100.0, 200.0, 300.0, 400.0, 500.0],
-            "region": ["Lisboa"] * 5,
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2024-01-01", periods=5, freq="h"),
+                "consumption_mw": [100.0, 200.0, 300.0, 400.0, 500.0],
+                "region": ["Lisboa"] * 5,
+            }
+        )
         result = feature_engineer.create_rolling_features(df, windows=[2])
         # Row 2: shift(1) gives [NaN, 100, 200, 300, 400], rolling(2) at idx 2 = mean(100, 200) = 150
         assert abs(result["consumption_mw_rolling_mean_2"].iloc[2] - 150.0) < 0.01
@@ -175,9 +181,7 @@ class TestWeatherDerivedFeatures:
         """pressure_relative should use standard pressure, not data mean (avoids leakage)."""
         result = feature_engineer.create_weather_derived_features(sample_energy_data)
         expected = sample_energy_data["pressure"] - STANDARD_PRESSURE_HPA
-        pd.testing.assert_series_equal(
-            result["pressure_relative"], expected, check_names=False
-        )
+        pd.testing.assert_series_equal(result["pressure_relative"], expected, check_names=False)
 
     def test_creates_derived_columns(self, feature_engineer, sample_energy_data):
         result = feature_engineer.create_weather_derived_features(sample_energy_data)
@@ -232,17 +236,19 @@ class TestNoLagsFeatures:
 
     def test_has_real_holiday_features(self, feature_engineer):
         """No-lags pipeline should use real Portuguese holidays, not hardcoded zeros."""
-        df = pd.DataFrame({
-            "timestamp": pd.to_datetime(["2024-01-01 12:00:00"]),
-            "region": ["Lisboa"],
-            "consumption_mw": [1500.0],
-            "temperature": [15.0],
-            "humidity": [60.0],
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.to_datetime(["2024-01-01 12:00:00"]),
+                "region": ["Lisboa"],
+                "consumption_mw": [1500.0],
+                "temperature": [15.0],
+                "humidity": [60.0],
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         result = feature_engineer.create_features_no_lags(df)
         # Jan 1 is Ano Novo - must be flagged
         assert result["is_holiday"].iloc[0] == 1

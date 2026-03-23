@@ -3,6 +3,7 @@
 Creates temporal features, lags, rolling windows and interactions
 for hourly energy consumption forecasting in Portugal.
 """
+
 from __future__ import annotations
 
 import logging
@@ -31,15 +32,15 @@ STANDARD_PRESSURE_HPA: float = 1013.25
 
 # Portuguese public holidays (fixed dates)
 PT_FIXED_HOLIDAYS: list[tuple[int, int]] = [
-    (1, 1),    # Ano Novo
-    (4, 25),   # Dia da Liberdade
-    (5, 1),    # Dia do Trabalhador
-    (6, 10),   # Dia de Portugal
-    (8, 15),   # Assuncao de Nossa Senhora
-    (10, 5),   # Implantacao da Republica
-    (11, 1),   # Todos os Santos
-    (12, 1),   # Restauracao da Independencia
-    (12, 8),   # Imaculada Conceicao
+    (1, 1),  # Ano Novo
+    (4, 25),  # Dia da Liberdade
+    (5, 1),  # Dia do Trabalhador
+    (6, 10),  # Dia de Portugal
+    (8, 15),  # Assuncao de Nossa Senhora
+    (10, 5),  # Implantacao da Republica
+    (11, 1),  # Todos os Santos
+    (12, 1),  # Restauracao da Independencia
+    (12, 8),  # Imaculada Conceicao
     (12, 25),  # Natal
 ]
 
@@ -109,6 +110,7 @@ DAYS_IN_YEAR: int = 365
 
 # -- Output bounds for validation (Task 2) ----------------------------------
 
+
 class _FeatureBounds(TypedDict):
     """Bounds specification for a single feature column."""
 
@@ -176,7 +178,7 @@ def get_portuguese_holidays(year: int) -> set[pd.Timestamp]:
         holidays.add(pd.Timestamp(year, month, day))
     easter = _compute_easter(year)
     holidays.add(easter - pd.Timedelta(days=2))  # Sexta-feira Santa
-    holidays.add(easter)                          # Pascoa
+    holidays.add(easter)  # Pascoa
     holidays.add(easter + pd.Timedelta(days=60))  # Corpo de Deus
     return holidays
 
@@ -203,8 +205,7 @@ def _validate_output_features(df: pd.DataFrame) -> pd.DataFrame:
     if n_inf > 0:
         cols_with_inf = [c for c in numeric_cols if inf_mask[c].any()]
         logger.warning(
-            "Output validation: %d infinite value(s) found in columns %s; "
-            "replacing with NaN",
+            "Output validation: %d infinite value(s) found in columns %s; " "replacing with NaN",
             n_inf,
             cols_with_inf,
         )
@@ -292,9 +293,7 @@ class FeatureEngineer:
             invalid = (df["humidity"] < 0) | (df["humidity"] > 100)
             if invalid.any():
                 bad = df.loc[invalid, "humidity"].tolist()[:5]
-                raise ValueError(
-                    f"humidity must be in [0, 100]. Found {invalid.sum()} invalid value(s): {bad}"
-                )
+                raise ValueError(f"humidity must be in [0, 100]. Found {invalid.sum()} invalid value(s): {bad}")
 
         if "temperature" in df.columns:
             invalid = (df["temperature"] < TEMP_VALID_MIN) | (df["temperature"] > TEMP_VALID_MAX)
@@ -316,9 +315,7 @@ class FeatureEngineer:
         if "wind_speed" in df.columns:
             invalid = df["wind_speed"] < 0
             if invalid.any():
-                raise ValueError(
-                    f"wind_speed cannot be negative. Found {invalid.sum()} invalid value(s)."
-                )
+                raise ValueError(f"wind_speed cannot be negative. Found {invalid.sum()} invalid value(s).")
             extreme = df["wind_speed"] > WIND_SPEED_WARN_MAX
             if extreme.any():
                 logger.warning(
@@ -330,9 +327,7 @@ class FeatureEngineer:
         if "precipitation" in df.columns:
             invalid = df["precipitation"] < 0
             if invalid.any():
-                raise ValueError(
-                    f"precipitation cannot be negative. Found {invalid.sum()} invalid value(s)."
-                )
+                raise ValueError(f"precipitation cannot be negative. Found {invalid.sum()} invalid value(s).")
             extreme = df["precipitation"] > PRECIP_WARN_MAX
             if extreme.any():
                 logger.warning(
@@ -354,9 +349,7 @@ class FeatureEngineer:
             invalid = (df["cloud_cover"] < 0) | (df["cloud_cover"] > 100)
             if invalid.any():
                 bad = df.loc[invalid, "cloud_cover"].tolist()[:5]
-                raise ValueError(
-                    f"cloud_cover must be in [0, 100]. Found {invalid.sum()} invalid value(s): {bad}"
-                )
+                raise ValueError(f"cloud_cover must be in [0, 100]. Found {invalid.sum()} invalid value(s): {bad}")
 
     @staticmethod
     def _winsorize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -381,7 +374,10 @@ class FeatureEngineer:
                 if n_clipped > 0:
                     logger.debug(
                         "Winsorizing %s: %d value(s) clipped to [%.1f, %.1f]",
-                        col, n_clipped, lo, hi,
+                        col,
+                        n_clipped,
+                        lo,
+                        hi,
                     )
                 df[col] = df[col].clip(lower=lo, upper=hi)
         return df
@@ -410,9 +406,7 @@ class FeatureEngineer:
         df["week_of_year"] = ts.dt.isocalendar().week.astype(int)
         df["day_of_year"] = ts.dt.dayofyear
         df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
-        df["is_business_hour"] = (
-            (df["hour"] >= 9) & (df["hour"] < 18) & (df["day_of_week"] < 5)
-        ).astype(int)
+        df["is_business_hour"] = ((df["hour"] >= 9) & (df["hour"] < 18) & (df["day_of_week"] < 5)).astype(int)
 
         # Cyclical encoding to capture periodic nature
         df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / HOURS_IN_DAY)
@@ -554,7 +548,8 @@ class FeatureEngineer:
             # --- Dew point via Magnus formula (Lawrence 2005) ---
             _gamma = np.log(np.clip(RH, 1.0, 100.0) / 100.0) + (MAGNUS_B * T) / (MAGNUS_C + T)
             df["dew_point"] = (MAGNUS_C * _gamma / (MAGNUS_B - _gamma)).clip(
-                lower=DEW_POINT_LOWER_BOUND, upper=T,
+                lower=DEW_POINT_LOWER_BOUND,
+                upper=T,
             )
 
             # --- Heat index via NWS Steadman (1979) equation ---
@@ -564,11 +559,11 @@ class FeatureEngineer:
                 + 2.04901523 * _T_f
                 + 10.14333127 * RH
                 - 0.22475541 * _T_f * RH
-                - 0.00683783 * _T_f ** 2
-                - 0.05481717 * RH ** 2
-                + 0.00122874 * _T_f ** 2 * RH
-                + 0.00085282 * _T_f * RH ** 2
-                - 0.00000199 * _T_f ** 2 * RH ** 2
+                - 0.00683783 * _T_f**2
+                - 0.05481717 * RH**2
+                + 0.00122874 * _T_f**2 * RH
+                + 0.00085282 * _T_f * RH**2
+                - 0.00000199 * _T_f**2 * RH**2
             )
             df["heat_index"] = (_hi_f - 32.0) * 5.0 / 9.0
 
@@ -580,7 +575,7 @@ class FeatureEngineer:
         if "wind_speed" in df.columns and "temperature" in df.columns:
             V = df["wind_speed"]
             T = df["temperature"]
-            df["wind_chill"] = 13.12 + 0.6215 * T - 11.37 * (V ** 0.16) + 0.3965 * T * (V ** 0.16)
+            df["wind_chill"] = 13.12 + 0.6215 * T - 11.37 * (V**0.16) + 0.3965 * T * (V**0.16)
 
         if "pressure" in df.columns:
             df["pressure_relative"] = df["pressure"] - STANDARD_PRESSURE_HPA
@@ -615,19 +610,13 @@ class FeatureEngineer:
             if "temperature" in df_region.columns:
                 df_region["temp_diff_1h"] = df_region["temperature"].diff(1)
                 df_region["temp_diff2_1h"] = df_region["temp_diff_1h"].diff(1)
-                df_region["temp_momentum"] = (
-                    df_region["temperature"].pct_change(periods=TREND_MOMENTUM_PERIODS) * 100
-                )
+                df_region["temp_momentum"] = df_region["temperature"].pct_change(periods=TREND_MOMENTUM_PERIODS) * 100
                 df_region["temp_deviation_24h"] = (
                     df_region["temperature"]
-                    - df_region["temperature"]
-                    .rolling(TREND_DEVIATION_WINDOW, min_periods=ROLLING_MIN_PERIODS)
-                    .mean()
+                    - df_region["temperature"].rolling(TREND_DEVIATION_WINDOW, min_periods=ROLLING_MIN_PERIODS).mean()
                 )
                 df_region["temp_volatility_12h"] = (
-                    df_region["temperature"]
-                    .rolling(TREND_VOLATILITY_WINDOW, min_periods=ROLLING_MIN_PERIODS)
-                    .std()
+                    df_region["temperature"].rolling(TREND_VOLATILITY_WINDOW, min_periods=ROLLING_MIN_PERIODS).std()
                 )
 
             if "humidity" in df_region.columns:
@@ -635,13 +624,9 @@ class FeatureEngineer:
 
             if "wind_speed" in df_region.columns:
                 df_region["wind_diff_1h"] = df_region["wind_speed"].diff(1)
-                df_region["wind_momentum"] = (
-                    df_region["wind_speed"].pct_change(periods=TREND_MOMENTUM_PERIODS) * 100
-                )
+                df_region["wind_momentum"] = df_region["wind_speed"].pct_change(periods=TREND_MOMENTUM_PERIODS) * 100
                 df_region["wind_volatility_12h"] = (
-                    df_region["wind_speed"]
-                    .rolling(TREND_VOLATILITY_WINDOW, min_periods=ROLLING_MIN_PERIODS)
-                    .std()
+                    df_region["wind_speed"].rolling(TREND_VOLATILITY_WINDOW, min_periods=ROLLING_MIN_PERIODS).std()
                 )
 
             if "pressure" in df_region.columns:
@@ -743,7 +728,8 @@ class FeatureEngineer:
             shifted = df_region[target_col].shift(1)
             for span in spans:
                 df_region[f"{target_col}_ewma_{span}"] = shifted.ewm(
-                    span=span, min_periods=1,
+                    span=span,
+                    min_periods=1,
                 ).mean()
             dfs_by_region.append(df_region)
 
@@ -852,12 +838,8 @@ class FeatureEngineer:
             df_features = self._winsorize_weather_columns(df_features)
 
         # Region coordinates
-        df_features["latitude"] = df_features["region"].map(
-            lambda x: REGION_COORDS.get(x, (0, 0))[0]
-        )
-        df_features["longitude"] = df_features["region"].map(
-            lambda x: REGION_COORDS.get(x, (0, 0))[1]
-        )
+        df_features["latitude"] = df_features["region"].map(lambda x: REGION_COORDS.get(x, (0, 0))[0])
+        df_features["longitude"] = df_features["region"].map(lambda x: REGION_COORDS.get(x, (0, 0))[1])
 
         # Simplified feels-like temperature
         df_features["temperature_feels_like"] = df_features["temperature"]
@@ -869,18 +851,10 @@ class FeatureEngineer:
         df_features = self.create_holiday_features(df_features)
 
         # Periods of day
-        df_features["is_morning"] = (
-            (df_features["hour"] >= 6) & (df_features["hour"] < 12)
-        ).astype(int)
-        df_features["is_afternoon"] = (
-            (df_features["hour"] >= 12) & (df_features["hour"] < 18)
-        ).astype(int)
-        df_features["is_evening"] = (
-            (df_features["hour"] >= 18) & (df_features["hour"] < 22)
-        ).astype(int)
-        df_features["is_night"] = (
-            (df_features["hour"] >= 22) | (df_features["hour"] < 6)
-        ).astype(int)
+        df_features["is_morning"] = ((df_features["hour"] >= 6) & (df_features["hour"] < 12)).astype(int)
+        df_features["is_afternoon"] = ((df_features["hour"] >= 12) & (df_features["hour"] < 18)).astype(int)
+        df_features["is_evening"] = ((df_features["hour"] >= 18) & (df_features["hour"] < 22)).astype(int)
+        df_features["is_night"] = ((df_features["hour"] >= 22) | (df_features["hour"] < 6)).astype(int)
 
         # Delegate interaction features to the shared method (Task 1 refactor)
         df_features = self.create_interaction_features(df_features)
@@ -939,12 +913,8 @@ class FeatureEngineer:
         # Region coordinates and simplified feels-like temperature are needed by
         # all model variants -- add them here so create_all_features produces
         # the same base columns as create_features_no_lags.
-        df["latitude"] = df["region"].map(
-            lambda x: REGION_COORDS.get(x, (0, 0))[0]
-        )
-        df["longitude"] = df["region"].map(
-            lambda x: REGION_COORDS.get(x, (0, 0))[1]
-        )
+        df["latitude"] = df["region"].map(lambda x: REGION_COORDS.get(x, (0, 0))[0])
+        df["longitude"] = df["region"].map(lambda x: REGION_COORDS.get(x, (0, 0))[1])
         df["temperature_feels_like"] = df["temperature"]
 
         if use_advanced:

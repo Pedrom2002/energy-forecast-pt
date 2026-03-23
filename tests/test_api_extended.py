@@ -3,25 +3,21 @@ Extended API tests for improved coverage.
 
 Tests middleware, model store, and helper functions.
 """
-import time
-import pytest
-from unittest.mock import patch, MagicMock
-from pathlib import Path
+
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.api.prediction import _scaled_rmse
+from src.api.schemas import VALID_REGIONS
 from src.api.store import (
     ModelStore,
     _file_sha256,
     _load_feature_names,
-    _load_rmse_from_metadata,
     _load_model_name_from_metadata,
+    _load_rmse_from_metadata,
 )
-from src.api.prediction import _scaled_rmse
-from src.api.middleware import RateLimitMiddleware
-from src.api.schemas import VALID_REGIONS
-
 
 client = TestClient(app)
 
@@ -152,16 +148,19 @@ class TestAPIKeyAuth:
 
     def test_predict_without_key_in_dev_mode(self):
         """In dev mode (no API_KEY env), auth is disabled."""
-        response = client.post("/predict", json={
-            "timestamp": "2024-01-01T00:00:00",
-            "region": "Lisboa",
-            "temperature": 15.0,
-            "humidity": 50.0,
-            "wind_speed": 10.0,
-            "precipitation": 0.0,
-            "cloud_cover": 50.0,
-            "pressure": 1013.0,
-        })
+        response = client.post(
+            "/predict",
+            json={
+                "timestamp": "2024-01-01T00:00:00",
+                "region": "Lisboa",
+                "temperature": 15.0,
+                "humidity": 50.0,
+                "wind_speed": 10.0,
+                "precipitation": 0.0,
+                "cloud_cover": 50.0,
+                "pressure": 1013.0,
+            },
+        )
         # Should not be 401 (auth disabled in dev)
         assert response.status_code != 401
 
@@ -211,16 +210,16 @@ class TestNegativeAPIInputs:
             content=b'{"timestamp": "2024-01-01T00:00:00", "region": "Li',
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 422, (
-            f"Expected 422 for corrupted JSON, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for corrupted JSON, got {response.status_code}: {response.text}"
 
     def test_empty_json_body_returns_422(self):
         """Sending an empty JSON object (missing all required fields) should return 422."""
         response = client.post("/predict", json={})
-        assert response.status_code == 422, (
-            f"Expected 422 for empty JSON body, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for empty JSON body, got {response.status_code}: {response.text}"
 
     def test_missing_region_field_returns_422(self):
         """Explicitly missing the required 'region' field should return 422."""
@@ -234,9 +233,9 @@ class TestNegativeAPIInputs:
             "pressure": 1013.0,
         }
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, (
-            f"Expected 422 for missing region, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for missing region, got {response.status_code}: {response.text}"
 
     def test_missing_timestamp_field_returns_422(self):
         """Explicitly missing the required 'timestamp' field should return 422."""
@@ -250,9 +249,9 @@ class TestNegativeAPIInputs:
             "pressure": 1013.0,
         }
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, (
-            f"Expected 422 for missing timestamp, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for missing timestamp, got {response.status_code}: {response.text}"
 
     def test_batch_over_limit_returns_400(self):
         """Batch with more than 1000 items must return 400."""
@@ -267,9 +266,9 @@ class TestNegativeAPIInputs:
             "pressure": 1013.0,
         }
         response = client.post("/predict/batch", json=[payload] * 1001)
-        assert response.status_code == 400, (
-            f"Expected 400 for batch > 1000, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 400
+        ), f"Expected 400 for batch > 1000, got {response.status_code}: {response.text}"
         detail = response.json().get("detail", {})
         assert "code" in detail, f"400 response missing structured error code: {detail}"
 
@@ -280,9 +279,9 @@ class TestNegativeAPIInputs:
             content=b"this is not json",
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 422, (
-            f"Expected 422 for non-JSON content, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for non-JSON content, got {response.status_code}: {response.text}"
 
     def test_null_body_returns_422(self):
         """Sending JSON null as body should return 422."""
@@ -291,6 +290,4 @@ class TestNegativeAPIInputs:
             content=b"null",
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 422, (
-            f"Expected 422 for null body, got {response.status_code}: {response.text}"
-        )
+        assert response.status_code == 422, f"Expected 422 for null body, got {response.status_code}: {response.text}"

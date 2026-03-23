@@ -5,6 +5,7 @@ including metrics calculation, cross-validation, visualization, and an
 online coverage tracker for monitoring conformal prediction calibration in
 production.
 """
+
 from __future__ import annotations
 
 import collections
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # TypedDicts for structured return types (Task 6)
 # ---------------------------------------------------------------------------
+
 
 class MetricsDict(TypedDict, total=False):
     """Dictionary of standard evaluation metrics."""
@@ -194,9 +196,13 @@ class ModelEvaluator:
         avg_metrics = {f"avg_{k}": v for k, v in clean_df.mean().to_dict().items()}
         std_metrics = {f"std_{k}": v for k, v in clean_df.std().to_dict().items()}
 
-        logger.info("CV Results - MAE: %.2f +/- %.2f, R2: %.4f +/- %.4f",
-                     avg_metrics["avg_mae"], std_metrics["std_mae"],
-                     avg_metrics["avg_r2"], std_metrics["std_r2"])
+        logger.info(
+            "CV Results - MAE: %.2f +/- %.2f, R2: %.4f +/- %.4f",
+            avg_metrics["avg_mae"],
+            std_metrics["std_mae"],
+            avg_metrics["avg_r2"],
+            std_metrics["std_r2"],
+        )
 
         return {
             "fold_metrics": fold_metrics,
@@ -272,8 +278,11 @@ class ModelEvaluator:
             f"R2: {metrics['r2']:.4f}"
         )
         axes[1].text(
-            0.05, 0.95, metrics_text,
-            transform=axes[1].transAxes, verticalalignment="top",
+            0.05,
+            0.95,
+            metrics_text,
+            transform=axes[1].transAxes,
+            verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
         )
 
@@ -345,8 +354,11 @@ class ModelEvaluator:
             f"Max: {residuals.max():.2f}"
         )
         axes[0, 1].text(
-            0.05, 0.95, stats_text,
-            transform=axes[0, 1].transAxes, verticalalignment="top",
+            0.05,
+            0.95,
+            stats_text,
+            transform=axes[0, 1].transAxes,
+            verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
         )
 
@@ -401,7 +413,9 @@ class ModelEvaluator:
 
         logger.info(
             "Coverage: %.1f%% (expected %.1f%%), avg width: %.2f MW",
-            actual_coverage * 100, confidence_level * 100, results["interval_width_mean"],
+            actual_coverage * 100,
+            confidence_level * 100,
+            results["interval_width_mean"],
         )
 
         return results
@@ -462,8 +476,11 @@ class ModelEvaluator:
             f"Avg Width: {coverage_info['interval_width_mean']:.2f}"
         )
         ax.text(
-            0.02, 0.98, coverage_text,
-            transform=ax.transAxes, verticalalignment="top",
+            0.02,
+            0.98,
+            coverage_text,
+            transform=ax.transAxes,
+            verticalalignment="top",
             bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
         )
 
@@ -618,10 +635,7 @@ class CoverageTracker:
             "window_size": self.window_size,
             "n_observations": n,
             "alert": alert,
-            "coverage_error": (
-                round(coverage - self.nominal_coverage, 4)
-                if coverage is not None else None
-            ),
+            "coverage_error": (round(coverage - self.nominal_coverage, 4) if coverage is not None else None),
         }
 
     def reset(self) -> None:

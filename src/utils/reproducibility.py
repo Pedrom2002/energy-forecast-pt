@@ -11,6 +11,7 @@ Usage::
     set_global_seed(42)
     info = get_reproducibility_info()   # capture environment for logging
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -19,7 +20,7 @@ import os
 import platform
 import random
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, TypedDict
 
 import numpy as np
@@ -113,7 +114,7 @@ def get_reproducibility_info(seed: int | None = None) -> ReproducibilityInfo:
         "platform": platform.platform(),
         "numpy_version": np.__version__,
         "sklearn_version": sklearn.__version__,
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "git_commit": _get_git_commit(),
         "hostname": platform.node(),
     }

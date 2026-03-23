@@ -4,11 +4,12 @@ Tests for FastAPI API endpoints.
 These tests use TestClient which runs synchronously.
 Prediction tests are skipped if model files are not present in data/models/.
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.api.prediction import _scaled_rmse, REGION_UNCERTAINTY_SCALE
+from src.api.prediction import REGION_UNCERTAINTY_SCALE, _scaled_rmse
 
 client = TestClient(app)
 
@@ -34,7 +35,9 @@ class TestInfoEndpoints:
 
     def test_health_returns_status(self):
         response = client.get("/health")
-        assert response.status_code == 200, f"Expected 200 from GET /health, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 from GET /health, got {response.status_code}: {response.text}"
         data = response.json()
         assert data["status"] in ("healthy", "degraded"), f"Unexpected health status: {data['status']}"
         assert isinstance(data["total_models"], int), f"total_models should be int, got {type(data['total_models'])}"
@@ -43,14 +46,18 @@ class TestInfoEndpoints:
 
     def test_regions_returns_five_portuguese_regions(self):
         response = client.get("/regions")
-        assert response.status_code == 200, f"Expected 200 from GET /regions, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 from GET /regions, got {response.status_code}: {response.text}"
         regions = response.json()["regions"]
         assert len(regions) == 5, f"Expected 5 regions, got {len(regions)}: {regions}"
         assert set(regions) == {"Alentejo", "Algarve", "Centro", "Lisboa", "Norte"}, f"Region mismatch: {regions}"
 
     def test_limitations_documents_model_specs(self):
         response = client.get("/limitations")
-        assert response.status_code == 200, f"Expected 200 from GET /limitations, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 from GET /limitations, got {response.status_code}: {response.text}"
         data = response.json()
         assert "models" in data, f"Missing 'models' in limitations response: {data}"
         assert "batch_limit" in data, f"Missing 'batch_limit' in limitations response: {data}"
@@ -66,32 +73,44 @@ class TestPredictionValidation:
     def test_invalid_region_returns_422(self, valid_prediction_payload):
         payload = {**valid_prediction_payload, "region": "InvalidRegion"}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, f"Expected 422 for invalid region, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for invalid region, got {response.status_code}: {response.text}"
 
     def test_missing_timestamp_returns_422(self, valid_prediction_payload):
         payload = {k: v for k, v in valid_prediction_payload.items() if k != "timestamp"}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, f"Expected 422 for missing timestamp, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for missing timestamp, got {response.status_code}: {response.text}"
 
     def test_humidity_above_100_returns_422(self, valid_prediction_payload):
         payload = {**valid_prediction_payload, "humidity": 150.0}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, f"Expected 422 for humidity=150, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for humidity=150, got {response.status_code}: {response.text}"
 
     def test_humidity_below_0_returns_422(self, valid_prediction_payload):
         payload = {**valid_prediction_payload, "humidity": -10.0}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, f"Expected 422 for humidity=-10, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for humidity=-10, got {response.status_code}: {response.text}"
 
     def test_temperature_below_min_returns_422(self, valid_prediction_payload):
         payload = {**valid_prediction_payload, "temperature": -100}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, f"Expected 422 for temperature=-100, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for temperature=-100, got {response.status_code}: {response.text}"
 
     def test_temperature_above_max_returns_422(self, valid_prediction_payload):
         payload = {**valid_prediction_payload, "temperature": 60}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, f"Expected 422 for temperature=60, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for temperature=60, got {response.status_code}: {response.text}"
 
     def test_empty_batch_returns_422(self):
         response = client.post("/predict/batch", json=[])
@@ -99,7 +118,9 @@ class TestPredictionValidation:
 
     def test_batch_over_1000_returns_400(self, valid_prediction_payload):
         response = client.post("/predict/batch", json=[valid_prediction_payload] * 1001)
-        assert response.status_code == 400, f"Expected 400 for batch > 1000, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 400
+        ), f"Expected 400 for batch > 1000, got {response.status_code}: {response.text}"
 
 
 class TestNoModels:
@@ -113,6 +134,7 @@ class TestNoModels:
     def _no_models(self):
         """Temporarily replace app.state.models with an empty ModelStore."""
         from src.api.store import ModelStore
+
         original = getattr(app.state, "models", None)
         app.state.models = ModelStore()  # no models loaded
         yield
@@ -126,14 +148,18 @@ class TestNoModels:
 
     def test_batch_returns_503(self, valid_prediction_payload):
         response = client.post("/predict/batch", json=[valid_prediction_payload])
-        assert response.status_code == 503, f"Expected 503 for batch with no models, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 503
+        ), f"Expected 503 for batch with no models, got {response.status_code}: {response.text}"
         detail = response.json()["detail"]
         assert detail["code"] == "NO_MODEL", f"Expected NO_MODEL error code, got: {detail}"
 
     def test_health_shows_degraded(self):
         response = client.get("/health")
         assert response.status_code == 200, f"Expected 200 from health, got {response.status_code}: {response.text}"
-        assert response.json()["status"] == "degraded", f"Expected 'degraded' status with no models, got: {response.json()['status']}"
+        assert (
+            response.json()["status"] == "degraded"
+        ), f"Expected 'degraded' status with no models, got: {response.json()['status']}"
 
 
 class TestPredictionResults:
@@ -155,11 +181,15 @@ class TestPredictionResults:
         response = client.post("/predict", json=valid_prediction_payload)
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         data = response.json()
-        assert data["predicted_consumption_mw"] > 0, f"Prediction should be positive, got {data['predicted_consumption_mw']}"
-        assert data["confidence_interval_lower"] < data["confidence_interval_upper"], (
-            f"CI lower ({data['confidence_interval_lower']}) should be < upper ({data['confidence_interval_upper']})"
-        )
-        assert data["confidence_interval_lower"] >= 0, f"CI lower should be >= 0, got {data['confidence_interval_lower']}"
+        assert (
+            data["predicted_consumption_mw"] > 0
+        ), f"Prediction should be positive, got {data['predicted_consumption_mw']}"
+        assert (
+            data["confidence_interval_lower"] < data["confidence_interval_upper"]
+        ), f"CI lower ({data['confidence_interval_lower']}) should be < upper ({data['confidence_interval_upper']})"
+        assert (
+            data["confidence_interval_lower"] >= 0
+        ), f"CI lower should be >= 0, got {data['confidence_interval_lower']}"
         assert data["confidence_level"] == 0.90, f"Expected confidence_level=0.90, got {data['confidence_level']}"
         assert data["region"] == "Lisboa", f"Expected region='Lisboa', got {data['region']}"
         assert "model_name" in data, f"Missing 'model_name' in response: {data}"
@@ -168,7 +198,9 @@ class TestPredictionResults:
         for region in ("Alentejo", "Algarve", "Centro", "Lisboa", "Norte"):
             payload = {**valid_prediction_payload, "region": region}
             response = client.post("/predict", json=payload)
-            assert response.status_code == 200, f"Expected 200 for region={region}, got {response.status_code}: {response.text}"
+            assert (
+                response.status_code == 200
+            ), f"Expected 200 for region={region}, got {response.status_code}: {response.text}"
             assert response.json()["region"] == region, f"Response region mismatch for {region}"
 
     def test_batch_predict_returns_correct_count(self, valid_prediction_payload):
@@ -181,7 +213,9 @@ class TestPredictionResults:
 
     def test_model_info_has_metadata(self):
         response = client.get("/model/info")
-        assert response.status_code == 200, f"Expected 200 from /model/info, got {response.status_code}: {response.text}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 from /model/info, got {response.status_code}: {response.text}"
         data = response.json()
         assert "models_available" in data, f"Missing 'models_available' in model info: {data}"
         assert len(data["models_available"]) > 0, f"Expected at least one model, got {data['models_available']}"
@@ -190,7 +224,9 @@ class TestPredictionResults:
         for ts in ("2024-12-31T14:00:00", "2024-12-31 14:00:00"):
             payload = {**valid_prediction_payload, "timestamp": ts}
             response = client.post("/predict", json=payload)
-            assert response.status_code == 200, f"Expected 200 for timestamp={ts}, got {response.status_code}: {response.text}"
+            assert (
+                response.status_code == 200
+            ), f"Expected 200 for timestamp={ts}, got {response.status_code}: {response.text}"
 
 
 class TestAuthentication:
@@ -206,6 +242,7 @@ class TestAuthentication:
     def test_auth_disabled_by_default(self, monkeypatch):
         """verify_api_key returns None (no-op) when API_KEY env var is not set."""
         import asyncio
+
         import src.api.main as main_mod
 
         monkeypatch.setattr(main_mod, "API_KEY", None)
@@ -215,6 +252,7 @@ class TestAuthentication:
     def test_correct_key_accepted(self, monkeypatch):
         """verify_api_key returns the key when it matches API_KEY."""
         import asyncio
+
         import src.api.main as main_mod
 
         monkeypatch.setattr(main_mod, "API_KEY", "secret-test-key")
@@ -224,7 +262,9 @@ class TestAuthentication:
     def test_wrong_key_raises_401(self, monkeypatch):
         """verify_api_key raises HTTP 401 when provided key does not match."""
         import asyncio
+
         from fastapi import HTTPException
+
         import src.api.main as main_mod
 
         monkeypatch.setattr(main_mod, "API_KEY", "secret-test-key")
@@ -235,7 +275,9 @@ class TestAuthentication:
     def test_missing_key_raises_401_when_auth_enabled(self, monkeypatch):
         """verify_api_key raises HTTP 401 when key is absent and auth is enabled."""
         import asyncio
+
         from fastapi import HTTPException
+
         import src.api.main as main_mod
 
         monkeypatch.setattr(main_mod, "API_KEY", "secret-test-key")

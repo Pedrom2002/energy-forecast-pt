@@ -21,12 +21,13 @@ Usage::
     tracker.log_artifact(run_id, "model_path", "data/models/checkpoints/best_model.pkl")
     tracker.end_run(run_id, status="completed")
 """
+
 from __future__ import annotations
 
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -76,14 +77,14 @@ class ExperimentTracker:
         Returns:
             Unique run ID string.
         """
-        run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8]
+        run_id = datetime.now(UTC).strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8]
 
         run_data: dict[str, Any] = {
             "run_id": run_id,
             "experiment_name": experiment_name,
             "model_key": model_key,
             "status": "running",
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": datetime.now(UTC).isoformat(),
             "ended_at": None,
             "hyperparams": hyperparams or {},
             "feature_names": feature_names,
@@ -186,9 +187,7 @@ class ExperimentTracker:
                 "best_baseline": best_baseline_name,
                 "baseline_rmse": best_baseline_rmse,
                 "model_rmse": float(model_rmse),
-                "rmse_reduction_pct": round(
-                    (1 - model_rmse / best_baseline_rmse) * 100, 2
-                ),
+                "rmse_reduction_pct": round((1 - model_rmse / best_baseline_rmse) * 100, 2),
             }
 
         run_data["baseline_comparison"] = comparison
@@ -232,7 +231,7 @@ class ExperimentTracker:
         """
         run_data = self._load_run(run_id)
         run_data["status"] = status
-        run_data["ended_at"] = datetime.now(timezone.utc).isoformat()
+        run_data["ended_at"] = datetime.now(UTC).isoformat()
         self._save_run(run_id, run_data)
         self._update_index(run_data)
         logger.info("Experiment %s: %s (run_id=%s)", status, run_data["experiment_name"], run_id)
@@ -288,10 +287,7 @@ class ExperimentTracker:
             value = run_data.get("metrics", {}).get(metric)
             if value is None:
                 continue
-            if lower_is_better and value < best_value:
-                best_value = value
-                best_run = run_data
-            elif not lower_is_better and value > best_value:
+            if lower_is_better and value < best_value or not lower_is_better and value > best_value:
                 best_value = value
                 best_run = run_data
 
@@ -310,13 +306,13 @@ class ExperimentTracker:
         path = self._run_path(run_id)
         if not path.exists():
             raise FileNotFoundError(f"Run not found: {run_id}")
-        with open(path, "r") as f:
+        with open(path) as f:
             return json.load(f)
 
     def _load_index(self) -> dict[str, Any]:
         if not self._index_path.exists():
             return {"runs": []}
-        with open(self._index_path, "r") as f:
+        with open(self._index_path) as f:
             return json.load(f)
 
     def _update_index(self, run_data: dict[str, Any]) -> None:
@@ -330,7 +326,8 @@ class ExperimentTracker:
             "started_at": run_data["started_at"],
             "ended_at": run_data["ended_at"],
             "metrics_summary": {
-                k: v for k, v in run_data.get("metrics", {}).items()
+                k: v
+                for k, v in run_data.get("metrics", {}).items()
                 if k in ("test_rmse", "test_mae", "test_mape", "test_r2")
             },
         }

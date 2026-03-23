@@ -3,6 +3,7 @@ Integration tests for the full pipeline: feature engineering -> model training -
 
 These tests verify that components work together correctly end-to-end.
 """
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -10,7 +11,7 @@ import pytest
 from src.features.feature_engineering import FeatureEngineer
 from src.models.evaluation import ModelEvaluator
 from src.models.model_registry import create_model, fit_model, train_and_select_best
-from src.utils.metrics import calculate_metrics, mean_absolute_scaled_error, calculate_residual_stats
+from src.utils.metrics import calculate_metrics, calculate_residual_stats, mean_absolute_scaled_error
 
 
 @pytest.fixture
@@ -56,17 +57,21 @@ def multi_region_data():
         # Ensure non-negative
         consumption = np.clip(consumption, 100, None)
 
-        frames.append(pd.DataFrame({
-            "timestamp": dates,
-            "consumption_mw": consumption,
-            "temperature": temperature,
-            "humidity": humidity,
-            "wind_speed": wind_speed,
-            "precipitation": precipitation,
-            "cloud_cover": cloud_cover,
-            "pressure": pressure,
-            "region": [region] * 200,
-        }))
+        frames.append(
+            pd.DataFrame(
+                {
+                    "timestamp": dates,
+                    "consumption_mw": consumption,
+                    "temperature": temperature,
+                    "humidity": humidity,
+                    "wind_speed": wind_speed,
+                    "precipitation": precipitation,
+                    "cloud_cover": cloud_cover,
+                    "pressure": pressure,
+                    "region": [region] * 200,
+                }
+            )
+        )
     return pd.concat(frames, ignore_index=True)
 
 
@@ -97,8 +102,7 @@ class TestFeatureToModelPipeline:
             f"(expected > 0.3 since consumption correlates with temperature and hour)"
         )
         assert metrics["mape"] < 50, (
-            f"Model MAPE too high: {metrics['mape']:.1f}% "
-            f"(expected < 50% on signal-bearing data)"
+            f"Model MAPE too high: {metrics['mape']:.1f}% " f"(expected < 50% on signal-bearing data)"
         )
 
     def test_no_lags_features_feed_into_model(self, multi_region_data):
@@ -116,9 +120,7 @@ class TestFeatureToModelPipeline:
         fit_model(model, X[:split], y[:split])
         y_pred = model.predict(X[split:])
 
-        assert len(y_pred) == len(y[split:]), (
-            f"Prediction count mismatch: got {len(y_pred)}, expected {len(y[split:])}"
-        )
+        assert len(y_pred) == len(y[split:]), f"Prediction count mismatch: got {len(y_pred)}, expected {len(y[split:])}"
         assert not np.any(np.isnan(y_pred)), "Predictions should not contain NaN values"
 
     def test_advanced_features_pipeline(self, multi_region_data):
@@ -147,7 +149,10 @@ class TestFeatureToModelPipeline:
 
         split = int(len(X) * 0.8)
         best_model, best_key, results = train_and_select_best(
-            X[:split], y[:split], X[split:], y[split:],
+            X[:split],
+            y[:split],
+            X[split:],
+            y[split:],
             model_keys=["random_forest"],
             params_override={"random_forest": {"n_estimators": 10}},
         )
@@ -239,17 +244,19 @@ class TestCrossRegionConsistency:
         rng = np.random.RandomState(42)
         dates = pd.date_range("2024-01-01", periods=10, freq="h")
 
-        df = pd.DataFrame({
-            "timestamp": list(dates) * 2,
-            "consumption_mw": [100.0] * 10 + [9999.0] * 10,
-            "region": ["Lisboa"] * 10 + ["Norte"] * 10,
-            "temperature": rng.uniform(10, 25, 20),
-            "humidity": rng.uniform(40, 80, 20),
-            "wind_speed": rng.uniform(0, 20, 20),
-            "precipitation": rng.uniform(0, 5, 20),
-            "cloud_cover": rng.uniform(0, 100, 20),
-            "pressure": rng.uniform(1000, 1020, 20),
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": list(dates) * 2,
+                "consumption_mw": [100.0] * 10 + [9999.0] * 10,
+                "region": ["Lisboa"] * 10 + ["Norte"] * 10,
+                "temperature": rng.uniform(10, 25, 20),
+                "humidity": rng.uniform(40, 80, 20),
+                "wind_speed": rng.uniform(0, 20, 20),
+                "precipitation": rng.uniform(0, 5, 20),
+                "cloud_cover": rng.uniform(0, 100, 20),
+                "pressure": rng.uniform(1000, 1020, 20),
+            }
+        )
 
         result = fe.create_lag_features(df, lags=[1])
         lisboa = result[result["region"] == "Lisboa"]
@@ -269,17 +276,19 @@ class TestCrossRegionConsistency:
         rng = np.random.RandomState(42)
         dates = pd.date_range("2024-01-01", periods=10, freq="h")
 
-        df = pd.DataFrame({
-            "timestamp": list(dates) * 2,
-            "consumption_mw": [100.0] * 10 + [9999.0] * 10,
-            "region": ["Lisboa"] * 10 + ["Norte"] * 10,
-            "temperature": rng.uniform(10, 25, 20),
-            "humidity": rng.uniform(40, 80, 20),
-            "wind_speed": rng.uniform(0, 20, 20),
-            "precipitation": rng.uniform(0, 5, 20),
-            "cloud_cover": rng.uniform(0, 100, 20),
-            "pressure": rng.uniform(1000, 1020, 20),
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": list(dates) * 2,
+                "consumption_mw": [100.0] * 10 + [9999.0] * 10,
+                "region": ["Lisboa"] * 10 + ["Norte"] * 10,
+                "temperature": rng.uniform(10, 25, 20),
+                "humidity": rng.uniform(40, 80, 20),
+                "wind_speed": rng.uniform(0, 20, 20),
+                "precipitation": rng.uniform(0, 5, 20),
+                "cloud_cover": rng.uniform(0, 100, 20),
+                "pressure": rng.uniform(1000, 1020, 20),
+            }
+        )
 
         result = fe.create_rolling_features(df, windows=[3])
         lisboa = result[result["region"] == "Lisboa"]

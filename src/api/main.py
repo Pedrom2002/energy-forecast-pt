@@ -12,6 +12,7 @@ All heavy logic is delegated to focused sub-modules:
 - :mod:`src.api.store`      — ``ModelStore`` dataclass and ``_load_models()``
 - :mod:`src.api.prediction` — Inference functions and CI computation
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -38,9 +39,10 @@ from src.api.prediction import (
     _explain_prediction,
     _make_batch_predictions_vectorized,
     _make_sequential_predictions,
+    _make_single_prediction,
 )
-from src.api.prediction import _make_single_prediction
 from src.api.schemas import (
+    VALID_REGIONS,
     BatchPredictionResponse,
     EnergyData,
     ErrorResponse,
@@ -48,13 +50,13 @@ from src.api.schemas import (
     PredictionResponse,
     SequentialForecastRequest,
     SequentialForecastResponse,
-    VALID_REGIONS,
 )
 from src.api.store import ModelStore, _load_models, reload_models
 from src.models.evaluation import CoverageTracker
 
 try:
     from prometheus_fastapi_instrumentator import Instrumentator  # type: ignore[import]
+
     _PROMETHEUS_AVAILABLE = True  # pragma: no cover
 except ImportError:
     _PROMETHEUS_AVAILABLE = False
@@ -72,9 +74,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_ORIGINS = "http://localhost:3000,http://localhost:8000"
 ALLOWED_ORIGINS: list[str] = [
-    o.strip()
-    for o in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
-    if o.strip() and o.strip() != "*"
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",") if o.strip() and o.strip() != "*"
 ]
 
 # ── Request body size limit ───────────────────────────────────────────────────
@@ -135,12 +135,12 @@ async def verify_admin_key(key: str | None = Security(api_key_header)) -> str | 
 
 # ── Lifespan & dependency ─────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # pragma: no cover — exercised at real startup, not by TestClient
     """Load models on startup; log shutdown on teardown."""
     logger.info(
-        "Starting Energy Forecast PT API — LOG_LEVEL=%s, MAX_BODY=%d bytes, "
-        "MODELS_DIR=%s, TRUST_PROXY=%s",
+        "Starting Energy Forecast PT API — LOG_LEVEL=%s, MAX_BODY=%d bytes, " "MODELS_DIR=%s, TRUST_PROXY=%s",
         _LOG_LEVEL,
         _MAX_REQUEST_BODY_BYTES,
         os.environ.get("MODELS_DIR", "data/models"),
@@ -223,6 +223,7 @@ _R_400 = {400: {"model": ErrorResponse, "description": "Bad request (e.g. batch 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @app.get("/", tags=["core"])
 async def root():
     """Root endpoint with basic API information."""
@@ -277,8 +278,12 @@ async def health(request: Request):
     }
 
 
-@app.post("/predict", response_model=PredictionResponse, tags=["predict"],
-          responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+@app.post(
+    "/predict",
+    response_model=PredictionResponse,
+    tags=["predict"],
+    responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500},
+)
 async def predict(
     data: EnergyData,
     use_model: str = "auto",
@@ -304,10 +309,11 @@ async def predict(
             asyncio.to_thread(_make_single_prediction, data, store, use_model),
             timeout=PREDICTION_TIMEOUT_SECONDS,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(
             "Prediction timed out after %.1fs for region=%s",
-            PREDICTION_TIMEOUT_SECONDS, data.region,
+            PREDICTION_TIMEOUT_SECONDS,
+            data.region,
         )
         raise HTTPException(
             status_code=504,
@@ -326,8 +332,12 @@ async def predict(
         )
 
 
-@app.post("/predict/batch", response_model=BatchPredictionResponse, tags=["predict"],
-          responses={**_R_400, **_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+@app.post(
+    "/predict/batch",
+    response_model=BatchPredictionResponse,
+    tags=["predict"],
+    responses={**_R_400, **_R_401, **_R_422, **_R_503, **_R_504, **_R_500},
+)
 async def predict_batch(
     data_list: list[EnergyData],
     use_model: str = "auto",
@@ -363,7 +373,7 @@ async def predict_batch(
             asyncio.to_thread(_make_batch_predictions_vectorized, data_list, store, use_model),
             timeout=batch_timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error("Batch prediction timed out after %.1fs for %d items", batch_timeout, len(data_list))
         raise HTTPException(
             status_code=504,
@@ -381,8 +391,12 @@ async def predict_batch(
     return BatchPredictionResponse(predictions=predictions, total_predictions=len(predictions))
 
 
-@app.post("/predict/sequential", response_model=SequentialForecastResponse, tags=["predict"],
-          responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+@app.post(
+    "/predict/sequential",
+    response_model=SequentialForecastResponse,
+    tags=["predict"],
+    responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500},
+)
 async def predict_sequential(
     request: SequentialForecastRequest,
     store: ModelStore = Depends(get_model_store),
@@ -407,8 +421,7 @@ async def predict_sequential(
             detail={
                 "code": "MIXED_REGIONS",
                 "message": (
-                    "All records in history and forecast must share the same region. "
-                    f"Found: {sorted(regions)}"
+                    "All records in history and forecast must share the same region. " f"Found: {sorted(regions)}"
                 ),
             },
         )
@@ -424,10 +437,11 @@ async def predict_sequential(
             asyncio.to_thread(_make_sequential_predictions, request, store),
             timeout=seq_timeout,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(
             "Sequential forecast timed out after %.1fs for %d steps",
-            seq_timeout, len(request.forecast),
+            seq_timeout,
+            len(request.forecast),
         )
         raise HTTPException(
             status_code=504,
@@ -446,8 +460,12 @@ async def predict_sequential(
         )
 
 
-@app.post("/predict/explain", response_model=ExplanationResponse, tags=["predict"],
-          responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+@app.post(
+    "/predict/explain",
+    response_model=ExplanationResponse,
+    tags=["predict"],
+    responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500},
+)
 async def predict_explain(
     data: EnergyData,
     top_n: int = 10,
@@ -480,7 +498,7 @@ async def predict_explain(
             asyncio.to_thread(_explain_prediction, data, store, top_n),
             timeout=PREDICTION_TIMEOUT_SECONDS,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         raise HTTPException(
             status_code=504,
             detail={
@@ -498,8 +516,7 @@ async def predict_explain(
         )
 
 
-@app.get("/model/info", tags=["models"],
-         responses={**_R_401, **_R_503})
+@app.get("/model/info", tags=["models"], responses={**_R_401, **_R_503})
 async def model_info(
     store: ModelStore = Depends(get_model_store),
     _key: str | None = Depends(verify_api_key),
@@ -564,17 +581,22 @@ async def get_limitations(store: ModelStore = Depends(get_model_store)):
         "batch_limit": 1000,
         "confidence_level": 0.90,
         "rate_limit": (
-            f"{os.environ.get('RATE_LIMIT_MAX', 60)} requests per "
-            f"{os.environ.get('RATE_LIMIT_WINDOW', 60)}s"
+            f"{os.environ.get('RATE_LIMIT_MAX', 60)} requests per " f"{os.environ.get('RATE_LIMIT_WINDOW', 60)}s"
         ),
-        "authentication": (
-            "API key via X-API-Key header" if API_KEY else "disabled (set API_KEY env var)"
-        ),
-        "ci_methods_available": ["conformal" if any([
-            store.conformal_q90_advanced,
-            store.conformal_q90_with_lags,
-            store.conformal_q90_no_lags,
-        ]) else "gaussian_z_rmse"],
+        "authentication": ("API key via X-API-Key header" if API_KEY else "disabled (set API_KEY env var)"),
+        "ci_methods_available": [
+            (
+                "conformal"
+                if any(
+                    [
+                        store.conformal_q90_advanced,
+                        store.conformal_q90_with_lags,
+                        store.conformal_q90_no_lags,
+                    ]
+                )
+                else "gaussian_z_rmse"
+            )
+        ],
         "note": (
             "Confidence intervals use conformal prediction (distribution-free coverage) "
             "when calibration data is available in metadata; otherwise falls back to "
@@ -583,8 +605,7 @@ async def get_limitations(store: ModelStore = Depends(get_model_store)):
     }
 
 
-@app.get("/model/drift", tags=["models"],
-         responses={**_R_401})
+@app.get("/model/drift", tags=["models"], responses={**_R_401})
 async def model_drift(
     store: ModelStore = Depends(get_model_store),
     _key: str | None = Depends(verify_api_key),
@@ -639,8 +660,7 @@ async def model_drift(
     }
 
 
-@app.post("/model/drift/check", tags=["models"],
-          responses={**_R_401, **_R_503})
+@app.post("/model/drift/check", tags=["models"], responses={**_R_401, **_R_503})
 async def model_drift_check(
     live_stats: dict,
     store: ModelStore = Depends(get_model_store),
@@ -726,8 +746,7 @@ async def model_drift_check(
     }
 
 
-@app.get("/metrics/summary", tags=["monitoring"],
-         responses={**_R_401})
+@app.get("/metrics/summary", tags=["monitoring"], responses={**_R_401})
 async def metrics_summary(
     request: Request,
     _key: str | None = Depends(verify_api_key),
@@ -783,8 +802,8 @@ async def metrics_summary(
 
 # ── Admin endpoints ───────────────────────────────────────────────────────────
 
-@app.post("/admin/reload-models", tags=["admin"],
-          responses={**_R_401, **_R_503, **_R_500})
+
+@app.post("/admin/reload-models", tags=["admin"], responses={**_R_401, **_R_503, **_R_500})
 async def admin_reload_models(
     request: Request,
     _key: str | None = Depends(verify_admin_key),
@@ -851,8 +870,7 @@ async def admin_reload_models(
     return result
 
 
-@app.get("/model/coverage", tags=["monitoring"],
-         responses={**_R_401})
+@app.get("/model/coverage", tags=["monitoring"], responses={**_R_401})
 async def model_coverage(
     request: Request,
     _key: str | None = Depends(verify_api_key),
@@ -892,8 +910,7 @@ async def model_coverage(
     return {"available": True, **summary}
 
 
-@app.post("/model/coverage/record", tags=["monitoring"],
-          responses={**_R_401, **_R_422, **_R_503})
+@app.post("/model/coverage/record", tags=["monitoring"], responses={**_R_401, **_R_422, **_R_503})
 async def record_coverage_observation(
     request: Request,
     actual_mw: float,
@@ -940,4 +957,5 @@ async def record_coverage_observation(
 
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -12,9 +12,11 @@ Expected responses depend on whether models are loaded:
 
 Health and informational endpoints must always return 200.
 """
+
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
 
 from src.api.main import app
 
@@ -38,6 +40,7 @@ def _bypass_rate_limit():
 
 
 # ── Informational / health endpoints (always 200) ────────────────────────────
+
 
 def test_root_returns_200() -> None:
     """`GET /` must always return 200 regardless of model state."""
@@ -75,6 +78,7 @@ def test_regions_returns_200() -> None:
 
 def test_regions_contains_all_portuguese_regions() -> None:
     from src.api.schemas import VALID_REGIONS
+
     response = client.get("/regions")
     assert response.status_code == 200, f"Expected 200 from GET /regions, got {response.status_code}: {response.text}"
     returned = set(response.json()["regions"])
@@ -84,7 +88,9 @@ def test_regions_contains_all_portuguese_regions() -> None:
 def test_limitations_returns_200() -> None:
     """`GET /limitations` must always return 200."""
     response = client.get("/limitations")
-    assert response.status_code == 200, f"Expected 200 from GET /limitations, got {response.status_code}: {response.text}"
+    assert (
+        response.status_code == 200
+    ), f"Expected 200 from GET /limitations, got {response.status_code}: {response.text}"
 
 
 def test_model_info_returns_200_or_503() -> None:
@@ -99,15 +105,15 @@ def test_model_info_returns_200_or_503() -> None:
         assert "code" in detail, f"503 response missing 'code' in detail: {response.text}"
         assert "message" in detail, f"503 response missing 'message' in detail: {response.text}"
     else:
-        raise AssertionError(
-            f"Expected 200 or 503 from /model/info, got {response.status_code}: {response.text}"
-        )
+        raise AssertionError(f"Expected 200 or 503 from /model/info, got {response.status_code}: {response.text}")
 
 
 def test_model_drift_returns_200() -> None:
     """`GET /model/drift` must return 200 with an 'available' field."""
     response = client.get("/model/drift")
-    assert response.status_code == 200, f"Expected 200 from GET /model/drift, got {response.status_code}: {response.text}"
+    assert (
+        response.status_code == 200
+    ), f"Expected 200 from GET /model/drift, got {response.status_code}: {response.text}"
     assert "available" in response.json(), f"Missing 'available' in /model/drift response: {response.text}"
 
 
@@ -130,18 +136,24 @@ def test_predict_returns_200_or_503() -> None:
     response = client.post("/predict", json=_VALID_PAYLOAD)
     if response.status_code == 200:
         body = response.json()
-        for field in ("predicted_consumption_mw", "region", "timestamp", "confidence_interval_lower", "confidence_interval_upper"):
+        for field in (
+            "predicted_consumption_mw",
+            "region",
+            "timestamp",
+            "confidence_interval_lower",
+            "confidence_interval_upper",
+        ):
             assert field in body, f"Missing field '{field}' in 200 /predict response: {response.text}"
-        assert body["predicted_consumption_mw"] > 0, f"Predicted consumption should be positive, got {body['predicted_consumption_mw']}"
+        assert (
+            body["predicted_consumption_mw"] > 0
+        ), f"Predicted consumption should be positive, got {body['predicted_consumption_mw']}"
     elif response.status_code == 503:
         detail = response.json().get("detail", {})
         assert isinstance(detail, dict), f"503 detail should be a dict, got: {response.text}"
         assert detail.get("code") == "NO_MODEL", f"Expected code='NO_MODEL' in 503, got: {detail}"
         assert "message" in detail, f"503 response missing 'message': {detail}"
     else:
-        raise AssertionError(
-            f"Expected 200 or 503 from /predict, got {response.status_code}: {response.text}"
-        )
+        raise AssertionError(f"Expected 200 or 503 from /predict, got {response.status_code}: {response.text}")
 
 
 def test_predict_invalid_region_returns_422() -> None:
@@ -172,9 +184,7 @@ def test_predict_missing_optional_field_accepted() -> None:
         body = response.json()
         assert "detail" in body, f"422 response missing 'detail': {response.text}"
     else:
-        raise AssertionError(
-            f"Expected 200, 422, or 503 from /predict, got {response.status_code}: {response.text}"
-        )
+        raise AssertionError(f"Expected 200, 422, or 503 from /predict, got {response.status_code}: {response.text}")
 
 
 def test_predict_humidity_out_of_range_returns_422() -> None:
@@ -214,9 +224,7 @@ def test_predict_batch_single_item_returns_200_or_503() -> None:
         assert detail.get("code") == "NO_MODEL", f"Expected NO_MODEL code in batch 503, got: {detail}"
         assert "message" in detail, f"503 response missing 'message': {detail}"
     else:
-        raise AssertionError(
-            f"Expected 200 or 503 from /predict/batch, got {response.status_code}: {response.text}"
-        )
+        raise AssertionError(f"Expected 200 or 503 from /predict/batch, got {response.status_code}: {response.text}")
 
 
 def test_predict_503_response_schema() -> None:
@@ -250,9 +258,11 @@ def test_predict_200_response_schema() -> None:
 
 # ── Error response contract ───────────────────────────────────────────────────
 
+
 def test_unauthorized_returns_401_when_api_key_set() -> None:
     """When API_KEY is configured, requests with wrong key must get 401."""
     from unittest.mock import patch
+
     with patch("src.api.main.API_KEY", "secret"):
         response = client.post(
             "/predict",
@@ -267,7 +277,9 @@ def test_unauthorized_returns_401_when_api_key_set() -> None:
 def test_404_for_nonexistent_endpoint() -> None:
     """Requests to non-existent paths must return 404."""
     response = client.get("/nonexistent-path-xyz")
-    assert response.status_code == 404, f"Expected 404 for nonexistent path, got {response.status_code}: {response.text}"
+    assert (
+        response.status_code == 404
+    ), f"Expected 404 for nonexistent path, got {response.status_code}: {response.text}"
 
 
 def test_drift_check_returns_200_or_503() -> None:

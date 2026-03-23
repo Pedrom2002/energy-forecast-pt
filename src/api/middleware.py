@@ -15,6 +15,7 @@ Four middleware classes are registered by ``src.api.main``:
    ``contextvars``, logs method / path / status / duration, and emits a
    WARNING for any request exceeding ``SLOW_REQUEST_THRESHOLD_MS``.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -39,14 +40,13 @@ logger = logging.getLogger(__name__)
 # Enable by setting the REDIS_URL environment variable.
 try:
     import redis.asyncio as aioredis  # type: ignore[import]
+
     _REDIS_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _REDIS_AVAILABLE = False
 
 # Requests that take longer than this will be logged at WARNING level.
-SLOW_REQUEST_THRESHOLD_MS = float(
-    os.environ.get("SLOW_REQUEST_THRESHOLD_MS", "5000")
-)
+SLOW_REQUEST_THRESHOLD_MS = float(os.environ.get("SLOW_REQUEST_THRESHOLD_MS", "5000"))
 
 # Regex that matches a canonical UUID4 (case-insensitive).
 _UUID4_RE = re.compile(
@@ -119,7 +119,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     ``CB_RECOVERY_SECONDS`` before retrying Redis.
     """
 
-    CB_THRESHOLD = 5          # failures before opening circuit
+    CB_THRESHOLD = 5  # failures before opening circuit
     CB_RECOVERY_SECONDS = 60  # seconds before attempting Redis again
 
     def __init__(self, app: Any, max_requests: int = 60, window_seconds: int = 60) -> None:
@@ -168,10 +168,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         key = f"ratelimit:{client_ip}"
 
         async with self._redis.pipeline(transaction=True) as pipe:
-            pipe.zremrangebyscore(key, 0, cutoff)   # prune expired
-            pipe.zcard(key)                          # count before adding
-            pipe.zadd(key, {str(now): now})          # record this request
-            pipe.expire(key, self.window + 1)        # auto-expire key
+            pipe.zremrangebyscore(key, 0, cutoff)  # prune expired
+            pipe.zcard(key)  # count before adding
+            pipe.zadd(key, {str(now): now})  # record this request
+            pipe.expire(key, self.window + 1)  # auto-expire key
             results = await pipe.execute()
 
         current_count: int = results[1]
@@ -211,9 +211,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 for ip in stale:
                     del self._hits[ip]
                 if stale:
-                    logger.debug(
-                        "Rate limiter: pruned %d stale in-memory keys", len(stale)
-                    )
+                    logger.debug("Rate limiter: pruned %d stale in-memory keys", len(stale))
                 self._last_cleanup = now
 
         return exceeded, current_count
@@ -346,8 +344,7 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                             "detail": {
                                 "code": "REQUEST_TOO_LARGE",
                                 "message": (
-                                    f"Request body exceeds maximum allowed size of "
-                                    f"{self.max_bytes // 1024} KB."
+                                    f"Request body exceeds maximum allowed size of " f"{self.max_bytes // 1024} KB."
                                 ),
                             }
                         },
@@ -383,9 +380,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = "default-src 'none'"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Permissions-Policy"] = (
-            "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
-        )
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
         response.headers["Cache-Control"] = "no-store"
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -448,11 +443,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger.warning(
                 "SLOW REQUEST " + log_msg,
                 *log_args,
-                extra={"extra_fields": {
-                    "slow_request": True,
-                    "duration_ms": round(duration_ms, 1),
-                    "threshold_ms": SLOW_REQUEST_THRESHOLD_MS,
-                }},
+                extra={
+                    "extra_fields": {
+                        "slow_request": True,
+                        "duration_ms": round(duration_ms, 1),
+                        "threshold_ms": SLOW_REQUEST_THRESHOLD_MS,
+                    }
+                },
             )
         else:
             logger.info(log_msg, *log_args)

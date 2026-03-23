@@ -10,29 +10,28 @@ Tests for all new features added in Round 1 improvements:
 - store: reload_models returns correct structure
 - main: /admin/reload-models endpoint, /model/coverage endpoints
 """
-import time
+
 import threading
-from typing import Optional
+import time
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from src.api.middleware import _extract_client_ip, _UUID4_RE
+from src.api.middleware import _UUID4_RE
 from src.api.schemas import EnergyData
 from src.features.feature_engineering import FeatureEngineer
 from src.models.evaluation import CoverageTracker
 
-
 # ── _extract_client_ip ────────────────────────────────────────────────────────
+
 
 class _FakeClient:
     def __init__(self, host):
         self.host = host
 
 
-def _make_request(xff: Optional[str] = None, client_host: str = "10.0.0.1", trust_proxy: str = "1"):
+def _make_request(xff: str | None = None, client_host: str = "10.0.0.1", trust_proxy: str = "1"):
     """Build a minimal mock Request for testing _extract_client_ip."""
     headers = {}
     if xff is not None:
@@ -48,6 +47,7 @@ def test_extract_client_ip_direct():
     req = _make_request(client_host="192.168.1.1")
     with patch.dict("os.environ", {"TRUST_PROXY": "0"}):
         from src.api.middleware import _extract_client_ip as fn
+
         assert fn(req) == "192.168.1.1"
 
 
@@ -56,6 +56,7 @@ def test_extract_client_ip_xff_single():
     req = _make_request(xff="203.0.113.5", client_host="10.0.0.1")
     with patch.dict("os.environ", {"TRUST_PROXY": "1"}):
         from src.api.middleware import _extract_client_ip as fn
+
         assert fn(req) == "203.0.113.5"
 
 
@@ -64,6 +65,7 @@ def test_extract_client_ip_xff_chain():
     req = _make_request(xff="203.0.113.5, 10.0.0.2, 10.0.0.3", client_host="10.0.0.3")
     with patch.dict("os.environ", {"TRUST_PROXY": "1"}):
         from src.api.middleware import _extract_client_ip as fn
+
         assert fn(req) == "203.0.113.5"
 
 
@@ -72,6 +74,7 @@ def test_extract_client_ip_xff_disabled_by_env():
     req = _make_request(xff="203.0.113.5", client_host="10.0.0.1")
     with patch.dict("os.environ", {"TRUST_PROXY": "0"}):
         from src.api.middleware import _extract_client_ip as fn
+
         assert fn(req) == "10.0.0.1"
 
 
@@ -82,19 +85,23 @@ def test_extract_client_ip_no_client():
     req.client = None
     with patch.dict("os.environ", {"TRUST_PROXY": "0"}):
         from src.api.middleware import _extract_client_ip as fn
+
         assert fn(req) == "unknown"
 
 
 # ── UUID4 regex ───────────────────────────────────────────────────────────────
 
+
 def test_uuid4_regex_valid():
     import uuid
+
     sample = str(uuid.uuid4())
     assert _UUID4_RE.match(sample), f"Should match valid UUID4: {sample}"
 
 
 def test_uuid4_regex_uppercase_valid():
     import uuid
+
     sample = str(uuid.uuid4()).upper()
     assert _UUID4_RE.match(sample)
 
@@ -113,6 +120,7 @@ def test_uuid4_regex_empty():
 
 
 # ── EnergyData timestamp validation ──────────────────────────────────────────
+
 
 def test_schema_valid_timestamp():
     data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
@@ -136,6 +144,7 @@ def test_schema_timestamp_year_too_high():
 
 # ── FeatureEngineer winsorization ────────────────────────────────────────────
 
+
 @pytest.fixture
 def fe():
     return FeatureEngineer()
@@ -143,17 +152,21 @@ def fe():
 
 @pytest.fixture
 def single_row_df():
-    return pd.DataFrame([{
-        "timestamp": pd.Timestamp("2024-06-15 14:00:00"),
-        "region": "Lisboa",
-        "temperature": 18.0,
-        "humidity": 65.0,
-        "wind_speed": 10.0,
-        "precipitation": 0.0,
-        "cloud_cover": 40.0,
-        "pressure": 1015.0,
-        "consumption_mw": 0,
-    }])
+    return pd.DataFrame(
+        [
+            {
+                "timestamp": pd.Timestamp("2024-06-15 14:00:00"),
+                "region": "Lisboa",
+                "temperature": 18.0,
+                "humidity": 65.0,
+                "wind_speed": 10.0,
+                "precipitation": 0.0,
+                "cloud_cover": 40.0,
+                "pressure": 1015.0,
+                "consumption_mw": 0,
+            }
+        ]
+    )
 
 
 def test_winsorize_clips_high_wind(fe, single_row_df):
@@ -198,6 +211,7 @@ def test_winsorize_clips_extreme_temperature(fe, single_row_df):
 
 # ── FeatureEngineer extended validation ──────────────────────────────────────
 
+
 def test_validate_pressure_too_low(fe, single_row_df):
     single_row_df = single_row_df.copy()
     single_row_df["pressure"] = 850.0  # Below 870 hPa
@@ -227,6 +241,7 @@ def test_validate_cloud_cover_negative(fe, single_row_df):
 
 
 # ── CoverageTracker ───────────────────────────────────────────────────────────
+
 
 def test_coverage_tracker_empty():
     tracker = CoverageTracker(window_size=10)
@@ -345,10 +360,12 @@ def test_coverage_tracker_coverage_error():
 
 # ── Security headers ──────────────────────────────────────────────────────────
 
+
 def test_security_middleware_permissions_policy():
     """SecurityHeadersMiddleware must include Permissions-Policy."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
     from src.api.middleware import SecurityHeadersMiddleware
 
     test_app = FastAPI()
@@ -367,6 +384,7 @@ def test_security_middleware_cache_control():
     """SecurityHeadersMiddleware must include Cache-Control: no-store."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
+
     from src.api.middleware import SecurityHeadersMiddleware
 
     test_app = FastAPI()
@@ -383,10 +401,12 @@ def test_security_middleware_cache_control():
 
 # ── Rate limiter memory cleanup ───────────────────────────────────────────────
 
+
 def test_rate_limiter_memory_cleanup():
     """In-memory rate limiter prunes stale entries during periodic cleanup."""
     import asyncio
     from collections import defaultdict
+
     from src.api.middleware import RateLimitMiddleware
 
     middleware = RateLimitMiddleware.__new__(RateLimitMiddleware)
@@ -411,14 +431,18 @@ def test_rate_limiter_memory_cleanup():
 
 # ── LOG_LEVEL env var ─────────────────────────────────────────────────────────
 
+
 def test_setup_logger_respects_env_level():
     """setup_logger uses LOG_LEVEL env var when no explicit level is given."""
     import logging
     from unittest.mock import patch
+
     with patch.dict("os.environ", {"LOG_LEVEL": "DEBUG"}):
         # Re-import to pick up new env var
         import importlib
+
         import src.utils.logger as logger_mod
+
         importlib.reload(logger_mod)
         log = logger_mod.setup_logger("test_env_level", file_output=False)
         assert log.level == logging.DEBUG
@@ -427,6 +451,7 @@ def test_setup_logger_respects_env_level():
 def test_slow_call_context_manager_warning(caplog):
     """log_slow_call emits a WARNING when the block exceeds the threshold."""
     import logging
+
     from src.utils.logger import log_slow_call
 
     test_logger = logging.getLogger("test_slow")
@@ -441,6 +466,7 @@ def test_slow_call_context_manager_warning(caplog):
 def test_slow_call_context_manager_no_warning(caplog):
     """log_slow_call does not warn when block completes quickly."""
     import logging
+
     from src.utils.logger import log_slow_call
 
     test_logger = logging.getLogger("test_fast")

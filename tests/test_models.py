@@ -1,6 +1,7 @@
 """
 Tests for Model Evaluation module.
 """
+
 import numpy as np
 import pytest
 
@@ -47,9 +48,7 @@ class TestCalculateMetrics:
         y_true = rng.uniform(1000, 3000, 100)
         y_pred = y_true + rng.normal(0, 50, 100)
         metrics = evaluator.calculate_metrics(y_true, y_pred)
-        assert metrics["rmse"] >= metrics["mae"], (
-            f"RMSE ({metrics['rmse']}) should be >= MAE ({metrics['mae']})"
-        )
+        assert metrics["rmse"] >= metrics["mae"], f"RMSE ({metrics['rmse']}) should be >= MAE ({metrics['mae']})"
 
     def test_r2_perfect(self, evaluator):
         y = np.array([100.0, 200.0, 300.0, 400.0, 500.0])
@@ -69,7 +68,7 @@ class TestCalculateMetrics:
         metrics = evaluator.calculate_metrics(y_true, y_pred)
         # MAPE should skip the zero value
         assert "mape" in metrics, f"Missing 'mape' in metrics: {metrics}"
-        assert not np.isnan(metrics["mae"]), f"MAE should not be NaN when zeros are present"
+        assert not np.isnan(metrics["mae"]), "MAE should not be NaN when zeros are present"
 
     def test_empty_arrays_raise(self, evaluator):
         with pytest.raises(ValueError, match="empty"):
@@ -86,7 +85,7 @@ class TestCalculateMetrics:
         assert "test_mae" in metrics, f"Expected 'test_mae' key with prefix, got keys: {list(metrics.keys())}"
         assert "test_rmse" in metrics, f"Expected 'test_rmse' key with prefix, got keys: {list(metrics.keys())}"
         assert "test_r2" in metrics, f"Expected 'test_r2' key with prefix, got keys: {list(metrics.keys())}"
-        assert "mae" not in metrics, f"Unprefixed 'mae' key should not exist when prefix is set"
+        assert "mae" not in metrics, "Unprefixed 'mae' key should not exist when prefix is set"
 
     def test_nrmse_calculated(self, evaluator):
         y_true = np.array([100.0, 200.0, 300.0])
@@ -94,7 +93,9 @@ class TestCalculateMetrics:
         metrics = evaluator.calculate_metrics(y_true, y_pred)
         assert "nrmse" in metrics, f"Missing 'nrmse' in metrics: {list(metrics.keys())}"
         expected_nrmse = metrics["rmse"] / y_true.mean()
-        assert abs(metrics["nrmse"] - expected_nrmse) < 0.001, f"Expected NRMSE ~{expected_nrmse:.4f}, got {metrics['nrmse']}"
+        assert (
+            abs(metrics["nrmse"] - expected_nrmse) < 0.001
+        ), f"Expected NRMSE ~{expected_nrmse:.4f}, got {metrics['nrmse']}"
 
 
 class TestModelQualityBenchmarks:

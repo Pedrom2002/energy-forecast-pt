@@ -3,7 +3,9 @@ Extended tests for ModelEvaluator to improve coverage.
 
 Tests cross-validation, coverage calculation edge cases, and metric saving.
 """
+
 import json
+
 import numpy as np
 import pytest
 
@@ -19,12 +21,16 @@ class TestTimeSeriesCrossValidation:
 
     def test_cv_returns_fold_metrics(self, evaluator):
         from sklearn.linear_model import LinearRegression
+
         rng = np.random.RandomState(42)
         X = rng.randn(200, 3)
         y = X[:, 0] * 2 + X[:, 1] + rng.randn(200) * 0.1
 
         result = evaluator.time_series_cross_validation(
-            LinearRegression(), X, y, n_splits=3,
+            LinearRegression(),
+            X,
+            y,
+            n_splits=3,
         )
         assert "fold_metrics" in result
         assert "avg_metrics" in result
@@ -35,12 +41,16 @@ class TestTimeSeriesCrossValidation:
 
     def test_cv_avg_metrics_keys(self, evaluator):
         from sklearn.linear_model import LinearRegression
+
         rng = np.random.RandomState(42)
         X = rng.randn(200, 3)
         y = X[:, 0] * 2 + rng.randn(200) * 0.1
 
         result = evaluator.time_series_cross_validation(
-            LinearRegression(), X, y, n_splits=3,
+            LinearRegression(),
+            X,
+            y,
+            n_splits=3,
         )
         assert "avg_mae" in result["avg_metrics"]
         assert "avg_rmse" in result["avg_metrics"]
@@ -48,12 +58,16 @@ class TestTimeSeriesCrossValidation:
 
     def test_cv_predictions_length(self, evaluator):
         from sklearn.linear_model import LinearRegression
+
         rng = np.random.RandomState(42)
         X = rng.randn(100, 2)
         y = X[:, 0] + rng.randn(100) * 0.1
 
         result = evaluator.time_series_cross_validation(
-            LinearRegression(), X, y, n_splits=3,
+            LinearRegression(),
+            X,
+            y,
+            n_splits=3,
         )
         assert len(result["predictions"]) == len(result["actuals"])
         assert len(result["predictions"]) > 0

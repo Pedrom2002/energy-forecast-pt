@@ -15,6 +15,7 @@ Targets (measured on a single CPU core, conservative):
   - HTTP /predict/batch 100 items      : < 1 000 ms (no-lags vectorised)
   - HTTP /predict/sequential 24 steps  : < 3 000 ms (lag model path, no model = skip)
 """
+
 import time
 from contextlib import contextmanager
 
@@ -26,10 +27,10 @@ from fastapi.testclient import TestClient
 from src.api.main import app
 from src.features.feature_engineering import FeatureEngineer
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 @contextmanager
 def _timer(label: str, limit_ms: float):
@@ -37,26 +38,26 @@ def _timer(label: str, limit_ms: float):
     t0 = time.perf_counter()
     yield
     elapsed_ms = (time.perf_counter() - t0) * 1000
-    assert elapsed_ms < limit_ms, (
-        f"{label}: took {elapsed_ms:.0f} ms, limit is {limit_ms:.0f} ms"
-    )
+    assert elapsed_ms < limit_ms, f"{label}: took {elapsed_ms:.0f} ms, limit is {limit_ms:.0f} ms"
 
 
 def _make_df(n: int, region: str = "Lisboa") -> pd.DataFrame:
     rng = np.random.RandomState(0)
     end = pd.Timestamp.now().floor("h")
     dates = pd.date_range(end=end, periods=n, freq="h")
-    return pd.DataFrame({
-        "timestamp": dates,
-        "consumption_mw": rng.uniform(1000, 3000, n),
-        "temperature": rng.uniform(5, 35, n),
-        "humidity": rng.uniform(30, 90, n),
-        "wind_speed": rng.uniform(0, 25, n),
-        "precipitation": rng.uniform(0, 10, n),
-        "cloud_cover": rng.uniform(0, 100, n),
-        "pressure": rng.uniform(1000, 1025, n),
-        "region": [region] * n,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": dates,
+            "consumption_mw": rng.uniform(1000, 3000, n),
+            "temperature": rng.uniform(5, 35, n),
+            "humidity": rng.uniform(30, 90, n),
+            "wind_speed": rng.uniform(0, 25, n),
+            "precipitation": rng.uniform(0, 10, n),
+            "cloud_cover": rng.uniform(0, 100, n),
+            "pressure": rng.uniform(1000, 1025, n),
+            "region": [region] * n,
+        }
+    )
 
 
 def _payload(ts_offset_days: int = 365, region: str = "Lisboa") -> dict:
@@ -76,6 +77,7 @@ def _payload(ts_offset_days: int = 365, region: str = "Lisboa") -> dict:
 # ---------------------------------------------------------------------------
 # Feature engineering benchmarks
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.slow
 class TestFeatureEngineeringPerformance:
@@ -132,6 +134,7 @@ class TestFeatureEngineeringPerformance:
 # API latency benchmarks
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.slow
 class TestAPILatency:
 
@@ -167,9 +170,7 @@ class TestAPILatency:
         payload = _payload()
         with _timer("POST /predict (503 no model)", limit_ms=600):
             resp = client.post("/predict", json=payload)
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}: {resp.text}"
 
     @pytest.mark.parametrize("batch_size", [10, 100])
     def test_batch_predict_latency(self, client, batch_size):
@@ -178,23 +179,20 @@ class TestAPILatency:
         limit_ms = batch_size * 30 + 1500  # 30ms per item + 1500ms base overhead (3x original)
         with _timer(f"POST /predict/batch ({batch_size} items)", limit_ms=limit_ms):
             resp = client.post("/predict/batch", json=batch)
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}: {resp.text}"
 
     def test_explain_endpoint_under_1500ms(self, client):
         """Explain endpoint should complete within 1500ms."""
         payload = _payload()
         with _timer("POST /predict/explain", limit_ms=1500):
             resp = client.post("/predict/explain", json=payload)
-        assert resp.status_code in (200, 503), (
-            f"Expected 200 or 503, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code in (200, 503), f"Expected 200 or 503, got {resp.status_code}: {resp.text}"
 
 
 # ---------------------------------------------------------------------------
 # Throughput: repeated calls
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.slow
 class TestThroughput:
@@ -220,14 +218,13 @@ class TestThroughput:
             times.append((time.perf_counter() - t0) * 1000)
 
         # Last call should not be >3x slower than first (no accumulation)
-        assert times[-1] < times[0] * 3, (
-            f"Performance degraded: first={times[0]:.0f}ms, last={times[-1]:.0f}ms"
-        )
+        assert times[-1] < times[0] * 3, f"Performance degraded: first={times[0]:.0f}ms, last={times[-1]:.0f}ms"
 
 
 # ---------------------------------------------------------------------------
 # pytest-benchmark: regression baselines
 # ---------------------------------------------------------------------------
+
 
 class TestBenchmarks:
     """pytest-benchmark tests for CI regression tracking.

@@ -50,6 +50,7 @@ Example metadata JSON (all keys)::
                               "Alentejo": 0.90, "Algarve": 0.85}
     }
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -72,11 +73,13 @@ logger = logging.getLogger(__name__)
 MODEL_PATH = Path(os.environ.get("MODELS_DIR", "data/models"))
 
 # ── Optional keys documented above ───────────────────────────────────────────
-_OPTIONAL_METADATA_KEYS: frozenset[str] = frozenset({
-    "conformal_q90",
-    "feature_stats",
-    "region_cv_scales",
-})
+_OPTIONAL_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "conformal_q90",
+        "feature_stats",
+        "region_cv_scales",
+    }
+)
 
 # Thread lock protecting concurrent reads during a hot-reload.
 # All callers hold _RELOAD_LOCK in read mode (non-blocking) and the reload
@@ -165,11 +168,13 @@ class ModelStore:
     @property
     def total_models(self) -> int:
         """Number of loaded model variants (0–3)."""
-        return sum([
-            self.model_with_lags is not None,
-            self.model_no_lags is not None,
-            self.model_advanced is not None,
-        ])
+        return sum(
+            [
+                self.model_with_lags is not None,
+                self.model_no_lags is not None,
+                self.model_advanced is not None,
+            ]
+        )
 
     @property
     def all_rmse_calibrated(self) -> bool:
@@ -186,6 +191,7 @@ class ModelStore:
 
 # ── Helper functions ──────────────────────────────────────────────────────────
 
+
 def _file_sha256(path: Path) -> str:
     """Compute the SHA-256 checksum of a file (for versioning)."""
     h = hashlib.sha256()
@@ -197,7 +203,7 @@ def _file_sha256(path: Path) -> str:
 
 def _load_feature_names(path: Path) -> list[str]:
     """Load an ordered list of feature names from a plain-text file."""
-    with open(path, "r") as f:
+    with open(path) as f:
         return [line.strip() for line in f if line.strip()]
 
 
@@ -211,7 +217,7 @@ def _load_rmse_from_metadata(path: Path, fallback: float) -> tuple[float, bool]:
         checks.
     """
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             metadata = json.load(f)
         rmse = float(metadata["test_metrics"]["rmse"])
         return rmse, True
@@ -235,7 +241,7 @@ def _load_rmse_from_metadata(path: Path, fallback: float) -> tuple[float, bool]:
 def _load_model_name_from_metadata(path: Path) -> str | None:
     """Extract the best model display name from training metadata JSON."""
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             metadata = json.load(f)
         return metadata.get("best_model")
     except (FileNotFoundError, KeyError, json.JSONDecodeError):
@@ -245,7 +251,7 @@ def _load_model_name_from_metadata(path: Path) -> str | None:
 def _load_metadata_json(path: Path) -> dict | None:
     """Load a JSON metadata file, returning None on any error."""
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return None
@@ -363,19 +369,40 @@ def _load_models() -> ModelStore:
             )
 
     _load_variant(
-        store, "advanced", "best_model_advanced.pkl",
-        "advanced_feature_names.txt", "metadata_advanced.json",
-        82.99, CK, META, FEAT, checksums,
+        store,
+        "advanced",
+        "best_model_advanced.pkl",
+        "advanced_feature_names.txt",
+        "metadata_advanced.json",
+        82.99,
+        CK,
+        META,
+        FEAT,
+        checksums,
     )
     _load_variant(
-        store, "with_lags", "best_model.pkl",
-        "feature_names.txt", "training_metadata.json",
-        82.27, CK, META, FEAT, checksums,
+        store,
+        "with_lags",
+        "best_model.pkl",
+        "feature_names.txt",
+        "training_metadata.json",
+        82.27,
+        CK,
+        META,
+        FEAT,
+        checksums,
     )
     _load_variant(
-        store, "no_lags", "best_model_no_lags.pkl",
-        "feature_names_no_lags.txt", "training_metadata_no_lags.json",
-        84.25, CK, META, FEAT, checksums,
+        store,
+        "no_lags",
+        "best_model_no_lags.pkl",
+        "feature_names_no_lags.txt",
+        "training_metadata_no_lags.json",
+        84.25,
+        CK,
+        META,
+        FEAT,
+        checksums,
     )
 
     store.checksums = checksums
@@ -403,11 +430,13 @@ def _load_models() -> ModelStore:
             "API ready with %d model(s) — RMSE calibrated: %s — conformal: %s",
             store.total_models,
             store.all_rmse_calibrated,
-            any([
-                store.conformal_q90_with_lags,
-                store.conformal_q90_no_lags,
-                store.conformal_q90_advanced,
-            ]),
+            any(
+                [
+                    store.conformal_q90_with_lags,
+                    store.conformal_q90_no_lags,
+                    store.conformal_q90_advanced,
+                ]
+            ),
         )
 
     return store
@@ -445,10 +474,12 @@ def reload_models(app_state: Any) -> dict:
         "status": "reloaded",
         "total_models": new_store.total_models,
         "rmse_calibrated": new_store.all_rmse_calibrated,
-        "conformal_available": any([
-            new_store.conformal_q90_with_lags,
-            new_store.conformal_q90_no_lags,
-            new_store.conformal_q90_advanced,
-        ]),
+        "conformal_available": any(
+            [
+                new_store.conformal_q90_with_lags,
+                new_store.conformal_q90_no_lags,
+                new_store.conformal_q90_advanced,
+            ]
+        ),
         "checksums": new_store.checksums or {},
     }

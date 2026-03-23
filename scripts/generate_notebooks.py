@@ -18,8 +18,9 @@ Usage:
   python run_notebooks.py            # then run analysis notebooks
 """
 
-import nbformat as nbf
 from pathlib import Path
+
+import nbformat as nbf
 
 NOTEBOOKS_DIR = Path(__file__).resolve().parent.parent / "notebooks"
 
@@ -47,7 +48,9 @@ def create_nb01():
     nb = nbf.v4.new_notebook()
     nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
     nb.cells = [
-        md("# 01 - Analise Exploratoria de Dados (EDA)\n\nAnalise completa dos dados de consumo energetico de Portugal."),
+        md(
+            "# 01 - Analise Exploratoria de Dados (EDA)\n\nAnalise completa dos dados de consumo energetico de Portugal."
+        ),
         code("""import sys
 sys.path.append('..')
 
@@ -66,7 +69,6 @@ plt.rcParams['figure.figsize'] = (14, 6)
 plt.rcParams['font.size'] = 12
 
 print('Bibliotecas carregadas')"""),
-
         md("## 1. Carregamento dos Dados"),
         code("""df = pd.read_parquet('../data/processed/processed_data.parquet')
 
@@ -76,7 +78,6 @@ print(f"Regioes: {df['region'].nunique()} - {sorted(df['region'].unique())}")
 print(f"\\nColunas ({len(df.columns)}):")
 for col in df.columns:
     print(f"  {col:25s} {str(df[col].dtype):10s} nulls={df[col].isnull().sum()}")"""),
-
         md("## 2. Estatisticas Descritivas"),
         code("""target = 'consumption_mw'
 
@@ -111,7 +112,6 @@ plt.suptitle('')
 
 plt.tight_layout()
 plt.show()"""),
-
         md("## 3. Padroes Temporais"),
         code("""df['hour'] = df['timestamp'].dt.hour
 df['day_of_week'] = df['timestamp'].dt.dayofweek
@@ -155,7 +155,6 @@ plt.show()
 
 print(f"Hora de pico: {hourly['mean'].idxmax()}h ({hourly['mean'].max():.0f} MW)")
 print(f"Hora de vale: {hourly['mean'].idxmin()}h ({hourly['mean'].min():.0f} MW)")"""),
-
         md("## 4. Analise Regional"),
         code("""fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
@@ -178,9 +177,9 @@ plt.show()
 
 print("\\nEstatisticas por Regiao:")
 print(regional.to_string())"""),
-
         md("## 5. Correlacoes Meteorologicas"),
-        code("""weather_cols = [c for c in ['temperature', 'humidity', 'wind_speed', 'precipitation', 'cloud_cover', 'pressure'] if c in df.columns]
+        code(
+            """weather_cols = [c for c in ['temperature', 'humidity', 'wind_speed', 'precipitation', 'cloud_cover', 'pressure'] if c in df.columns]
 
 fig, axes = plt.subplots(2, 3, figsize=(18, 10))
 for i, col in enumerate(weather_cols):
@@ -199,8 +198,8 @@ plt.show()
 print("\\nCorrelacoes com consumo:")
 for col in weather_cols:
     r = df[col].corr(df[target])
-    print(f"  {col:20s}: {r:+.4f}")"""),
-
+    print(f"  {col:20s}: {r:+.4f}")"""
+        ),
         md("## 6. Analise de Autocorrelacao"),
         code("""df_lisboa = df[df['region'] == 'Lisboa'].sort_values('timestamp').set_index('timestamp')
 
@@ -219,7 +218,6 @@ plt.show()
 print("Observacoes:")
 print("  - Forte autocorrelacao com periodicidade de 24h (padrao diario)")
 print("  - Decaimento lento da ACF indica tendencia ou sazonalidade longa")"""),
-
         md("## 7. Decomposicao Sazonal"),
         code("""df_decomp = df_lisboa[target].resample('h').mean().dropna()[:90*24]
 
@@ -241,7 +239,6 @@ var_total = df_decomp.var()
 var_resid = decomposition.resid.var()
 var_explained = (1 - var_resid / var_total) * 100
 print(f"\\nVariancia explicada pela decomposicao: {var_explained:.2f}%")"""),
-
         md("## 8. Deteccao de Outliers"),
         code("""Q1 = df[target].quantile(0.25)
 Q3 = df[target].quantile(0.75)
@@ -273,7 +270,6 @@ ax.set_title('Deteccao de Outliers')
 ax.legend()
 plt.tight_layout()
 plt.show()"""),
-
         md("## 9. Resumo"),
         code("""print("=" * 70)
 print("RESUMO DA ANALISE EXPLORATORIA")
@@ -334,7 +330,6 @@ from src.models.evaluation import ModelEvaluator
 
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')"""),
-
         md("## 1. Carregar Metadados e Modelos"),
         code("""models_dir = Path('../data/models')
 evaluator = ModelEvaluator()
@@ -379,7 +374,6 @@ for name, paths in variant_configs.items():
           f"RMSE={meta['test_metrics']['rmse']:.2f} | MAPE={meta['test_metrics']['mape']:.2f}%")
 
 print(f"\\n{len(variants)} variante(s) carregada(s)")"""),
-
         md("## 2. Reavaliar no Conjunto de Teste"),
         code("""df = pd.read_parquet('../data/processed/processed_data.parquet')
 fe = FeatureEngineer()
@@ -408,7 +402,6 @@ for name, v in variants.items():
     print(f"\\n{name.upper()}:")
     for k, val in metrics.items():
         print(f"  {k}: {val:.4f}")"""),
-
         md("## 3. Comparacao Visual"),
         code("""n_variants = len(results)
 fig, axes = plt.subplots(1, n_variants, figsize=(7*n_variants, 5))
@@ -426,7 +419,6 @@ for ax, (name, r) in zip(axes, results.items()):
 
 plt.tight_layout()
 plt.show()"""),
-
         md("## 4. Comparacao por Regiao"),
         code("""for name, r in results.items():
     r['df_test'] = r['df_test'].copy()
@@ -435,7 +427,6 @@ plt.show()"""),
     regional = r['df_test'].groupby('region')['abs_error'].agg(['mean', 'std']).sort_values('mean')
     print(f"\\n{name.upper()} - Erro por Regiao:")
     print(regional.to_string())"""),
-
         md("## 5. Tabela Comparativa"),
         code("""comparison = pd.DataFrame({
     name: {k: round(v, 4) for k, v in r['metrics'].items()}
@@ -496,7 +487,6 @@ warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 
 print(f"Pressao atmosferica padrao: {STANDARD_PRESSURE_HPA} hPa")"""),
-
         md("## 1. Carregar Dados e Modelo Avancado"),
         code("""df = pd.read_parquet('../data/processed/processed_data.parquet')
 print(f"Dados: {len(df):,} linhas")
@@ -532,7 +522,6 @@ for col in df_features.columns:
 
 all_features = [c for c in df_features.columns if c not in exclude_cols]
 print(f"Total features numericas: {len(all_features)}")"""),
-
         md("## 2. Analise de Features Derivadas"),
         code("""weather_derived = ['heat_index', 'dew_point', 'comfort_index', 'effective_temperature',
                    'temp_humidity_ratio', 'wind_chill', 'pressure_relative', 'solar_proxy',
@@ -549,9 +538,9 @@ print(f"\\nFeatures de tendencia: {len(trend_features)}")
 for f in trend_features:
     corr = df_features[f].corr(df_features['consumption_mw'])
     print(f"  {f:30s} corr={corr:+.4f}")"""),
-
         md("## 3. Correlacao com Target"),
-        code("""correlations = df_features[all_features].corrwith(df_features['consumption_mw']).abs().sort_values(ascending=False)
+        code(
+            """correlations = df_features[all_features].corrwith(df_features['consumption_mw']).abs().sort_values(ascending=False)
 
 fig, ax = plt.subplots(figsize=(12, 10))
 top30_corr = correlations.head(30)
@@ -566,8 +555,8 @@ plt.show()
 
 print("Top 10 features mais correlacionadas:")
 for feat, corr in correlations.head(10).items():
-    print(f"  {feat:40s} |r| = {corr:.4f}")"""),
-
+    print(f"  {feat:40s} |r| = {corr:.4f}")"""
+        ),
         md("## 4. Informacao Mutua"),
         code("""sample_size = min(50000, len(df_features))
 df_sample = df_features.sample(sample_size, random_state=42)
@@ -592,7 +581,6 @@ ax.set_xlabel('Mutual Information')
 ax.set_title('Top 20 Features por MI')
 plt.tight_layout()
 plt.show()"""),
-
         md("## 5. Multicolinearidade"),
         code("""non_lag_features = [f for f in all_features if 'lag' not in f and 'rolling' not in f]
 corr_matrix = df_features[non_lag_features].corr()
@@ -606,7 +594,6 @@ for i in range(len(corr_matrix)):
 print(f"Pares com |correlacao| > 0.95: {len(high_corr_pairs)}")
 for f1, f2, corr in sorted(high_corr_pairs, key=lambda x: -abs(x[2]))[:15]:
     print(f"  {f1:35s} <-> {f2:35s} r={corr:.4f}")"""),
-
         md("## 6. Feature Importance do Modelo Pre-Treinado"),
         code("""if model is not None and hasattr(model, 'feature_importances_'):
     importance_df = pd.DataFrame({
@@ -664,7 +651,6 @@ from src.models.evaluation import ModelEvaluator
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 plt.rcParams['figure.figsize'] = (14, 6)"""),
-
         md("## 1. Carregar Modelo e Dados"),
         code("""models_dir = Path('../data/models')
 
@@ -685,7 +671,6 @@ if missing:
     print(f"AVISO: {len(missing)} features em falta: {missing}")
 
 print(f"Features usadas: {len(available_features)}")"""),
-
         md("## 2. Preparar Conjunto de Teste"),
         code("""df_sorted = df_features.sort_values('timestamp').reset_index(drop=True)
 test_start = int(0.85 * len(df_sorted))
@@ -715,7 +700,6 @@ print(f"\\nMetricas globais:")
 for k, v in metrics.items():
     print(f"  {k}: {v:.4f}")
 print(f"  Amostras: {len(y_test):,}")"""),
-
         md("## 3. Erro por Regiao"),
         code("""regional = df_test.groupby('region').agg(
     mae=('abs_error', 'mean'),
@@ -747,7 +731,6 @@ for ax in axes:
 
 plt.tight_layout()
 plt.show()"""),
-
         md("## 4. Erro por Hora"),
         code("""hourly = df_test.groupby('hour').agg(
     mae=('abs_error', 'mean'),
@@ -773,7 +756,6 @@ plt.show()
 
 print(f"Pior hora (MAPE): {hourly['mape'].idxmax()}h ({hourly['mape'].max():.2f}%)")
 print(f"Melhor hora (MAPE): {hourly['mape'].idxmin()}h ({hourly['mape'].min():.2f}%)")"""),
-
         md("## 5. Erro por Estacao"),
         code("""seasonal = df_test.groupby('season').agg(
     mae=('abs_error', 'mean'),
@@ -791,7 +773,6 @@ ax.set_title('MAPE por Estacao')
 ax.tick_params(axis='x', rotation=0)
 plt.tight_layout()
 plt.show()"""),
-
         md("## 6. Analise de Residuos"),
         code("""residuals = df_test['error'].values
 
@@ -824,7 +805,6 @@ print(f"  Media (bias):  {residuals.mean():.2f} MW")
 print(f"  Desvio-padrao: {residuals.std():.2f} MW")
 print(f"  Skewness:      {stats.skew(residuals):.4f}")
 print(f"  Kurtosis:      {stats.kurtosis(residuals):.4f}")"""),
-
         md("## 7. Resumo"),
         code("""print("=" * 70)
 print("RESUMO DA ANALISE DE ERROS")
@@ -854,7 +834,9 @@ def create_nb05():
     nb = nbf.v4.new_notebook()
     nb.metadata["kernelspec"] = {"display_name": "Python 3", "language": "python", "name": "python3"}
     nb.cells = [
-        md("# 05 - Validacao Robusta\n\nWalk-forward, backtesting sazonal e teste de estabilidade.\n\n**Nota:** Este notebook treina modelos temporarios para validacao. Nenhum modelo e salvo."),
+        md(
+            "# 05 - Validacao Robusta\n\nWalk-forward, backtesting sazonal e teste de estabilidade.\n\n**Nota:** Este notebook treina modelos temporarios para validacao. Nenhum modelo e salvo."
+        ),
         code("""import sys
 sys.path.append('..')
 
@@ -874,7 +856,6 @@ from src.models.evaluation import ModelEvaluator
 warnings.filterwarnings('ignore')
 plt.style.use('seaborn-v0_8-darkgrid')
 print(f"Inicio: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")"""),
-
         md("## 1. Preparacao"),
         code("""df = pd.read_parquet('../data/processed/processed_data.parquet')
 fe = FeatureEngineer()
@@ -894,7 +875,6 @@ X = df_sorted[features].values
 y = df_sorted['consumption_mw'].values
 
 print(f"Dados: {len(X):,} | Features: {len(features)}")"""),
-
         md("## 2. Walk-Forward Validation"),
         code("""N_SPLITS = 5
 tscv = TimeSeriesSplit(n_splits=N_SPLITS)
@@ -920,7 +900,6 @@ for fold, (train_idx, test_idx) in enumerate(tscv.split(X), 1):
 df_folds = pd.DataFrame(fold_results)
 print(f"\\nMedia: MAPE={df_folds['mape'].mean():.2f}% +/- {df_folds['mape'].std():.2f}%")
 print(f"       R2={df_folds['r2'].mean():.4f} +/- {df_folds['r2'].std():.4f}")"""),
-
         md("## 3. Backtesting Sazonal"),
         code("""df_sorted['month_val'] = df_sorted['timestamp'].dt.month
 df_sorted['season'] = df_sorted['month_val'].map(
@@ -953,7 +932,6 @@ for season in ['Primavera', 'Verao', 'Outono', 'Inverno']:
     print(f"{season:12s}: MAPE={m['mape']:.2f}% R2={m['r2']:.4f} (n={len(X_test_s):,})")
 
 df_seasons = pd.DataFrame(season_results)"""),
-
         md("## 4. Estabilidade (Random Seeds)"),
         code("""stability_results = []
 seeds = list(range(42, 52))
@@ -982,7 +960,6 @@ print(f"Estabilidade ({len(seeds)} seeds):")
 print(f"  MAPE: {df_stability['mape'].mean():.3f}% +/- {df_stability['mape'].std():.5f}%")
 print(f"  R2:   {df_stability['r2'].mean():.5f} +/- {df_stability['r2'].std():.6f}")
 print(f"  Conclusao: {'Estavel' if df_stability['mape'].std() < 0.1 else 'Instavel'}")"""),
-
         md("## 5. Visualizacao"),
         code("""fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
@@ -1005,7 +982,6 @@ axes[2].grid(True, alpha=0.3)
 
 plt.tight_layout()
 plt.show()"""),
-
         md("## 6. Resumo"),
         code("""print("=" * 70)
 print("RESUMO DA VALIDACAO ROBUSTA")
@@ -1042,5 +1018,5 @@ if __name__ == "__main__":
     create_nb03()
     create_nb04()
     create_nb05()
-    print(f"\nTodos os 5 notebooks gerados com sucesso!")
+    print("\nTodos os 5 notebooks gerados com sucesso!")
     print("Proximo passo: python scripts/retrain.py && python run_notebooks.py")

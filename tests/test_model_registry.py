@@ -1,18 +1,19 @@
 """
 Tests for the model registry module.
 """
-import pytest
-import numpy as np
+
 import joblib
+import numpy as np
+import pytest
 
 from src.models.model_registry import (
+    DEFAULT_PARAMS,
+    DISPLAY_NAMES,
+    _infer_model_key,
     create_model,
     fit_model,
-    train_and_select_best,
     get_search_space,
-    DISPLAY_NAMES,
-    DEFAULT_PARAMS,
-    _infer_model_key,
+    train_and_select_best,
 )
 
 
@@ -81,7 +82,10 @@ class TestTrainAndSelectBest:
     def test_returns_best_model_and_key(self, small_data):
         X_train, y_train, X_val, y_val = small_data
         best_model, best_key, all_results = train_and_select_best(
-            X_train, y_train, X_val, y_val,
+            X_train,
+            y_train,
+            X_val,
+            y_val,
             params_override={
                 "xgboost": {"n_estimators": 10},
                 "lightgbm": {"n_estimators": 10},
@@ -101,7 +105,10 @@ class TestTrainAndSelectBest:
     def test_subset_of_models(self, small_data):
         X_train, y_train, X_val, y_val = small_data
         _, best_key, results = train_and_select_best(
-            X_train, y_train, X_val, y_val,
+            X_train,
+            y_train,
+            X_val,
+            y_val,
             model_keys=["xgboost", "random_forest"],
             params_override={
                 "xgboost": {"n_estimators": 10},
@@ -117,6 +124,7 @@ class TestSearchSpace:
 
     def test_all_keys_have_search_space(self):
         import optuna
+
         study = optuna.create_study(direction="minimize")
 
         for key in ("xgboost", "lightgbm", "catboost", "random_forest"):
@@ -127,6 +135,7 @@ class TestSearchSpace:
 
     def test_unknown_key_raises(self):
         import optuna
+
         study = optuna.create_study(direction="minimize")
         trial = study.ask()
         with pytest.raises(ValueError):

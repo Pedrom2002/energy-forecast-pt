@@ -4,8 +4,8 @@ Tests for src/models/metadata.py.
 Covers path resolution, round-trip save/load for metadata and feature names,
 variant validation, and the get_best_model_info helper.
 """
+
 import json
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -30,10 +30,10 @@ from src.models.metadata import (
     save_metadata,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _patch_models_dir(tmp_path: Path):
     """Context manager: redirect MODELS_DIR to a temp directory."""
@@ -43,6 +43,7 @@ def _patch_models_dir(tmp_path: Path):
 # ---------------------------------------------------------------------------
 # get_models_dir
 # ---------------------------------------------------------------------------
+
 
 class TestGetModelsDir:
     def test_creates_subdirectories(self, tmp_path):
@@ -62,6 +63,7 @@ class TestGetModelsDir:
 # ---------------------------------------------------------------------------
 # get_model_path
 # ---------------------------------------------------------------------------
+
 
 class TestGetModelPath:
     def test_default_variant(self, tmp_path):
@@ -86,9 +88,8 @@ class TestGetModelPath:
             assert "horizon_6h" in path.name
 
     def test_unknown_variant_raises(self, tmp_path):
-        with _patch_models_dir(tmp_path):
-            with pytest.raises(ValueError, match="Unknown variant"):
-                get_model_path("nonexistent")
+        with _patch_models_dir(tmp_path), pytest.raises(ValueError, match="Unknown variant"):
+            get_model_path("nonexistent")
 
     def test_all_defined_variants_resolve(self, tmp_path):
         with _patch_models_dir(tmp_path):
@@ -101,6 +102,7 @@ class TestGetModelPath:
 # get_metadata_path
 # ---------------------------------------------------------------------------
 
+
 class TestGetMetadataPath:
     def test_default_variant(self, tmp_path):
         with _patch_models_dir(tmp_path):
@@ -109,9 +111,8 @@ class TestGetMetadataPath:
             assert METADATA_DIR in str(path)
 
     def test_unknown_variant_raises(self, tmp_path):
-        with _patch_models_dir(tmp_path):
-            with pytest.raises(ValueError, match="Unknown variant"):
-                get_metadata_path("nonexistent")
+        with _patch_models_dir(tmp_path), pytest.raises(ValueError, match="Unknown variant"):
+            get_metadata_path("nonexistent")
 
     def test_all_defined_variants_resolve(self, tmp_path):
         with _patch_models_dir(tmp_path):
@@ -124,6 +125,7 @@ class TestGetMetadataPath:
 # get_feature_names_path
 # ---------------------------------------------------------------------------
 
+
 class TestGetFeatureNamesPath:
     def test_default_variant(self, tmp_path):
         with _patch_models_dir(tmp_path):
@@ -132,9 +134,8 @@ class TestGetFeatureNamesPath:
             assert FEATURES_DIR in str(path)
 
     def test_unknown_variant_raises(self, tmp_path):
-        with _patch_models_dir(tmp_path):
-            with pytest.raises(ValueError, match="Unknown variant"):
-                get_feature_names_path("nonexistent")
+        with _patch_models_dir(tmp_path), pytest.raises(ValueError, match="Unknown variant"):
+            get_feature_names_path("nonexistent")
 
     def test_all_defined_variants_resolve(self, tmp_path):
         with _patch_models_dir(tmp_path):
@@ -146,6 +147,7 @@ class TestGetFeatureNamesPath:
 # ---------------------------------------------------------------------------
 # save_metadata / load_metadata
 # ---------------------------------------------------------------------------
+
 
 class TestSaveLoadMetadata:
     def test_round_trip(self, tmp_path):
@@ -192,6 +194,7 @@ class TestSaveLoadMetadata:
 # ---------------------------------------------------------------------------
 # save_feature_names / load_feature_names
 # ---------------------------------------------------------------------------
+
 
 class TestSaveLoadFeatureNames:
     def test_round_trip(self, tmp_path):
@@ -242,6 +245,7 @@ class TestSaveLoadFeatureNames:
 # get_best_model_info
 # ---------------------------------------------------------------------------
 
+
 class TestGetBestModelInfo:
     def test_returns_expected_keys(self, tmp_path):
         payload = {
@@ -277,6 +281,7 @@ class TestGetBestModelInfo:
 # Optional metadata keys (_OPTIONAL_METADATA_KEYS + API integration)
 # ---------------------------------------------------------------------------
 
+
 class TestOptionalMetadataKeys:
     """Tests that optional metadata keys are round-tripped and recognised."""
 
@@ -297,8 +302,12 @@ class TestOptionalMetadataKeys:
         """feature_stats dict is preserved through save/load."""
         feature_stats = {
             "temperature": {
-                "mean": 15.2, "std": 7.3, "min": -5.0,
-                "max": 42.0, "q25": 9.5, "q75": 21.0,
+                "mean": 15.2,
+                "std": 7.3,
+                "min": -5.0,
+                "max": 42.0,
+                "q25": 9.5,
+                "q75": 21.0,
             }
         }
         payload = {
@@ -347,13 +356,14 @@ class TestOptionalMetadataKeys:
     def test_optional_keys_constant_set(self):
         """_OPTIONAL_METADATA_KEYS contains the three documented keys."""
         from src.models.metadata import _OPTIONAL_METADATA_KEYS
+
         assert "conformal_q90" in _OPTIONAL_METADATA_KEYS
         assert "feature_stats" in _OPTIONAL_METADATA_KEYS
         assert "region_cv_scales" in _OPTIONAL_METADATA_KEYS
 
     def test_region_cv_scales_overrides_hardcoded_in_prediction(self):
         """region_cv_scales from metadata overrides the hardcoded constant."""
-        from src.api.prediction import _scaled_rmse, REGION_UNCERTAINTY_SCALE
+        from src.api.prediction import REGION_UNCERTAINTY_SCALE, _scaled_rmse
 
         custom_scales = {"Norte": 2.5}
         rmse_custom = _scaled_rmse(100.0, "Norte", 12, scale_dict=custom_scales)
@@ -370,8 +380,7 @@ class TestOptionalMetadataKeys:
         store = ModelStore()
         store.metadata_no_lags = {
             "feature_stats": {
-                "temperature": {"mean": 15.0, "std": 7.0,
-                                "min": -5.0, "max": 40.0, "q25": 9.0, "q75": 20.0}
+                "temperature": {"mean": 15.0, "std": 7.0, "min": -5.0, "max": 40.0, "q25": 9.0, "q75": 20.0}
             }
         }
         # Replicate the logic from the /model/drift endpoint

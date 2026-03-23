@@ -24,13 +24,13 @@ Usage::
         model=trained_model,
     )
 """
+
 from __future__ import annotations
 
 import logging
 from typing import Any, TypedDict
 
 import numpy as np
-import pandas as pd
 from sklearn.inspection import permutation_importance
 
 logger = logging.getLogger(__name__)
@@ -148,11 +148,13 @@ def rank_by_permutation_importance(
 
     importances = []
     for i, name in enumerate(feature_names):
-        importances.append({
-            "feature": name,
-            "importance_mean": float(result.importances_mean[i]),
-            "importance_std": float(result.importances_std[i]),
-        })
+        importances.append(
+            {
+                "feature": name,
+                "importance_mean": float(result.importances_mean[i]),
+                "importance_std": float(result.importances_std[i]),
+            }
+        )
 
     importances.sort(key=lambda x: x["importance_mean"], reverse=True)
 
@@ -207,7 +209,9 @@ def select_features(
 
     # Step 1: correlation filter
     kept_names, removed_by_corr = correlation_filter(
-        X_train, feature_names, threshold=correlation_threshold,
+        X_train,
+        feature_names,
+        threshold=correlation_threshold,
     )
 
     # Get indices of kept features
@@ -229,10 +233,7 @@ def select_features(
     )
 
     # Step 3: filter by importance threshold and/or max_features
-    selected = [
-        entry for entry in importances
-        if entry["importance_mean"] >= min_importance
-    ]
+    selected = [entry for entry in importances if entry["importance_mean"] >= min_importance]
 
     if max_features is not None and len(selected) > max_features:
         selected = selected[:max_features]

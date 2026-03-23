@@ -4,28 +4,31 @@ Edge case tests for feature engineering and API.
 Tests temporal edge cases (leap year, year boundaries, extreme weather)
 and API robustness scenarios.
 """
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.features.feature_engineering import FeatureEngineer, get_portuguese_holidays, _compute_easter
+from src.features.feature_engineering import FeatureEngineer, _compute_easter, get_portuguese_holidays
 
 
 def _make_df(timestamps, region="Lisboa"):
     """Helper to create minimal DataFrames for testing."""
     n = len(timestamps)
     rng = np.random.RandomState(42)
-    return pd.DataFrame({
-        "timestamp": pd.to_datetime(timestamps),
-        "consumption_mw": rng.uniform(1000, 3000, n),
-        "temperature": rng.uniform(5, 35, n),
-        "humidity": rng.uniform(30, 90, n),
-        "wind_speed": rng.uniform(0, 25, n),
-        "precipitation": rng.uniform(0, 5, n),
-        "cloud_cover": rng.uniform(0, 100, n),
-        "pressure": rng.uniform(995, 1030, n),
-        "region": [region] * n,
-    })
+    return pd.DataFrame(
+        {
+            "timestamp": pd.to_datetime(timestamps),
+            "consumption_mw": rng.uniform(1000, 3000, n),
+            "temperature": rng.uniform(5, 35, n),
+            "humidity": rng.uniform(30, 90, n),
+            "wind_speed": rng.uniform(0, 25, n),
+            "precipitation": rng.uniform(0, 5, n),
+            "cloud_cover": rng.uniform(0, 100, n),
+            "pressure": rng.uniform(995, 1030, n),
+            "region": [region] * n,
+        }
+    )
 
 
 class TestLeapYear:
@@ -125,16 +128,19 @@ class TestExtremeWeather:
 class TestEasterDates:
     """Test Easter computation across multiple years."""
 
-    @pytest.mark.parametrize("year,month,day", [
-        (2020, 4, 12),
-        (2021, 4, 4),
-        (2022, 4, 17),
-        (2023, 4, 9),
-        (2024, 3, 31),
-        (2025, 4, 20),
-        (2026, 4, 5),
-        (2030, 4, 21),
-    ])
+    @pytest.mark.parametrize(
+        "year,month,day",
+        [
+            (2020, 4, 12),
+            (2021, 4, 4),
+            (2022, 4, 17),
+            (2023, 4, 9),
+            (2024, 3, 31),
+            (2025, 4, 20),
+            (2026, 4, 5),
+            (2030, 4, 21),
+        ],
+    )
     def test_easter_dates(self, year, month, day):
         result = _compute_easter(year)
         assert result == pd.Timestamp(year, month, day)
@@ -165,26 +171,33 @@ class TestTrendFeatures:
         df = _make_df(dates)
         result = fe.create_trend_features(df)
         expected_cols = [
-            "temp_diff_1h", "temp_diff2_1h", "temp_momentum",
-            "temp_deviation_24h", "temp_volatility_12h",
-            "humidity_diff_1h", "wind_diff_1h", "wind_momentum",
+            "temp_diff_1h",
+            "temp_diff2_1h",
+            "temp_momentum",
+            "temp_deviation_24h",
+            "temp_volatility_12h",
+            "humidity_diff_1h",
+            "wind_diff_1h",
+            "wind_momentum",
         ]
         for col in expected_cols:
             assert col in result.columns, f"Missing trend feature: {col}"
 
     def test_temperature_diff_correct(self):
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2024-01-01", periods=5, freq="h"),
-            "temperature": [10.0, 12.0, 15.0, 14.0, 16.0],
-            "humidity": [60.0] * 5,
-            "wind_speed": [10.0] * 5,
-            "pressure": [1013.0] * 5,
-            "region": ["Lisboa"] * 5,
-            "consumption_mw": [1500.0] * 5,
-            "precipitation": [0.0] * 5,
-            "cloud_cover": [50.0] * 5,
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2024-01-01", periods=5, freq="h"),
+                "temperature": [10.0, 12.0, 15.0, 14.0, 16.0],
+                "humidity": [60.0] * 5,
+                "wind_speed": [10.0] * 5,
+                "pressure": [1013.0] * 5,
+                "region": ["Lisboa"] * 5,
+                "consumption_mw": [1500.0] * 5,
+                "precipitation": [0.0] * 5,
+                "cloud_cover": [50.0] * 5,
+            }
+        )
         result = fe.create_trend_features(df)
         # diff(1) for temp: NaN, 2, 3, -1, 2
         assert abs(result["temp_diff_1h"].iloc[1] - 2.0) < 0.01
@@ -222,7 +235,9 @@ class TestNegativeInputs:
     @pytest.fixture
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import app
+
         return TestClient(app)
 
     def _base_payload(self):
@@ -241,6 +256,7 @@ class TestNegativeInputs:
         """NaN values in weather fields must be rejected by validation."""
         # NaN is not valid JSON, so we send it as null (which Pydantic rejects for float fields)
         import json
+
         raw = json.dumps(self._base_payload())
         raw = raw.replace('"temperature": 18.5', '"temperature": null')
         response = client.post(
@@ -248,13 +264,14 @@ class TestNegativeInputs:
             content=raw.encode(),
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 422, (
-            f"Expected 422 for null temperature, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for null temperature, got {response.status_code}: {response.text}"
 
     def test_nan_humidity_returns_422(self, client):
         """Null humidity should be rejected."""
         import json
+
         raw = json.dumps(self._base_payload())
         raw = raw.replace('"humidity": 65.0', '"humidity": null')
         response = client.post(
@@ -262,58 +279,69 @@ class TestNegativeInputs:
             content=raw.encode(),
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 422, (
-            f"Expected 422 for null humidity, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for null humidity, got {response.status_code}: {response.text}"
 
     def test_negative_consumption_in_history_returns_422(self, client):
         """Negative consumption_mw in sequential history should be rejected (ge=0)."""
         import pandas as pd
+
         base = pd.Timestamp("2025-01-01")
         history = [
             {
                 "timestamp": (base + pd.Timedelta(hours=h)).isoformat(),
                 "region": "Lisboa",
-                "temperature": 15.0, "humidity": 60.0, "wind_speed": 10.0,
-                "precipitation": 0.0, "cloud_cover": 50.0, "pressure": 1013.0,
+                "temperature": 15.0,
+                "humidity": 60.0,
+                "wind_speed": 10.0,
+                "precipitation": 0.0,
+                "cloud_cover": 50.0,
+                "pressure": 1013.0,
                 "consumption_mw": -500.0,  # negative — invalid
             }
             for h in range(48)
         ]
-        forecast = [{
-            "timestamp": "2025-01-03T00:00:00",
-            "region": "Lisboa",
-            "temperature": 12.0, "humidity": 70.0, "wind_speed": 8.0,
-            "precipitation": 0.0, "cloud_cover": 60.0, "pressure": 1010.0,
-        }]
+        forecast = [
+            {
+                "timestamp": "2025-01-03T00:00:00",
+                "region": "Lisboa",
+                "temperature": 12.0,
+                "humidity": 70.0,
+                "wind_speed": 8.0,
+                "precipitation": 0.0,
+                "cloud_cover": 60.0,
+                "pressure": 1010.0,
+            }
+        ]
         response = client.post("/predict/sequential", json={"history": history, "forecast": forecast})
-        assert response.status_code == 422, (
-            f"Expected 422 for negative consumption, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for negative consumption, got {response.status_code}: {response.text}"
 
     def test_timestamps_wrong_format_returns_422(self, client):
         """Completely invalid timestamp format should return 422."""
         payload = {**self._base_payload(), "timestamp": "not-a-date"}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, (
-            f"Expected 422 for invalid timestamp, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for invalid timestamp, got {response.status_code}: {response.text}"
 
     def test_extremely_large_temperature_returns_422(self, client):
         """Temperature=1000 exceeds the schema max of 50, should return 422."""
         payload = {**self._base_payload(), "temperature": 1000.0}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, (
-            f"Expected 422 for temperature=1000, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for temperature=1000, got {response.status_code}: {response.text}"
 
     def test_empty_string_region_returns_422(self, client):
         """Empty string for region should return 422 (not a valid Literal)."""
         payload = {**self._base_payload(), "region": ""}
         response = client.post("/predict", json=payload)
-        assert response.status_code == 422, (
-            f"Expected 422 for empty region, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 422
+        ), f"Expected 422 for empty region, got {response.status_code}: {response.text}"
 
 
 class TestAPIEdgeCases:
@@ -322,7 +350,9 @@ class TestAPIEdgeCases:
     @pytest.fixture
     def client(self):
         from fastapi.testclient import TestClient
+
         from src.api.main import app
+
         return TestClient(app)
 
     def test_boundary_temperature_min(self, client):

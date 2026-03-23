@@ -27,6 +27,7 @@ Usage::
 
     results = evaluate_all_baselines(y_train, y_test, seasonality=24)
 """
+
 from __future__ import annotations
 
 import logging
@@ -48,7 +49,7 @@ class PersistenceBaseline:
     def __init__(self) -> None:
         self._last_value: float | None = None
 
-    def fit(self, y_train: np.ndarray, **kwargs: Any) -> "PersistenceBaseline":
+    def fit(self, y_train: np.ndarray, **kwargs: Any) -> PersistenceBaseline:
         """Store the last training value for use in prediction."""
         self._last_value = float(y_train[-1])
         return self
@@ -67,7 +68,7 @@ class PersistenceBaseline:
         ``y_train[-n_steps:]`` shifted forward by one position, with the last
         training value prepended.
         """
-        return np.concatenate([[y_train[-1]], y_train[-(n_steps - 1):]]) if n_steps > 1 else np.array([y_train[-1]])
+        return np.concatenate([[y_train[-1]], y_train[-(n_steps - 1) :]]) if n_steps > 1 else np.array([y_train[-1]])
 
 
 class SeasonalNaiveBaseline:
@@ -86,7 +87,7 @@ class SeasonalNaiveBaseline:
         self.seasonality = seasonality
         self._history: np.ndarray | None = None
 
-    def fit(self, y_train: np.ndarray, **kwargs: Any) -> "SeasonalNaiveBaseline":
+    def fit(self, y_train: np.ndarray, **kwargs: Any) -> SeasonalNaiveBaseline:
         """Store the training series for seasonal lookup."""
         self._history = np.asarray(y_train, dtype=np.float64)
         return self
@@ -95,7 +96,7 @@ class SeasonalNaiveBaseline:
         """Predict *n_steps* by repeating the seasonal pattern."""
         if self._history is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
-        season = self._history[-self.seasonality:]
+        season = self._history[-self.seasonality :]
         # Tile the seasonal pattern to cover n_steps
         repeats = (n_steps // self.seasonality) + 1
         tiled = np.tile(season, repeats)
@@ -117,7 +118,7 @@ class MovingAverageBaseline:
         self.window = window
         self._history: np.ndarray | None = None
 
-    def fit(self, y_train: np.ndarray, **kwargs: Any) -> "MovingAverageBaseline":
+    def fit(self, y_train: np.ndarray, **kwargs: Any) -> MovingAverageBaseline:
         """Store the training series."""
         self._history = np.asarray(y_train, dtype=np.float64)
         return self
@@ -126,7 +127,7 @@ class MovingAverageBaseline:
         """Predict *n_steps* by repeating the trailing moving average."""
         if self._history is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
-        ma = float(np.mean(self._history[-self.window:]))
+        ma = float(np.mean(self._history[-self.window :]))
         return np.full(n_steps, ma)
 
 
@@ -144,7 +145,7 @@ class WeeklySeasonalBaseline:
         self.period = period
         self._history: np.ndarray | None = None
 
-    def fit(self, y_train: np.ndarray, **kwargs: Any) -> "WeeklySeasonalBaseline":
+    def fit(self, y_train: np.ndarray, **kwargs: Any) -> WeeklySeasonalBaseline:
         """Store the training series."""
         self._history = np.asarray(y_train, dtype=np.float64)
         return self
@@ -153,7 +154,7 @@ class WeeklySeasonalBaseline:
         """Predict *n_steps* by repeating the weekly pattern."""
         if self._history is None:
             raise RuntimeError("Model not fitted. Call fit() first.")
-        season = self._history[-self.period:]
+        season = self._history[-self.period :]
         repeats = (n_steps // self.period) + 1
         tiled = np.tile(season, repeats)
         return tiled[:n_steps]
@@ -162,6 +163,7 @@ class WeeklySeasonalBaseline:
 # ---------------------------------------------------------------------------
 # Convenience: evaluate all baselines at once
 # ---------------------------------------------------------------------------
+
 
 def evaluate_all_baselines(
     y_train: np.ndarray,
@@ -199,7 +201,11 @@ def evaluate_all_baselines(
 
     if use_regions:
         return _evaluate_baselines_per_region(
-            y_train, y_test, regions_train, regions_test, seasonality,
+            y_train,
+            y_test,
+            regions_train,
+            regions_test,
+            seasonality,
         )
 
     # Fallback: global evaluation (no region info)

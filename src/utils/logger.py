@@ -11,6 +11,7 @@ Features:
     - Slow-call helper: :func:`log_slow_call` context manager that emits a
       WARNING when a block exceeds a configurable threshold
 """
+
 from __future__ import annotations
 
 import contextvars
@@ -21,7 +22,7 @@ import sys
 import time
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -73,7 +74,7 @@ class JSONFormatter(logging.Formatter):
             JSON-encoded string representation of the log record.
         """
         log_data: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

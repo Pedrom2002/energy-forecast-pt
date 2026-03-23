@@ -15,6 +15,7 @@ Two concerns addressed here:
    Tests here assert both the status code *and* the presence of ``code`` /
    ``message`` keys in the detail object.
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -30,6 +31,7 @@ def _models_loaded() -> bool:
 
 
 # ── Shared payload factory ────────────────────────────────────────────────────
+
 
 def _payload(region: str = "Lisboa", **overrides: object) -> dict:
     base = {
@@ -48,6 +50,7 @@ def _payload(region: str = "Lisboa", **overrides: object) -> dict:
 
 # ── Parametrized validation tests — all 5 regions ────────────────────────────
 
+
 class TestAllRegionsValidation:
     """Input validation must work identically for every Portuguese region."""
 
@@ -56,9 +59,7 @@ class TestAllRegionsValidation:
         """Each of the 5 valid regions must pass schema validation (not 422)."""
         response = client.post("/predict", json=_payload(region))
         # May be 503 (no models) or 200 (models loaded) — never 422 for a valid region
-        assert response.status_code != 422, (
-            f"Region '{region}' should be valid but got 422: {response.text}"
-        )
+        assert response.status_code != 422, f"Region '{region}' should be valid but got 422: {response.text}"
 
     @pytest.mark.parametrize("region", VALID_REGIONS)
     def test_invalid_humidity_rejected_for_all_regions(self, region: str) -> None:
@@ -86,6 +87,7 @@ class TestAllRegionsValidation:
 
 
 # ── Parametrized prediction tests — all 5 regions (requires models) ──────────
+
 
 class TestAllRegionsPrediction:
     """End-to-end prediction must succeed for every region when models are loaded."""
@@ -121,9 +123,10 @@ class TestAllRegionsPrediction:
         response = client.post("/predict", json=_payload(region))
         assert response.status_code == 200
         ci_method = response.json().get("ci_method")
-        assert ci_method in ("conformal", "gaussian_z_rmse"), (
-            f"Unexpected ci_method '{ci_method}' for region '{region}'"
-        )
+        assert ci_method in (
+            "conformal",
+            "gaussian_z_rmse",
+        ), f"Unexpected ci_method '{ci_method}' for region '{region}'"
 
     @pytest.mark.parametrize("region", VALID_REGIONS)
     def test_batch_predict_single_item_all_regions(self, region: str) -> None:
@@ -137,6 +140,7 @@ class TestAllRegionsPrediction:
 
 # ── Error response schema validation ─────────────────────────────────────────
 
+
 class TestErrorResponseSchema:
     """All API errors must use the structured {code, message} detail format.
 
@@ -146,9 +150,9 @@ class TestErrorResponseSchema:
 
     def _assert_structured_error(self, response: object, expected_status: int) -> None:
         """Helper: check status code and structured detail schema."""
-        assert response.status_code == expected_status, (
-            f"Expected {expected_status}, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == expected_status
+        ), f"Expected {expected_status}, got {response.status_code}: {response.text}"
         detail = response.json().get("detail")
         assert detail is not None, "Response must have a 'detail' field"
         # Pydantic validation errors return a list; our custom errors return a dict
@@ -163,6 +167,7 @@ class TestErrorResponseSchema:
     def test_503_no_model_has_structured_error(self) -> None:
         """503 when no models are loaded must use {code, message} format."""
         from src.api.store import ModelStore
+
         original = getattr(app.state, "models", None)
         app.state.models = ModelStore()
         try:
@@ -175,6 +180,7 @@ class TestErrorResponseSchema:
     def test_503_batch_no_model_has_structured_error(self) -> None:
         """503 for /predict/batch must use {code, message} format."""
         from src.api.store import ModelStore
+
         original = getattr(app.state, "models", None)
         app.state.models = ModelStore()
         try:
@@ -207,18 +213,28 @@ class TestErrorResponseSchema:
             {
                 "timestamp": (base + __import__("pandas").Timedelta(hours=h)).isoformat(),
                 "region": "Lisboa",
-                "temperature": 15.0, "humidity": 60.0, "wind_speed": 10.0,
-                "precipitation": 0.0, "cloud_cover": 50.0, "pressure": 1013.0,
+                "temperature": 15.0,
+                "humidity": 60.0,
+                "wind_speed": 10.0,
+                "precipitation": 0.0,
+                "cloud_cover": 50.0,
+                "pressure": 1013.0,
                 "consumption_mw": 1500.0,
             }
             for h in range(48)
         ]
-        forecast = [{
-            "timestamp": "2025-01-03T00:00:00",
-            "region": "Norte",   # different region — should fail
-            "temperature": 12.0, "humidity": 70.0, "wind_speed": 8.0,
-            "precipitation": 0.0, "cloud_cover": 60.0, "pressure": 1010.0,
-        }]
+        forecast = [
+            {
+                "timestamp": "2025-01-03T00:00:00",
+                "region": "Norte",  # different region — should fail
+                "temperature": 12.0,
+                "humidity": 70.0,
+                "wind_speed": 8.0,
+                "precipitation": 0.0,
+                "cloud_cover": 60.0,
+                "pressure": 1010.0,
+            }
+        ]
         response = client.post("/predict/sequential", json={"history": history, "forecast": forecast})
         self._assert_structured_error(response, 422)
         assert response.json()["detail"]["code"] == "MIXED_REGIONS"
@@ -240,6 +256,7 @@ class TestErrorResponseSchema:
     def test_401_wrong_api_key_has_structured_error(self) -> None:
         """401 for invalid API key must use {code, message} format."""
         from unittest.mock import patch
+
         with patch("src.api.main.API_KEY", "secret"):
             response = client.post(
                 "/predict",
@@ -252,6 +269,7 @@ class TestErrorResponseSchema:
     def test_503_model_info_no_model_has_structured_error(self) -> None:
         """503 for /model/info when no models are loaded must be structured."""
         from src.api.store import ModelStore
+
         original = getattr(app.state, "models", None)
         app.state.models = ModelStore()
         try:

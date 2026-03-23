@@ -3,6 +3,7 @@
 Centralized model creation, training, and selection.
 Eliminates duplicated model instantiation logic across notebooks and scripts.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Typed dictionaries for structured return types (Task 6)
 # ---------------------------------------------------------------------------
+
 
 class ModelResultEntry(TypedDict):
     """Per-model evaluation results from :func:`train_and_select_best`."""
@@ -131,12 +133,11 @@ def create_model(model_key: str, params: dict[str, Any] | None = None) -> Any:
         ValueError: If *model_key* is not recognised.
     """
     if model_key not in _CONSTRUCTORS:
-        raise ValueError(
-            f"Unknown model key: {model_key}. Available: {list(_CONSTRUCTORS.keys())}"
-        )
+        raise ValueError(f"Unknown model key: {model_key}. Available: {list(_CONSTRUCTORS.keys())}")
 
     module_name, class_name = _CONSTRUCTORS[model_key]
     import importlib
+
     mod = importlib.import_module(module_name)
     cls = getattr(mod, class_name)
 
@@ -185,19 +186,20 @@ def fit_model(
     if X_val is not None and y_val is not None:
         if model_key == "xgboost":
             model.set_params(early_stopping_rounds=early_stopping_rounds)
-            model.fit(X_train, y_train,
-                      eval_set=[(X_val, y_val)], verbose=False)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
         elif model_key == "lightgbm":
-            model.fit(X_train, y_train,
-                      eval_set=[(X_val, y_val)],
-                      callbacks=[
-                          __import__("lightgbm").early_stopping(early_stopping_rounds, verbose=False),
-                          __import__("lightgbm").log_evaluation(period=0),
-                      ])
+            model.fit(
+                X_train,
+                y_train,
+                eval_set=[(X_val, y_val)],
+                callbacks=[
+                    __import__("lightgbm").early_stopping(early_stopping_rounds, verbose=False),
+                    __import__("lightgbm").log_evaluation(period=0),
+                ],
+            )
         elif model_key == "catboost":
             model.set_params(early_stopping_rounds=early_stopping_rounds)
-            model.fit(X_train, y_train,
-                      eval_set=(X_val, y_val))
+            model.fit(X_train, y_train, eval_set=(X_val, y_val))
         else:
             model.fit(X_train, y_train)
     else:
@@ -264,7 +266,12 @@ def train_and_select_best(
 
         logger.info(
             "  %s -- Val RMSE: %.2f | MAE: %.2f | MAPE: %.2f%% | R2: %.4f (%.1fs)",
-            display, rmse, mae, mape, r2, elapsed,
+            display,
+            rmse,
+            mae,
+            mape,
+            r2,
+            elapsed,
         )
 
     best_key = min(all_results, key=lambda k: all_results[k]["rmse"])

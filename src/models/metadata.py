@@ -39,6 +39,7 @@ Complete metadata example (all keys)::
                               "Alentejo": 0.90, "Algarve": 0.85}
     }
 """
+
 from __future__ import annotations
 
 import json
@@ -53,6 +54,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Typed dictionaries for metadata structures (Task 6)
 # ---------------------------------------------------------------------------
+
 
 class TestMetrics(TypedDict, total=False):
     """Test-set evaluation metrics stored in training metadata."""
@@ -138,15 +140,21 @@ FEATURE_NAME_FILES: dict[str, str] = {
 }
 
 # Required / optional metadata keys
-_REQUIRED_METADATA_KEYS: frozenset[str] = frozenset({
-    "best_model_key", "best_model", "test_metrics",
-})
+_REQUIRED_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "best_model_key",
+        "best_model",
+        "test_metrics",
+    }
+)
 
-_OPTIONAL_METADATA_KEYS: frozenset[str] = frozenset({
-    "conformal_q90",
-    "feature_stats",
-    "region_cv_scales",
-})
+_OPTIONAL_METADATA_KEYS: frozenset[str] = frozenset(
+    {
+        "conformal_q90",
+        "feature_stats",
+        "region_cv_scales",
+    }
+)
 
 
 # ---------------------------------------------------------------------------

@@ -1,14 +1,13 @@
 """
 Extended tests for src/utils/metrics.py to improve coverage.
 """
+
 import numpy as np
-import pytest
 
 from src.utils.metrics import (
-    calculate_metrics,
     calculate_coverage,
+    calculate_metrics,
     mean_absolute_scaled_error,
-    calculate_residual_stats,
     print_metrics,
 )
 
@@ -63,6 +62,7 @@ class TestPrintMetrics:
 
     def test_print_metrics_runs(self, caplog):
         import logging
+
         with caplog.at_level(logging.INFO):
             metrics = {"mae": 10.5, "rmse": 15.3, "r2": 0.95, "status": "good"}
             print_metrics(metrics, title="Test")

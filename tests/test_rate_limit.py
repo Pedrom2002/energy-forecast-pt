@@ -9,22 +9,19 @@ Covers:
 - Concurrent request handling under the asyncio.Lock
 - Header validation (Retry-After)
 """
+
 import asyncio
-import time
-from collections import defaultdict
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
 
 from src.api.main import app
 from src.api.middleware import RateLimitMiddleware
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_middleware(max_requests: int = 3, window: int = 60) -> RateLimitMiddleware:
     """Instantiate middleware with test-friendly limits (no real app needed)."""
@@ -38,20 +35,24 @@ def _make_middleware(max_requests: int = 3, window: int = 60) -> RateLimitMiddle
 # In-memory backend unit tests
 # ---------------------------------------------------------------------------
 
+
 class TestInMemoryRateLimit:
     """Unit-test the _is_limited_memory coroutine directly."""
 
     def test_allows_requests_under_limit(self):
         mw = _make_middleware(max_requests=3)
+
         async def run():
             for _ in range(3):
                 result = await mw._is_limited_memory("127.0.0.1")
                 exceeded = result[0] if isinstance(result, tuple) else result
                 assert exceeded is False, "Should not be rate-limited under the limit"
+
         asyncio.run(run())
 
     def test_blocks_request_over_limit(self):
         mw = _make_middleware(max_requests=3)
+
         async def run():
             for _ in range(3):
                 await mw._is_limited_memory("127.0.0.1")
@@ -59,10 +60,12 @@ class TestInMemoryRateLimit:
             result = await mw._is_limited_memory("127.0.0.1")
             blocked = result[0] if isinstance(result, tuple) else result
             assert blocked is True
+
         asyncio.run(run())
 
     def test_different_ips_are_independent(self):
         mw = _make_middleware(max_requests=2)
+
         async def run():
             await mw._is_limited_memory("1.1.1.1")
             await mw._is_limited_memory("1.1.1.1")
@@ -74,11 +77,13 @@ class TestInMemoryRateLimit:
             result_b = await mw._is_limited_memory("2.2.2.2")
             blocked_b = result_b[0] if isinstance(result_b, tuple) else result_b
             assert blocked_b is False
+
         asyncio.run(run())
 
     def test_window_expiry_allows_new_requests(self):
         """After the window expires, old requests are pruned and new ones allowed."""
         mw = _make_middleware(max_requests=2, window=1)
+
         async def run():
             await mw._is_limited_memory("10.0.0.1")
             await mw._is_limited_memory("10.0.0.1")
@@ -92,11 +97,13 @@ class TestInMemoryRateLimit:
             result2 = await mw._is_limited_memory("10.0.0.1")
             allowed = result2[0] if isinstance(result2, tuple) else result2
             assert allowed is False
+
         asyncio.run(run())
 
     def test_concurrent_requests_dont_exceed_limit(self):
         """Even with concurrent requests, the limit is respected under asyncio.Lock."""
         mw = _make_middleware(max_requests=5)
+
         async def run():
             tasks = [mw._is_limited_memory("192.168.1.1") for _ in range(10)]
             raw_results = await asyncio.gather(*tasks)
@@ -107,12 +114,14 @@ class TestInMemoryRateLimit:
             blocked = results.count(True)
             assert allowed == 5
             assert blocked == 5
+
         asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
 # Redis backend unit tests (mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestRedisRateLimit:
     """Unit-test _is_limited_redis with a mocked Redis pipeline."""
@@ -145,6 +154,7 @@ class TestRedisRateLimit:
             result = await mw._is_limited_redis("10.0.0.1")
             exceeded = result[0] if isinstance(result, tuple) else result
             assert exceeded is False  # 2 < 3, not limited
+
         asyncio.run(run())
 
     def test_redis_blocks_at_limit(self):
@@ -156,6 +166,7 @@ class TestRedisRateLimit:
             result = await mw._is_limited_redis("10.0.0.1")
             exceeded = result[0] if isinstance(result, tuple) else result
             assert exceeded is True  # 3 >= 3, limited
+
         asyncio.run(run())
 
     def test_redis_failure_fails_open(self):
@@ -178,12 +189,14 @@ class TestRedisRateLimit:
             response = await mw.dispatch(request, fake_call_next)
             # Should return the upstream response (not 429)
             assert response.status_code == 200
+
         asyncio.run(run())
 
 
 # ---------------------------------------------------------------------------
 # Integration: full HTTP request flow via TestClient
 # ---------------------------------------------------------------------------
+
 
 class TestRateLimitHTTP:
     """End-to-end tests using TestClient against the real FastAPI app."""
@@ -212,6 +225,7 @@ class TestRateLimitHTTP:
             # Response must use the structured {code, message} error format
             body = r2.body  # JSONResponse stores raw bytes
             import json
+
             detail = json.loads(body)["detail"]
             assert isinstance(detail, dict), "429 detail must be a dict, not a string"
             assert detail["code"] == "RATE_LIMITED"
@@ -262,6 +276,7 @@ class TestRateLimitHTTP:
 # Middleware initialization
 # ---------------------------------------------------------------------------
 
+
 class TestMiddlewareInit:
     def test_uses_env_vars(self):
         with patch.dict("os.environ", {"RATE_LIMIT_MAX": "100", "RATE_LIMIT_WINDOW": "30"}):
@@ -273,6 +288,7 @@ class TestMiddlewareInit:
         with patch.dict("os.environ", {}, clear=True):
             # Remove vars if present
             import os
+
             os.environ.pop("RATE_LIMIT_MAX", None)
             os.environ.pop("RATE_LIMIT_WINDOW", None)
             mw = RateLimitMiddleware(MagicMock(), max_requests=60, window_seconds=60)
@@ -282,6 +298,7 @@ class TestMiddlewareInit:
     def test_no_redis_when_url_not_set(self):
         with patch.dict("os.environ", {}, clear=True):
             import os
+
             os.environ.pop("REDIS_URL", None)
             mw = RateLimitMiddleware(MagicMock())
         assert mw._redis is None

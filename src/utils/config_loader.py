@@ -3,6 +3,7 @@
 Wraps the functional API from config.py in a class for convenience.
 Provides dot-notation access, runtime reload, and Mapping-style helpers.
 """
+
 from __future__ import annotations
 
 import logging
@@ -16,9 +17,16 @@ logger = logging.getLogger(__name__)
 
 # Known top-level keys defined by the project's config schema.
 # Any key not in this set triggers a warning so typos are caught early.
-_KNOWN_KEYS: frozenset[str] = frozenset({
-    "models", "features", "api", "training", "data", "logging",
-})
+_KNOWN_KEYS: frozenset[str] = frozenset(
+    {
+        "models",
+        "features",
+        "api",
+        "training",
+        "data",
+        "logging",
+    }
+)
 # Keys that must be present for core functionality.
 _REQUIRED_KEYS: frozenset[str] = frozenset({"models"})
 
@@ -58,7 +66,7 @@ class ConfigLoader:
         Returns:
             Parsed configuration dictionary.
         """
-        with open(self.config_path, "r", encoding="utf-8") as f:
+        with open(self.config_path, encoding="utf-8") as f:
             config: dict[str, Any] = yaml.safe_load(f) or {}
         logger.info("Loaded configuration from %s", self.config_path)
         self._validate_schema(config)

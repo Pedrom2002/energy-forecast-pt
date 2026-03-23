@@ -25,6 +25,7 @@ Public API::
     calculate_residual_stats(y_true, y_pred)        -> residual distribution statistics
     metrics_summary(y_true, y_pred, ...)            -> all of the above combined
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Structured return types (Task 6)
 # ---------------------------------------------------------------------------
+
 
 class MetricsResult(TypedDict, total=False):
     """Dictionary returned by :func:`calculate_metrics`."""
@@ -113,12 +115,7 @@ def calculate_metrics(
         )
     if mask_nonzero.sum() > 0:
         metrics["mape"] = float(
-            np.mean(
-                np.abs(
-                    (y_true_clean[mask_nonzero] - y_pred_clean[mask_nonzero])
-                    / y_true_clean[mask_nonzero]
-                )
-            )
+            np.mean(np.abs((y_true_clean[mask_nonzero] - y_pred_clean[mask_nonzero]) / y_true_clean[mask_nonzero]))
             * 100
         )
     else:

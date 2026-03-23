@@ -4,9 +4,9 @@ Pydantic request/response schemas for the Energy Forecast PT API.
 All public models are re-exported from ``src.api.main`` for backward
 compatibility — importers should prefer ``from src.api.schemas import ...``.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -19,6 +19,7 @@ VALID_REGIONS: list[str] = list(RegionType.__args__)  # type: ignore[attr-define
 
 # ── Timestamp validator ───────────────────────────────────────────────────────
 
+
 def _validate_timestamp(v: str) -> str:
     """Reject clearly malformed or out-of-range ISO 8601 timestamps.
 
@@ -30,17 +31,17 @@ def _validate_timestamp(v: str) -> str:
     """
     try:
         import pandas as pd
+
         ts = pd.Timestamp(v)
     except (ValueError, TypeError) as exc:
         raise ValueError(f"Invalid timestamp '{v}': {exc}") from exc
     if ts.year < 1900 or ts.year > 2200:
-        raise ValueError(
-            f"Timestamp year {ts.year} is outside the supported range [1900, 2200]."
-        )
+        raise ValueError(f"Timestamp year {ts.year} is outside the supported range [1900, 2200].")
     return v
 
 
 # ── Request schemas ───────────────────────────────────────────────────────────
+
 
 class EnergyData(BaseModel):
     """Input data for a single-point prediction.
@@ -154,6 +155,7 @@ class SequentialForecastRequest(BaseModel):
 
 # ── Response schemas ──────────────────────────────────────────────────────────
 
+
 class PredictionResponse(BaseModel):
     """Prediction response with confidence interval.
 
@@ -224,6 +226,7 @@ class ExplanationResponse(BaseModel):
 
 
 # ── Error response schemas ─────────────────────────────────────────────────────
+
 
 class ErrorDetail(BaseModel):
     """Structured error detail returned in all non-2xx responses."""

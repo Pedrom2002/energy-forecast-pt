@@ -3,14 +3,14 @@
 Each test class documents the exact source file and line numbers it targets.
 Tests use mocking to isolate specific branches without requiring real models.
 """
+
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from collections import defaultdict
 from contextlib import contextmanager
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -48,6 +48,7 @@ def _override_store(store: ModelStore):
 # ============================================================================
 # src/api/main.py  --  body size limit (lines 223-236)
 # ============================================================================
+
 
 class TestBodySizeLimit:
     """Cover lines 223-236 in main.py: the body-size middleware returning 413."""
@@ -90,6 +91,7 @@ class TestBodySizeLimit:
 # ============================================================================
 # src/api/main.py  --  drift endpoints (lines 638-640, 659, 703-705, 719-748)
 # ============================================================================
+
 
 class TestDriftEndpoints:
     """Cover drift baseline and drift check endpoints in main.py."""
@@ -151,7 +153,7 @@ class TestDriftEndpoints:
         }
         live_stats = {
             "temperature": {"mean": 16.0},  # z = (16-15)/5 = 0.2 -> normal
-            "humidity": {"mean": 95.0},      # z = (95-60)/10 = 3.5 -> alert
+            "humidity": {"mean": 95.0},  # z = (95-60)/10 = 3.5 -> alert
         }
         with _override_store(fake_store):
             resp = client.post("/model/drift/check", json=live_stats)
@@ -250,6 +252,7 @@ class TestDriftEndpoints:
 # src/api/main.py  --  coverage alert logging (line 915)
 # ============================================================================
 
+
 class TestCoverageAlertLogging:
     """Cover line 915 in main.py: coverage alert WARNING log path."""
 
@@ -284,12 +287,12 @@ class TestCoverageAlertLogging:
 # src/api/main.py  --  empty ModelStore (lines 166-167)
 # ============================================================================
 
+
 class TestEmptyModelStoreReturn:
     """Cover lines 166-167 in main.py: get_model_store returns empty store."""
 
     def test_get_model_store_before_init(self):
         """When app.state.models is None, get_model_store returns empty ModelStore."""
-        from src.api.main import get_model_store
 
         mock_request = MagicMock()
         mock_request.app.state = MagicMock(spec=[])  # no 'models' attribute
@@ -302,6 +305,7 @@ class TestEmptyModelStoreReturn:
 # src/api/main.py  --  sequential forecast timeout/exception (lines 456-472)
 # ============================================================================
 
+
 class TestSequentialForecastErrorPaths:
     """Cover sequential forecast timeout and generic exception handling."""
 
@@ -312,8 +316,22 @@ class TestSequentialForecastErrorPaths:
             hour_str = f"{i % 24:02d}"
             day = 26 + i // 24
             ts = f"2024-06-{day:02d}T{hour_str}:00:00"
-            history.append({
-                "timestamp": ts,
+            history.append(
+                {
+                    "timestamp": ts,
+                    "region": "Lisboa",
+                    "temperature": 18.0,
+                    "humidity": 65.0,
+                    "wind_speed": 10.0,
+                    "precipitation": 0.0,
+                    "cloud_cover": 50.0,
+                    "pressure": 1013.0,
+                    "consumption_mw": 2000.0,
+                }
+            )
+        forecast = [
+            {
+                "timestamp": "2024-06-29T00:00:00",
                 "region": "Lisboa",
                 "temperature": 18.0,
                 "humidity": 65.0,
@@ -321,18 +339,8 @@ class TestSequentialForecastErrorPaths:
                 "precipitation": 0.0,
                 "cloud_cover": 50.0,
                 "pressure": 1013.0,
-                "consumption_mw": 2000.0,
-            })
-        forecast = [{
-            "timestamp": "2024-06-29T00:00:00",
-            "region": "Lisboa",
-            "temperature": 18.0,
-            "humidity": 65.0,
-            "wind_speed": 10.0,
-            "precipitation": 0.0,
-            "cloud_cover": 50.0,
-            "pressure": 1013.0,
-        }]
+            }
+        ]
         return {"history": history, "forecast": forecast}
 
     def test_sequential_timeout(self):
@@ -341,10 +349,9 @@ class TestSequentialForecastErrorPaths:
         fake_store.model_no_lags = MagicMock()
 
         async def slow_wait_for(*args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=slow_wait_for):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=slow_wait_for):
             payload = self._build_sequential_payload()
             resp = client.post("/predict/sequential", json=payload)
         assert resp.status_code == 504
@@ -358,8 +365,7 @@ class TestSequentialForecastErrorPaths:
         async def raise_value_error(*args, **kwargs):
             raise ValueError("Feature engineering produced no valid rows")
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=raise_value_error):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=raise_value_error):
             payload = self._build_sequential_payload()
             resp = client.post("/predict/sequential", json=payload)
         assert resp.status_code == 422
@@ -373,8 +379,7 @@ class TestSequentialForecastErrorPaths:
         async def raise_runtime(*args, **kwargs):
             raise RuntimeError("Unexpected failure")
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=raise_runtime):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=raise_runtime):
             payload = self._build_sequential_payload()
             resp = client.post("/predict/sequential", json=payload)
         assert resp.status_code == 500
@@ -384,6 +389,7 @@ class TestSequentialForecastErrorPaths:
 # ============================================================================
 # src/api/main.py  --  explain endpoint paths (lines 503, 521)
 # ============================================================================
+
 
 class TestExplainEndpointPaths:
     """Cover /predict/explain no-model and re-raise HTTPException paths."""
@@ -401,10 +407,9 @@ class TestExplainEndpointPaths:
         fake_store.model_no_lags = MagicMock()
 
         async def timeout_side_effect(*args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=timeout_side_effect):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=timeout_side_effect):
             resp = client.post("/predict/explain", json=_VALID_PAYLOAD)
         assert resp.status_code == 504
 
@@ -416,8 +421,7 @@ class TestExplainEndpointPaths:
         async def generic_err(*args, **kwargs):
             raise RuntimeError("boom")
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=generic_err):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=generic_err):
             resp = client.post("/predict/explain", json=_VALID_PAYLOAD)
         assert resp.status_code == 500
 
@@ -425,6 +429,7 @@ class TestExplainEndpointPaths:
 # ============================================================================
 # src/api/middleware.py  --  circuit breaker and rate limit paths
 # ============================================================================
+
 
 class TestMiddlewareCircuitBreaker:
     """Cover middleware.py lines 208-214, 217, 222-232: circuit breaker logic."""
@@ -555,6 +560,7 @@ class TestSecurityHeadersCacheControl:
 # src/api/middleware.py  --  Redis init from URL (lines 138-140)
 # ============================================================================
 
+
 class TestRedisInitialization:
     """Cover middleware.py lines 41-42, 138-140: Redis backend init."""
 
@@ -566,9 +572,11 @@ class TestRedisInitialization:
         mock_redis_client = MagicMock()
         mock_redis_module.from_url.return_value = mock_redis_client
 
-        with patch.dict("os.environ", {"REDIS_URL": "redis://localhost:6379"}), \
-             patch("src.api.middleware._REDIS_AVAILABLE", True), \
-             patch("src.api.middleware.aioredis", mock_redis_module, create=True):
+        with (
+            patch.dict("os.environ", {"REDIS_URL": "redis://localhost:6379"}),
+            patch("src.api.middleware._REDIS_AVAILABLE", True),
+            patch("src.api.middleware.aioredis", mock_redis_module, create=True),
+        ):
             mw = RateLimitMiddleware(app=MagicMock())
         assert mw._redis is mock_redis_client
 
@@ -576,6 +584,7 @@ class TestRedisInitialization:
 # ============================================================================
 # src/api/prediction.py  --  model fallback chains
 # ============================================================================
+
 
 class TestPredictionAdvancedModelPath:
     """Cover prediction.py lines 230-239: advanced model prediction try path."""
@@ -596,6 +605,7 @@ class TestPredictionAdvancedModelPath:
 
         # Setup feature engineer to return a df with the right columns
         import pandas as pd
+
         mock_df = pd.DataFrame({"f1": [1.0], "f2": [2.0]})
         store.feature_engineer.create_all_features.return_value = mock_df
         store.model_advanced.predict.return_value = np.array([1500.0])
@@ -625,6 +635,7 @@ class TestPredictionAdvancedModelPath:
 
         # No-lags model that succeeds
         import pandas as pd
+
         store.model_no_lags = MagicMock()
         store.feature_names_no_lags = ["f1"]
         store.model_name_no_lags = "XGBoost (no lags)"
@@ -657,6 +668,7 @@ class TestPredictionWithLagsPath:
         store.conformal_q90_with_lags = 30.0
 
         import pandas as pd
+
         mock_df = pd.DataFrame({"g1": [3.0], "g2": [4.0]})
         store.feature_engineer.create_all_features.return_value = mock_df
         store.model_with_lags.predict.return_value = np.array([2200.0])
@@ -680,6 +692,7 @@ class TestPredictionWithLagsPath:
         store.feature_names_with_lags = ["g1"]
 
         import pandas as pd
+
         store.feature_engineer.create_all_features.side_effect = Exception("With-lags failed")
 
         # No-lags succeeds
@@ -740,6 +753,7 @@ class TestBatchPredictionErrors:
         store.rmse_no_lags = 50.0
 
         import pandas as pd
+
         mock_df = pd.DataFrame({"f1": [1.0]})
         store.feature_engineer.create_features_no_lags.return_value = mock_df
         store.model_no_lags.predict.return_value = np.array([float("nan")])
@@ -792,6 +806,7 @@ class TestExplainPredictionPaths:
         store.model_with_lags = None
 
         import pandas as pd
+
         mock_features_df = pd.DataFrame({"f1": [1.0], "f2": [2.0], "f3": [3.0]})
         store.feature_engineer.create_features_no_lags.return_value = mock_features_df
         store.model_no_lags.predict.return_value = np.array([1500.0])
@@ -822,6 +837,7 @@ class TestExplainPredictionPaths:
         store.model_with_lags = None
 
         import pandas as pd
+
         mock_features_df = pd.DataFrame({"f1": [1.0], "f2": [2.0]})
         store.feature_engineer.create_features_no_lags.return_value = mock_features_df
 
@@ -849,6 +865,7 @@ class TestExplainPredictionPaths:
         store.model_no_lags = None
 
         import pandas as pd
+
         # create_all_features returns df with enough rows
         mock_all_df = pd.DataFrame({"f1": [1.0], "f2": [2.0], "f3": [3.0], "lag_1h": [100.0], "lag_2h": [99.0]})
         store.feature_engineer.create_all_features.return_value = mock_all_df
@@ -880,6 +897,7 @@ class TestExplainPredictionPaths:
         store.model_with_lags = None
 
         import pandas as pd
+
         mock_features_df = pd.DataFrame({"f1": [1.0], "f2": [2.0]})
         store.feature_engineer.create_features_no_lags.return_value = mock_features_df
         store.model_no_lags.predict.return_value = np.array([1500.0])
@@ -911,6 +929,7 @@ class TestExplainPredictionPaths:
         store.model_with_lags = None
 
         import pandas as pd
+
         # First call (for _make_single_prediction) succeeds
         mock_features_df = pd.DataFrame({"f1": [1.0], "f2": [2.0]})
         store.feature_engineer.create_features_no_lags.side_effect = [
@@ -929,6 +948,7 @@ class TestExplainPredictionPaths:
 # ============================================================================
 # src/utils/metrics.py  --  edge cases
 # ============================================================================
+
 
 class TestMetricsEdgeCases:
     """Cover metrics.py uncovered lines for edge case inputs."""
@@ -1036,18 +1056,21 @@ class TestMetricsEdgeCases:
 # src/api/main.py  --  Prometheus instrumentation (line 205)
 # ============================================================================
 
+
 class TestPrometheusSetup:
     """Cover line 57 and 205: Prometheus import success and instrumentation."""
 
     def test_prometheus_available_flag(self):
         """When prometheus_fastapi_instrumentator is importable, flag is True."""
         from src.api.main import _PROMETHEUS_AVAILABLE
+
         assert isinstance(_PROMETHEUS_AVAILABLE, bool)
 
 
 # ============================================================================
 # src/api/main.py  --  predict route line 283/349 (predict and batch endpoints)
 # ============================================================================
+
 
 class TestPredictRouteHandlers:
     """Cover error handling routes for /predict and /predict/batch."""
@@ -1058,10 +1081,9 @@ class TestPredictRouteHandlers:
         fake_store.model_no_lags = MagicMock()
 
         async def timeout_side(*args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=timeout_side):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=timeout_side):
             resp = client.post("/predict", json=_VALID_PAYLOAD)
         assert resp.status_code == 504
 
@@ -1073,8 +1095,7 @@ class TestPredictRouteHandlers:
         async def generic_err(*args, **kwargs):
             raise RuntimeError("boom")
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=generic_err):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=generic_err):
             resp = client.post("/predict", json=_VALID_PAYLOAD)
         assert resp.status_code == 500
 
@@ -1091,19 +1112,23 @@ class TestPredictRouteHandlers:
 # Lines 250-251, 282, 310-311, 317, 323-324, 327-328, 360, 389, 396
 # ============================================================================
 
+
 class TestStoreLoadMetadataJson:
     """Cover store.py lines 250-251: _load_metadata_json returning None on errors."""
 
     def test_load_metadata_json_file_not_found(self):
         """Missing file returns None."""
-        from src.api.store import _load_metadata_json
         from pathlib import Path
+
+        from src.api.store import _load_metadata_json
+
         result = _load_metadata_json(Path("/nonexistent/path/meta.json"))
         assert result is None
 
     def test_load_metadata_json_invalid_json(self, tmp_path):
         """Malformed JSON returns None."""
         from src.api.store import _load_metadata_json
+
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("{invalid json content")
         result = _load_metadata_json(bad_file)
@@ -1111,8 +1136,10 @@ class TestStoreLoadMetadataJson:
 
     def test_load_metadata_json_valid(self, tmp_path):
         """Valid JSON returns the dict."""
-        from src.api.store import _load_metadata_json
         import json
+
+        from src.api.store import _load_metadata_json
+
         good_file = tmp_path / "good.json"
         good_file.write_text(json.dumps({"best_model": "XGBoost", "test_metrics": {"rmse": 20.0}}))
         result = _load_metadata_json(good_file)
@@ -1125,7 +1152,7 @@ class TestStoreLoadVariant:
 
     def test_load_variant_model_not_found(self, tmp_path):
         """When model file does not exist, _load_variant returns early (line 282)."""
-        from src.api.store import _load_variant, ModelStore
+        from src.api.store import ModelStore, _load_variant
 
         store = ModelStore()
         checksums = {}
@@ -1137,9 +1164,16 @@ class TestStoreLoadVariant:
         feat.mkdir()
         # No model file exists under ck
         _load_variant(
-            store, "advanced", "nonexistent.pkl",
-            "feat.txt", "meta.json", 20.0,
-            ck, meta, feat, checksums,
+            store,
+            "advanced",
+            "nonexistent.pkl",
+            "feat.txt",
+            "meta.json",
+            20.0,
+            ck,
+            meta,
+            feat,
+            checksums,
         )
         assert store.model_advanced is None
         assert "advanced" not in checksums
@@ -1147,7 +1181,8 @@ class TestStoreLoadVariant:
     def test_load_variant_success_path(self, tmp_path):
         """Successful _load_variant populates store attributes."""
         import json
-        from src.api.store import _load_variant, ModelStore
+
+        from src.api.store import ModelStore, _load_variant
 
         store = ModelStore()
         checksums = {}
@@ -1168,17 +1203,28 @@ class TestStoreLoadVariant:
 
         # Create metadata file
         meta_file = meta / "meta.json"
-        meta_file.write_text(json.dumps({
-            "best_model": "XGBoost",
-            "test_metrics": {"rmse": 15.0},
-        }))
+        meta_file.write_text(
+            json.dumps(
+                {
+                    "best_model": "XGBoost",
+                    "test_metrics": {"rmse": 15.0},
+                }
+            )
+        )
 
         mock_model = MagicMock()
         with patch("src.api.store.joblib.load", return_value=mock_model):
             _load_variant(
-                store, "with_lags", "test_model.pkl",
-                "feat_names.txt", "meta.json", 20.0,
-                ck, meta, feat, checksums,
+                store,
+                "with_lags",
+                "test_model.pkl",
+                "feat_names.txt",
+                "meta.json",
+                20.0,
+                ck,
+                meta,
+                feat,
+                checksums,
             )
 
         assert store.model_with_lags is mock_model
@@ -1190,7 +1236,7 @@ class TestStoreLoadVariant:
 
     def test_load_variant_exception_in_loading(self, tmp_path):
         """When joblib.load raises, variant is not loaded (lines 310-311)."""
-        from src.api.store import _load_variant, ModelStore
+        from src.api.store import ModelStore, _load_variant
 
         store = ModelStore()
         checksums = {}
@@ -1207,9 +1253,16 @@ class TestStoreLoadVariant:
 
         with patch("src.api.store.joblib.load", side_effect=Exception("Corrupt file")):
             _load_variant(
-                store, "no_lags", "broken.pkl",
-                "feat.txt", "meta.json", 86.55,
-                ck, meta, feat, checksums,
+                store,
+                "no_lags",
+                "broken.pkl",
+                "feat.txt",
+                "meta.json",
+                86.55,
+                ck,
+                meta,
+                feat,
+                checksums,
             )
 
         assert store.model_no_lags is None
@@ -1221,7 +1274,7 @@ class TestStoreLoadOptionalKeys:
 
     def test_load_optional_keys_none_metadata(self):
         """When meta_dict is None, _load_optional_keys returns early (line 317)."""
-        from src.api.store import _load_optional_keys, ModelStore
+        from src.api.store import ModelStore, _load_optional_keys
 
         store = ModelStore()
         _load_optional_keys(store, None, "conformal_q90_advanced")
@@ -1229,7 +1282,7 @@ class TestStoreLoadOptionalKeys:
 
     def test_load_optional_keys_valid_conformal_q90(self):
         """Valid conformal_q90 is set on the store (line 321)."""
-        from src.api.store import _load_optional_keys, ModelStore
+        from src.api.store import ModelStore, _load_optional_keys
 
         store = ModelStore()
         meta = {"conformal_q90": 35.5}
@@ -1238,7 +1291,7 @@ class TestStoreLoadOptionalKeys:
 
     def test_load_optional_keys_invalid_conformal_q90(self):
         """Invalid conformal_q90 value logs warning, attribute stays None (lines 323-324)."""
-        from src.api.store import _load_optional_keys, ModelStore
+        from src.api.store import ModelStore, _load_optional_keys
 
         store = ModelStore()
         meta = {"conformal_q90": "not_a_number"}
@@ -1248,7 +1301,7 @@ class TestStoreLoadOptionalKeys:
 
     def test_load_optional_keys_region_cv_scales(self):
         """region_cv_scales dict is loaded into store (lines 327-328)."""
-        from src.api.store import _load_optional_keys, ModelStore
+        from src.api.store import ModelStore, _load_optional_keys
 
         store = ModelStore()
         meta = {
@@ -1261,7 +1314,7 @@ class TestStoreLoadOptionalKeys:
 
     def test_load_optional_keys_region_scales_not_overwritten(self):
         """If store already has region_uncertainty_scale, it is NOT overwritten (line 326 condition)."""
-        from src.api.store import _load_optional_keys, ModelStore
+        from src.api.store import ModelStore, _load_optional_keys
 
         store = ModelStore()
         store.region_uncertainty_scale = {"Norte": 0.5}
@@ -1296,8 +1349,7 @@ class TestStoreLoadModelsEdgePaths:
         from src.api.store import _load_models
 
         # tmp_path exists but has NO checkpoints/metadata/features subdirs
-        with patch("src.api.store.MODEL_PATH", tmp_path), \
-             patch("src.api.store.logger") as mock_logger:
+        with patch("src.api.store.MODEL_PATH", tmp_path), patch("src.api.store.logger") as mock_logger:
             store = _load_models()
 
         assert store.has_any_model is False
@@ -1306,7 +1358,7 @@ class TestStoreLoadModelsEdgePaths:
 
     def test_load_models_with_uncalibrated_rmse(self, tmp_path):
         """Models loaded without metadata trigger uncalibrated RMSE warning (line 396)."""
-        import json
+
         from src.api.store import _load_models
 
         ck = tmp_path / "checkpoints"
@@ -1325,9 +1377,11 @@ class TestStoreLoadModelsEdgePaths:
         feat_file.write_text("f1\nf2\n")
 
         mock_model = MagicMock()
-        with patch("src.api.store.MODEL_PATH", tmp_path), \
-             patch("src.api.store.joblib.load", return_value=mock_model), \
-             patch("src.api.store.logger") as mock_logger:
+        with (
+            patch("src.api.store.MODEL_PATH", tmp_path),
+            patch("src.api.store.joblib.load", return_value=mock_model),
+            patch("src.api.store.logger") as mock_logger,
+        ):
             store = _load_models()
 
         assert store.has_any_model is True
@@ -1347,6 +1401,7 @@ class TestStoreLoadModelsEdgePaths:
 # Lines 587-590: SHAP values handling
 # ============================================================================
 
+
 class TestPredictionSuccessPaths:
     """Cover prediction.py lines 233-237 (advanced success), 250-256 (with_lags success),
     267-273 (no_lags success) — the actual model.predict() calls and result assignment."""
@@ -1354,9 +1409,10 @@ class TestPredictionSuccessPaths:
     def test_advanced_model_predict_returns_valid_result(self):
         """Advanced model predict path: feature_engineer.create_all_features succeeds,
         model.predict returns valid numpy array, prediction assigned (lines 228-237)."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1378,9 +1434,10 @@ class TestPredictionSuccessPaths:
 
     def test_with_lags_model_predict_returns_valid_result(self):
         """With-lags model predict path when advanced is None (lines 245-256)."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1403,9 +1460,10 @@ class TestPredictionSuccessPaths:
 
     def test_no_lags_fallback_predict_returns_valid_result(self):
         """No-lags model predict path as fallback (lines 264-273)."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1433,9 +1491,10 @@ class TestExplainModelVariantSelection:
 
     def test_explain_selects_advanced_model(self):
         """When advanced model produced the prediction, explain uses advanced variant (lines 549-551)."""
+        import pandas as pd
+
         from src.api.prediction import _explain_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1469,9 +1528,10 @@ class TestExplainModelVariantSelection:
 
     def test_explain_selects_with_lags_model(self):
         """When with_lags model produced the prediction, explain uses with_lags variant (line 552-554)."""
+        import pandas as pd
+
         from src.api.prediction import _explain_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1502,9 +1562,10 @@ class TestExplainShapValuesHandling:
 
     def test_explain_shap_success_path(self):
         """When SHAP succeeds, importances come from SHAP values (lines 586-590)."""
+        import pandas as pd
+
         from src.api.prediction import _explain_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1547,19 +1608,23 @@ class TestExplainShapValuesHandling:
 # Lines 302-303: temperature validation ValueError
 # ============================================================================
 
+
 class TestValidateOutputFeaturesInfinity:
     """Cover feature_engineering.py lines 203-211: infinity replacement in output validation."""
 
     def test_infinity_values_replaced_with_nan(self):
         """DataFrame with inf values should have them replaced with NaN (lines 204-211)."""
-        from src.features.feature_engineering import _validate_output_features
         import pandas as pd
 
-        df = pd.DataFrame({
-            "hour": [14],
-            "temperature": [np.inf],
-            "some_numeric": [-np.inf],
-        })
+        from src.features.feature_engineering import _validate_output_features
+
+        df = pd.DataFrame(
+            {
+                "hour": [14],
+                "temperature": [np.inf],
+                "some_numeric": [-np.inf],
+            }
+        )
         result = _validate_output_features(df)
         assert np.isnan(result["temperature"].iloc[0])
         assert np.isnan(result["some_numeric"].iloc[0])
@@ -1572,15 +1637,18 @@ class TestValidateOutputFeaturesClipping:
 
     def test_out_of_range_values_clipped(self):
         """Values outside known bounds are clipped (lines 221-228)."""
-        from src.features.feature_engineering import _validate_output_features
         import pandas as pd
 
-        df = pd.DataFrame({
-            "hour": [25],        # max 23
-            "month": [0],        # min 1
-            "cloud_cover": [150],  # max 100
-            "is_weekend": [2],   # max 1
-        })
+        from src.features.feature_engineering import _validate_output_features
+
+        df = pd.DataFrame(
+            {
+                "hour": [25],  # max 23
+                "month": [0],  # min 1
+                "cloud_cover": [150],  # max 100
+                "is_weekend": [2],  # max 1
+            }
+        )
         result = _validate_output_features(df)
         assert result["hour"].iloc[0] == 23
         assert result["month"].iloc[0] == 1
@@ -1593,39 +1661,45 @@ class TestWeatherValidationHumidity:
 
     def test_humidity_above_100_raises(self):
         """Humidity > 100 triggers ValueError (lines 293-296)."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [20.0],
-            "humidity": [110.0],  # invalid
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [20.0],
+                "humidity": [110.0],  # invalid
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         with pytest.raises(ValueError, match="humidity"):
             fe._validate_weather_columns(df)
 
     def test_humidity_below_0_raises(self):
         """Humidity < 0 triggers ValueError."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [20.0],
-            "humidity": [-5.0],  # invalid
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [20.0],
+                "humidity": [-5.0],  # invalid
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         with pytest.raises(ValueError, match="humidity"):
             fe._validate_weather_columns(df)
 
@@ -1635,134 +1709,155 @@ class TestWeatherValidationTemperature:
 
     def test_temperature_above_max_raises(self):
         """Temperature > TEMP_VALID_MAX (60) triggers ValueError (lines 301-305)."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [65.0],  # above 60
-            "humidity": [50.0],
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [65.0],  # above 60
+                "humidity": [50.0],
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         with pytest.raises(ValueError, match="temperature"):
             fe._validate_weather_columns(df)
 
     def test_temperature_below_min_raises(self):
         """Temperature < TEMP_VALID_MIN (-50) triggers ValueError."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [-55.0],  # below -50
-            "humidity": [50.0],
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [-55.0],  # below -50
+                "humidity": [50.0],
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         with pytest.raises(ValueError, match="temperature"):
             fe._validate_weather_columns(df)
 
     def test_temperature_unusual_but_valid_warns(self):
         """Temperature in unusual range (e.g. -15 C) logs warning but does not raise."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-01-15T14:00:00")],
-            "region": ["Norte"],
-            "temperature": [-15.0],  # unusual but valid (between -50 and -10)
-            "humidity": [50.0],
-            "wind_speed": [10.0],
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-01-15T14:00:00")],
+                "region": ["Norte"],
+                "temperature": [-15.0],  # unusual but valid (between -50 and -10)
+                "humidity": [50.0],
+                "wind_speed": [10.0],
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         # Should not raise, just warn
         fe._validate_weather_columns(df)
 
     def test_wind_speed_negative_raises(self):
         """Negative wind_speed triggers ValueError (lines 317-321)."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [20.0],
-            "humidity": [50.0],
-            "wind_speed": [-5.0],  # invalid
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [20.0],
+                "humidity": [50.0],
+                "wind_speed": [-5.0],  # invalid
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         with pytest.raises(ValueError, match="wind_speed"):
             fe._validate_weather_columns(df)
 
     def test_precipitation_negative_raises(self):
         """Negative precipitation triggers ValueError (lines 331-335)."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [20.0],
-            "humidity": [50.0],
-            "wind_speed": [10.0],
-            "precipitation": [-1.0],  # invalid
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [20.0],
+                "humidity": [50.0],
+                "wind_speed": [10.0],
+                "precipitation": [-1.0],  # invalid
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         with pytest.raises(ValueError, match="precipitation"):
             fe._validate_weather_columns(df)
 
     def test_extreme_wind_speed_warns(self):
         """Wind speed above WIND_SPEED_WARN_MAX (150) logs warning but does not raise."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [20.0],
-            "humidity": [50.0],
-            "wind_speed": [160.0],  # extreme but not negative
-            "precipitation": [0.0],
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [20.0],
+                "humidity": [50.0],
+                "wind_speed": [160.0],  # extreme but not negative
+                "precipitation": [0.0],
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         # Should not raise
         fe._validate_weather_columns(df)
 
     def test_extreme_precipitation_warns(self):
         """Precipitation above PRECIP_WARN_MAX (200) logs warning but does not raise."""
-        from src.features.feature_engineering import FeatureEngineer
         import pandas as pd
 
+        from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
-            "region": ["Lisboa"],
-            "temperature": [20.0],
-            "humidity": [50.0],
-            "wind_speed": [10.0],
-            "precipitation": [250.0],  # extreme
-            "cloud_cover": [50.0],
-            "pressure": [1013.0],
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": [pd.Timestamp("2024-06-15T14:00:00")],
+                "region": ["Lisboa"],
+                "temperature": [20.0],
+                "humidity": [50.0],
+                "wind_speed": [10.0],
+                "precipitation": [250.0],  # extreme
+                "cloud_cover": [50.0],
+                "pressure": [1013.0],
+            }
+        )
         # Should not raise
         fe._validate_weather_columns(df)
 
@@ -1772,6 +1867,7 @@ class TestWeatherValidationTemperature:
 # Line 254: health endpoint returning degraded when store is None
 # Line 320: except HTTPException: raise in predict endpoint
 # ============================================================================
+
 
 class TestHealthDegradedStoreNone:
     """Cover main.py line 253-265: health endpoint returns degraded when store is None."""
@@ -1810,8 +1906,7 @@ class TestPredictHTTPExceptionReRaise:
         async def raise_http_exc(*args, **kwargs):
             raise FastAPIHTTPException(status_code=418, detail="I'm a teapot")
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=raise_http_exc):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=raise_http_exc):
             resp = client.post("/predict", json=_VALID_PAYLOAD)
 
         assert resp.status_code == 418
@@ -1822,14 +1917,16 @@ class TestPredictHTTPExceptionReRaise:
 # prediction.py lines 233, 252, 269 — Model returns NaN/negative
 # ============================================================================
 
+
 class TestPredictionInvalidModelOutput:
     """Cover lines 233, 252, 269 — model returns NaN or negative."""
 
     def test_advanced_model_nan_falls_back(self):
         """Mock advanced model to return NaN; should fall back to with_lags or no_lags."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1864,9 +1961,10 @@ class TestPredictionInvalidModelOutput:
 
     def test_with_lags_model_negative_falls_back(self):
         """Mock with_lags model to return -1.0; should fall back to no_lags."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1901,9 +1999,10 @@ class TestPredictionInvalidModelOutput:
 
     def test_no_lags_model_nan_raises(self):
         """Mock no_lags model to return NaN; should raise ValueError (line 269) -> 500."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1928,9 +2027,10 @@ class TestPredictionInvalidModelOutput:
 
     def test_no_lags_model_negative_raises(self):
         """Mock no_lags model to return -5.0; should raise ValueError (line 269)."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1952,9 +2052,10 @@ class TestPredictionInvalidModelOutput:
 
     def test_advanced_model_inf_falls_back(self):
         """Mock advanced model to return +inf; should fall back (line 232-233)."""
+        import pandas as pd
+
         from src.api.prediction import _make_single_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -1987,6 +2088,7 @@ class TestPredictionInvalidModelOutput:
 # prediction.py lines 483, 491 — Sequential empty features / invalid prediction
 # ============================================================================
 
+
 class TestSequentialEmptyFeaturesAndInvalidPrediction:
     """Cover lines 483, 491 — sequential feature eng returns empty df and model returns NaN."""
 
@@ -2006,8 +2108,9 @@ class TestSequentialEmptyFeaturesAndInvalidPrediction:
 
     def test_sequential_empty_features_raises(self):
         """When create_all_features returns empty df, ValueError is raised (line 483)."""
-        from src.api.prediction import _make_sequential_predictions
         import pandas as pd
+
+        from src.api.prediction import _make_sequential_predictions
 
         req = self._make_history_and_forecast()
         store = ModelStore()
@@ -2029,8 +2132,9 @@ class TestSequentialEmptyFeaturesAndInvalidPrediction:
 
     def test_sequential_model_returns_nan_raises(self):
         """When sequential model returns NaN, ValueError is raised (line 491)."""
-        from src.api.prediction import _make_sequential_predictions
         import pandas as pd
+
+        from src.api.prediction import _make_sequential_predictions
 
         req = self._make_history_and_forecast()
         store = ModelStore()
@@ -2052,8 +2156,9 @@ class TestSequentialEmptyFeaturesAndInvalidPrediction:
 
     def test_sequential_model_returns_negative_raises(self):
         """When sequential model returns negative, ValueError is raised (line 491)."""
-        from src.api.prediction import _make_sequential_predictions
         import pandas as pd
+
+        from src.api.prediction import _make_sequential_predictions
 
         req = self._make_history_and_forecast()
         store = ModelStore()
@@ -2078,15 +2183,17 @@ class TestSequentialEmptyFeaturesAndInvalidPrediction:
 # prediction.py line 619 — Feature values padding in explain
 # ============================================================================
 
+
 class TestExplainFeatureValuesPaddingWhileLoop:
     """Cover line 618-619 — while loop padding when feature_names > feature_values."""
 
     def test_feature_values_padded_with_zeros(self):
         """Trigger the while-loop at line 618-619 by making feature_values shorter
         than feature_names via a mock DataFrame that returns truncated values."""
+        import pandas as pd
+
         from src.api.prediction import _explain_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -2101,9 +2208,14 @@ class TestExplainFeatureValuesPaddingWhileLoop:
         store.model_with_lags = None
         store.model_no_lags = None
 
-        mock_all_df = pd.DataFrame({
-            "f1": [1.0], "f2": [2.0], "lag_1": [3.0], "lag_2": [4.0],
-        })
+        mock_all_df = pd.DataFrame(
+            {
+                "f1": [1.0],
+                "f2": [2.0],
+                "lag_1": [3.0],
+                "lag_2": [4.0],
+            }
+        )
         store.feature_engineer.create_all_features.return_value = mock_all_df
         store.model_advanced.predict.return_value = np.array([2000.0])
         store.model_advanced.feature_importances_ = np.array([0.4, 0.3, 0.2, 0.1])
@@ -2128,9 +2240,10 @@ class TestExplainFeatureValuesPaddingWhileLoop:
     def test_feature_values_padding_via_direct_mock(self):
         """Directly trigger while-loop padding at line 618-619 by ensuring
         feature_values is shorter than feature_names after the try block."""
+        import pandas as pd
+
         from src.api.prediction import _explain_prediction
         from src.api.schemas import EnergyData
-        import pandas as pd
 
         data = EnergyData(**_VALID_PAYLOAD)
         store = ModelStore()
@@ -2145,20 +2258,30 @@ class TestExplainFeatureValuesPaddingWhileLoop:
         store.model_with_lags = None
         store.model_no_lags = None
 
-        mock_all_df = pd.DataFrame({
-            "f1": [1.0], "f2": [2.0], "f3": [3.0],
-            "adv1": [4.0], "adv2": [5.0],
-        })
+        mock_all_df = pd.DataFrame(
+            {
+                "f1": [1.0],
+                "f2": [2.0],
+                "f3": [3.0],
+                "adv1": [4.0],
+                "adv2": [5.0],
+            }
+        )
         store.feature_engineer.create_all_features.return_value = mock_all_df
         store.model_advanced.predict.return_value = np.array([2000.0])
 
         # For explain: create_features_no_lags returns a df that has ALL 5
         # feature_names as columns, so the check at line 578 passes.
         # But we make .values return a mock that yields only 3 values via tolist().
-        mock_no_lags_df = pd.DataFrame({
-            "f1": [1.0], "f2": [2.0], "f3": [3.0],
-            "adv1": [4.0], "adv2": [5.0],
-        })
+        mock_no_lags_df = pd.DataFrame(
+            {
+                "f1": [1.0],
+                "f2": [2.0],
+                "f3": [3.0],
+                "adv1": [4.0],
+                "adv2": [5.0],
+            }
+        )
         store.feature_engineer.create_features_no_lags.return_value = mock_no_lags_df
 
         # feature_importances_ with 5 entries (matching feature_names length)
@@ -2197,6 +2320,7 @@ class TestExplainFeatureValuesPaddingWhileLoop:
 # ============================================================================
 # middleware.py line 279 — Redis success path
 # ============================================================================
+
 
 class TestRateLimitRedisSuccessPath:
     """Cover middleware.py line 279 — Redis succeeds, _record_redis_success is called."""
@@ -2245,6 +2369,7 @@ class TestRateLimitRedisSuccessPath:
 # ============================================================================
 # middleware.py lines 291-293 — Redis fails, then memory also fails
 # ============================================================================
+
 
 class TestRateLimitRedisAndMemoryBothFail:
     """Cover middleware.py lines 291-293 — Redis raises, then _is_limited_memory also raises.
@@ -2297,6 +2422,7 @@ class TestRateLimitRedisAndMemoryBothFail:
 # ============================================================================
 # middleware.py line 391 — HSTS header for HTTPS
 # ============================================================================
+
 
 class TestSecurityHeadersHSTS:
     """Cover middleware.py line 390-391 — Strict-Transport-Security header for HTTPS."""
@@ -2359,12 +2485,14 @@ class TestSecurityHeadersHSTS:
 # middleware.py line 423 — Valid UUID X-Request-ID
 # ============================================================================
 
+
 class TestRequestLoggingValidUUID:
     """Cover middleware.py line 422-423 — valid UUID4 X-Request-ID is preserved."""
 
     def test_valid_uuid4_request_id_is_preserved(self):
         """A valid UUID4 X-Request-ID header is kept as-is (line 422-423)."""
         import uuid
+
         valid_uuid = str(uuid.uuid4())
         resp = client.get("/health", headers={"X-Request-ID": valid_uuid})
         assert resp.status_code == 200
@@ -2374,6 +2502,7 @@ class TestRequestLoggingValidUUID:
     def test_valid_uuid4_uppercase_is_preserved(self):
         """A valid UUID4 in uppercase is also accepted (regex is case-insensitive)."""
         import uuid
+
         valid_uuid = str(uuid.uuid4()).upper()
         resp = client.get("/health", headers={"X-Request-ID": valid_uuid})
         assert resp.status_code == 200
@@ -2383,6 +2512,7 @@ class TestRequestLoggingValidUUID:
 # ============================================================================
 # main.py line 492 — HTTPException re-raise in explain endpoint
 # ============================================================================
+
 
 class TestExplainHTTPExceptionReRaise:
     """Cover main.py line 491-492 — HTTPException re-raise in explain endpoint."""
@@ -2397,8 +2527,7 @@ class TestExplainHTTPExceptionReRaise:
         async def raise_http_exc(*args, **kwargs):
             raise FastAPIHTTPException(status_code=403, detail="Forbidden resource")
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=raise_http_exc):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=raise_http_exc):
             resp = client.post("/predict/explain", json=_VALID_PAYLOAD)
 
         assert resp.status_code == 403
@@ -2412,13 +2541,9 @@ class TestExplainHTTPExceptionReRaise:
         fake_store.model_no_lags = MagicMock()
 
         async def raise_http_422(*args, **kwargs):
-            raise FastAPIHTTPException(
-                status_code=422,
-                detail={"code": "INVALID_REQUEST", "message": "Bad input"}
-            )
+            raise FastAPIHTTPException(status_code=422, detail={"code": "INVALID_REQUEST", "message": "Bad input"})
 
-        with _override_store(fake_store), \
-             patch("src.api.main.asyncio.wait_for", side_effect=raise_http_422):
+        with _override_store(fake_store), patch("src.api.main.asyncio.wait_for", side_effect=raise_http_422):
             resp = client.post("/predict/explain", json=_VALID_PAYLOAD)
 
         assert resp.status_code == 422
@@ -2431,19 +2556,22 @@ class TestHolidayEmptyList:
     """Cover feature_engineering.py lines 705-707 — no holidays in date range."""
 
     def test_empty_holiday_list_sets_cap(self):
-        from src.features.feature_engineering import FeatureEngineer, HOLIDAY_PROXIMITY_CAP
+        from src.features.feature_engineering import HOLIDAY_PROXIMITY_CAP, FeatureEngineer
+
         fe = FeatureEngineer()
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2099-01-01", periods=3, freq="h"),
-            "region": "Lisboa",
-            "temperature": [20.0] * 3,
-            "humidity": [60.0] * 3,
-            "wind_speed": [5.0] * 3,
-            "precipitation": [0.0] * 3,
-            "cloud_cover": [50.0] * 3,
-            "pressure": [1013.0] * 3,
-            "consumption_mw": [1000.0] * 3,
-        })
+        df = pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2099-01-01", periods=3, freq="h"),
+                "region": "Lisboa",
+                "temperature": [20.0] * 3,
+                "humidity": [60.0] * 3,
+                "wind_speed": [5.0] * 3,
+                "precipitation": [0.0] * 3,
+                "cloud_cover": [50.0] * 3,
+                "pressure": [1013.0] * 3,
+                "consumption_mw": [1000.0] * 3,
+            }
+        )
         with patch("src.features.feature_engineering.get_portuguese_holidays", return_value=[]):
             result = fe.create_holiday_features(df)
         assert (result["days_to_nearest_holiday"] == HOLIDAY_PROXIMITY_CAP).all()
@@ -2455,20 +2583,23 @@ class TestFeaturesWinsorize:
     """Cover feature_engineering.py line 859 — winsorize=True in create_all_features."""
 
     def _make_df(self, n: int = 50) -> pd.DataFrame:
-        return pd.DataFrame({
-            "timestamp": pd.date_range("2024-06-15", periods=n, freq="h"),
-            "region": "Norte",
-            "temperature": [20.0 + i % 5 for i in range(n)],
-            "humidity": [60.0 + i % 10 for i in range(n)],
-            "wind_speed": [5.0 + i % 3 for i in range(n)],
-            "precipitation": [float(i % 2) for i in range(n)],
-            "cloud_cover": [50.0 + i % 20 for i in range(n)],
-            "pressure": [1013.0 + i % 5 for i in range(n)],
-            "consumption_mw": [1000.0 + i * 10 for i in range(n)],
-        })
+        return pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2024-06-15", periods=n, freq="h"),
+                "region": "Norte",
+                "temperature": [20.0 + i % 5 for i in range(n)],
+                "humidity": [60.0 + i % 10 for i in range(n)],
+                "wind_speed": [5.0 + i % 3 for i in range(n)],
+                "precipitation": [float(i % 2) for i in range(n)],
+                "cloud_cover": [50.0 + i % 20 for i in range(n)],
+                "pressure": [1013.0 + i % 5 for i in range(n)],
+                "consumption_mw": [1000.0 + i * 10 for i in range(n)],
+            }
+        )
 
     def test_create_all_features_winsorize(self):
         from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
         df = self._make_df(50)
         result = fe.create_all_features(df, winsorize=True)
@@ -2477,6 +2608,7 @@ class TestFeaturesWinsorize:
 
     def test_create_features_no_lags_winsorize(self):
         from src.features.feature_engineering import FeatureEngineer
+
         fe = FeatureEngineer()
         df = self._make_df(5)
         result = fe.create_features_no_lags(df, winsorize=True)
@@ -2509,11 +2641,15 @@ class TestModelRegistryParamsOverrideDefault:
 
     def test_params_override_none_defaults_to_empty(self):
         from src.models.model_registry import train_and_select_best
+
         rng = np.random.default_rng(42)
         X = rng.standard_normal((50, 3))
         y = X[:, 0] * 2 + rng.standard_normal(50) * 0.1
         best_model, best_key, results = train_and_select_best(
-            X, y, X[:10], y[:10],
+            X,
+            y,
+            X[:10],
+            y[:10],
             model_keys=["xgboost"],
             params_override=None,
         )
@@ -2526,6 +2662,7 @@ class TestMetadataWarningMissingRMSE:
 
     def test_warns_on_missing_rmse(self):
         from src.models.metadata import validate_metadata_schema
+
         meta = {
             "model_name": "test",
             "training_date": "2024-01-01",
@@ -2543,14 +2680,21 @@ class TestJSONFormatterRequestId:
     """Cover logger.py line 87 — request_id added to log data."""
 
     def test_request_id_in_json_output(self):
-        from src.utils.logger import JSONFormatter, set_request_id
         import json as json_mod
+
+        from src.utils.logger import JSONFormatter, set_request_id
+
         formatter = JSONFormatter()
         set_request_id("test-uuid-1234")
         try:
             record = logging.LogRecord(
-                name="test", level=logging.INFO, pathname="test.py",
-                lineno=1, msg="hello", args=(), exc_info=None,
+                name="test",
+                level=logging.INFO,
+                pathname="test.py",
+                lineno=1,
+                msg="hello",
+                args=(),
+                exc_info=None,
             )
             output = formatter.format(record)
             data = json_mod.loads(output)
@@ -2564,8 +2708,10 @@ class TestEvaluationTimestampSubsampling:
 
     def test_plot_predictions_with_pandas_timestamps(self):
         import matplotlib
+
         matplotlib.use("Agg")
         from src.models.evaluation import ModelEvaluator
+
         ev = ModelEvaluator()
         n = 2000
         y_true = np.random.default_rng(42).standard_normal(n) * 100 + 1000
@@ -2574,12 +2720,15 @@ class TestEvaluationTimestampSubsampling:
         fig = ev.plot_predictions(y_true, y_pred, timestamps=timestamps, max_points=500)
         assert fig is not None
         import matplotlib.pyplot as plt
+
         plt.close(fig)
 
     def test_plot_prediction_intervals_with_pandas_timestamps(self):
         import matplotlib
+
         matplotlib.use("Agg")
         from src.models.evaluation import ModelEvaluator
+
         ev = ModelEvaluator()
         n = 2000
         rng = np.random.default_rng(42)
@@ -2589,9 +2738,14 @@ class TestEvaluationTimestampSubsampling:
         y_upper = y_pred + 50
         timestamps = pd.date_range("2024-01-01", periods=n, freq="h")
         fig = ev.plot_prediction_intervals(
-            y_true, y_pred, y_lower, y_upper,
-            timestamps=timestamps, max_points=500,
+            y_true,
+            y_pred,
+            y_lower,
+            y_upper,
+            timestamps=timestamps,
+            max_points=500,
         )
         assert fig is not None
         import matplotlib.pyplot as plt
+
         plt.close(fig)
