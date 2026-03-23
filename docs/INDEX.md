@@ -105,11 +105,17 @@ docs/
 │   ├── API_DOCUMENTATION.md          # API complete guide
 │   └── NOTEBOOKS_GUIDE.md            # Jupyter notebooks guide
 │
+├── 📊 ML & Data Science Docs
+│   ├── ML_PIPELINE.md                # Complete ML pipeline reference
+│   └── DATA_DICTIONARY.md            # Data schemas, features, metadata
+│
 └── 📁 Root Level Docs
     ├── README.md                     # Project quick start
     ├── ARCHITECTURE.md               # System architecture
-    ├── MODEL_CARD.md                 # Model card
-    └── DEPLOYMENT.md                 # Deployment guide
+    ├── MODEL_CARD.md                 # Model card (v2.0)
+    ├── DEPLOYMENT.md                 # Deployment guide
+    ├── MONITORING.md                 # Production monitoring
+    └── SECURITY.md                   # Security architecture
 ```
 
 ---
@@ -293,6 +299,13 @@ The detailed technical documentation is in Portuguese, but:
 
 ## 📝 Changelog
 
+### v2.0 (March 2026)
+- ✅ ML Pipeline documentation (ML_PIPELINE.md)
+- ✅ Data Dictionary (DATA_DICTIONARY.md)
+- ✅ Updated MODEL_CARD.md (v2.0, Pipeline v5)
+- ✅ Updated ARCHITECTURE.md with new ML components
+- ✅ DVC pipeline documentation
+
 ### v1.0 (January 2025)
 - ✅ Initial documentation creation
 - ✅ 6 detailed Portuguese documents (500+ pages)
@@ -302,8 +315,8 @@ The detailed technical documentation is in Portuguese, but:
 
 ---
 
-**Last Updated**: January 2025
-**Version**: 1.0
+**Last Updated**: March 2026
+**Version**: 2.0
 **Author**: Pedro Marques
 **Project**: Energy Forecast PT
 **Language**: 🇬🇧 English (this index) | 🇵🇹 Portuguese (technical docs)

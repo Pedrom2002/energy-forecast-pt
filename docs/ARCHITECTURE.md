@@ -133,25 +133,34 @@ sequenceDiagram
 - ✅ **Reproducible**: Same input → same output
 - ⚠️ **Memory**: Loads full dataset in memory (trade-off for speed)
 
-### 2. Model Training (`notebooks/02_model_training.ipynb`)
+### 2. Model Training (`scripts/retrain.py`)
 
 **Responsibilities:**
-- Train multiple model types
-- Perform hyperparameter optimization
-- Validate using time series split
-- Save trained models and metadata
+- Set global seeds for reproducibility
+- Evaluate baseline models (persistence, seasonal naive, moving average)
+- Train 4 model types with 5-fold time-series CV
+- Optuna hyperparameter optimisation (50 trials, 5 CV folds)
+- Permutation-importance feature selection
+- Compute conformal prediction calibration
+- Log experiments to file-based tracker
 
 **Models Compared:**
-1. **Random Forest** - Baseline, interpretable
-2. **XGBoost** - Best performer (MAPE 0.86%) ⭐
-3. **LightGBM** - Fast training, competitive performance
-4. **CatBoost** - Automatic categorical handling
+1. **CatBoost** - Typically selected (best CV RMSE)
+2. **XGBoost** - Competitive, fast inference
+3. **LightGBM** - Memory-efficient, fast training
+4. **Random Forest** - Robust baseline
+
+**Baselines** (every ML model must beat):
+1. Persistence (lag-1 naive)
+2. Seasonal Naive (daily, period=24h)
+3. Seasonal Naive (weekly, period=168h)
+4. Moving Average (24h and 168h windows)
 
 **Optimization:**
-- Framework: Optuna with TPE Sampler
-- Pruning: MedianPruner for early stopping
-- CV Strategy: TimeSeriesSplit (2 folds)
-- Trials: 20 per model (optimized for speed)
+- Framework: Optuna with TPE Sampler (seeded)
+- CV Strategy: TimeSeriesSplit (5 folds)
+- Trials: 50 per model (sufficient for convergence)
+- Timeout: 3600s safety net
 
 ### 3. API Server (`src/api/main.py`)
 
@@ -197,32 +206,13 @@ sequenceDiagram
 - ✅ No PII or sensitive data
 - ✅ CORS middleware configured
 - ✅ Input validation with Pydantic
-- ⚠️ No authentication (demo/internal use)
-- ⚠️ No rate limiting
-- ⚠️ No HTTPS/SSL (deployment responsibility)
-
-### Production Recommendations
-1. **Add API Key Authentication**
-   ```python
-   from fastapi.security import APIKeyHeader
-   api_key_header = APIKeyHeader(name="X-API-Key")
-   ```
-
-2. **Implement Rate Limiting**
-   ```python
-   from slowapi import Limiter
-   limiter = Limiter(key_func=get_remote_address)
-   ```
-
-3. **Use HTTPS Only**
-   - Configure SSL certificates
-   - Redirect HTTP to HTTPS
-   - Use HSTS headers
-
-4. **Add Request/Response Logging**
-   - Log all predictions for audit
-   - Monitor for suspicious patterns
-   - Implement anomaly detection
+- ✅ API Key Authentication (HMAC-based, timing-safe)
+- ✅ Rate limiting (in-memory or Redis-backed)
+- ✅ Security headers middleware
+- ✅ Non-root Docker user
+- ✅ pip-audit, bandit, detect-secrets in CI
+- ✅ Trivy container scanning + SBOM generation
+- ⚠️ HTTPS/SSL (deployment responsibility via nginx/cloud LB)
 
 ## 📊 Data Model
 
@@ -371,34 +361,53 @@ graph LR
 4. **Push** - Registry upload (ECR/ACR/GCR)
 5. **Deploy** - Cloud platform deployment
 
-## 📚 Future Improvements
+### 5. Reproducibility & Tracking
 
-### Short-term (Nível 2)
+**New in Pipeline v5:**
+
+| Component | File | Purpose |
+|---|---|---|
+| **Global seeds** | `src/utils/reproducibility.py` | Deterministic random state |
+| **Data hashing** | `src/utils/reproducibility.py` | DataFrame SHA-256 for version verification |
+| **Experiment tracker** | `src/models/experiment_tracker.py` | File-based run logging |
+| **Baseline models** | `src/models/baselines.py` | Performance floor comparison |
+| **Feature selection** | `src/models/feature_selection.py` | Correlation + permutation importance |
+| **DVC pipeline** | `dvc.yaml` | Reproducible pipeline with data versioning |
+
+### 6. Documentation
+
+| Document | Purpose |
+|---|---|
+| [ML_PIPELINE.md](ML_PIPELINE.md) | Complete ML pipeline technical reference |
+| [DATA_DICTIONARY.md](DATA_DICTIONARY.md) | All data schemas, features, and metadata |
+| [MODEL_CARD.md](MODEL_CARD.md) | Model capabilities, limitations, and ethics |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Cloud deployment guides |
+| [MONITORING.md](MONITORING.md) | Production monitoring setup |
+| [SECURITY.md](SECURITY.md) | Security architecture |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+
+## Future Improvements
+
+### Completed in v5
 - [x] Architecture documentation
 - [x] Structured logging
-- [ ] MLflow experiment tracking
-- [ ] Data validation (Great Expectations)
+- [x] File-based experiment tracking
+- [x] Data versioning (DVC)
+- [x] Baseline model comparison
+- [x] Feature selection pipeline
+- [x] Reproducibility module
+- [x] Comprehensive ML pipeline documentation
 
-### Medium-term (Nível 3)
-- [ ] Model explainability (SHAP values)
+### Remaining
+- [ ] Model explainability (SHAP values in API)
 - [ ] A/B testing framework
 - [ ] Streamlit dashboard
-- [ ] Automated retraining pipeline
-
-### Long-term
+- [ ] Automated retraining pipeline (Airflow/Prefect)
 - [ ] Real-time streaming predictions
-- [ ] Multi-model ensemble in production
-- [ ] Automated model monitoring
-- [ ] Data drift detection
-
-## 📞 Contact
-
-For questions about the architecture:
-- **Technical Lead**: [Your Name]
-- **Repository**: [GitHub URL]
-- **Documentation**: See [README.md](README.md)
+- [ ] pandera / Great Expectations data validation
+- [ ] MLflow integration (for team collaboration)
 
 ---
 
-**Last Updated**: January 2025
-**Version**: 1.0
+**Last Updated**: March 2026
+**Version**: 2.0

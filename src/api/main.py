@@ -1,497 +1,943 @@
 """
-FastAPI application for Energy Consumption Forecasting
+FastAPI application for Energy Forecast PT.
+
+This module is the composition root: it creates the ``app`` object, registers
+middleware, defines the authentication dependency, and declares all HTTP route
+handlers.
+
+All heavy logic is delegated to focused sub-modules:
+
+- :mod:`src.api.schemas`    — Pydantic request / response models
+- :mod:`src.api.middleware` — Rate limiting, security headers, request logging
+- :mod:`src.api.store`      — ``ModelStore`` dataclass and ``_load_models()``
+- :mod:`src.api.prediction` — Inference functions and CI computation
 """
+from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
-from datetime import datetime
+import asyncio
+import hmac
+import logging
+import os
+import time
 from contextlib import asynccontextmanager
-import joblib
-import pandas as pd
-import numpy as np
-from pathlib import Path
 
-from src.features.feature_engineering import FeatureEngineer
+from fastapi import Depends, FastAPI, HTTPException, Request, Security
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import APIKeyHeader
 
-# Load models and feature engineering
-MODEL_PATH = Path("data/models")
-model_with_lags = None
-model_no_lags = None
-model_advanced = None
-feature_engineer = None
-feature_names_with_lags = None
-feature_names_no_lags = None
-feature_names_advanced = None
+from src.api.middleware import (
+    BodySizeLimitMiddleware,
+    RateLimitMiddleware,
+    RequestLoggingMiddleware,
+    SecurityHeadersMiddleware,
+)
+from src.api.prediction import (
+    BATCH_TIMEOUT_PER_ITEM_S,
+    PREDICTION_TIMEOUT_SECONDS,
+    SEQUENTIAL_TIMEOUT_PER_STEP_S,
+    _explain_prediction,
+    _make_batch_predictions_vectorized,
+    _make_sequential_predictions,
+)
+from src.api.prediction import _make_single_prediction
+from src.api.schemas import (
+    BatchPredictionResponse,
+    EnergyData,
+    ErrorResponse,
+    ExplanationResponse,
+    PredictionResponse,
+    SequentialForecastRequest,
+    SequentialForecastResponse,
+    VALID_REGIONS,
+)
+from src.api.store import ModelStore, _load_models, reload_models
+from src.models.evaluation import CoverageTracker
 
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator  # type: ignore[import]
+    _PROMETHEUS_AVAILABLE = True  # pragma: no cover
+except ImportError:
+    _PROMETHEUS_AVAILABLE = False
+
+# ── Logging setup ─────────────────────────────────────────────────────────────
+
+_LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, _LOG_LEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# ── CORS ──────────────────────────────────────────────────────────────────────
+
+_DEFAULT_ORIGINS = "http://localhost:3000,http://localhost:8000"
+ALLOWED_ORIGINS: list[str] = [
+    o.strip()
+    for o in os.environ.get("ALLOWED_ORIGINS", _DEFAULT_ORIGINS).split(",")
+    if o.strip() and o.strip() != "*"
+]
+
+# ── Request body size limit ───────────────────────────────────────────────────
+# Protects against oversized payloads that could cause OOM (1000 × EnergyData
+# is approximately 200 KB; 2 MB is a safe upper bound).
+_MAX_REQUEST_BODY_BYTES = int(os.environ.get("MAX_REQUEST_BODY_BYTES", str(2 * 1024 * 1024)))
+
+# ── API-key authentication ────────────────────────────────────────────────────
+
+API_KEY = os.environ.get("API_KEY")
+ADMIN_API_KEY = os.environ.get("ADMIN_API_KEY")  # separate key for admin ops
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(key: str | None = Security(api_key_header)) -> str | None:
+    """Verify the API key when ``API_KEY`` env var is configured.
+
+    When ``API_KEY`` is *not* set the check is skipped entirely (development
+    mode).  In production always set ``API_KEY`` to a strong random secret.
+    """
+    if API_KEY is None:
+        return None  # Auth disabled — dev mode
+    if key is None or not hmac.compare_digest(key, API_KEY):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "UNAUTHORIZED",
+                "message": "Invalid or missing API key. Set the X-API-Key header.",
+            },
+        )
+    return key
+
+
+async def verify_admin_key(key: str | None = Security(api_key_header)) -> str | None:
+    """Verify the admin API key for privileged endpoints (e.g. model reload).
+
+    Falls back to ``API_KEY`` when ``ADMIN_API_KEY`` is not set separately.
+    In production, set ``ADMIN_API_KEY`` to a distinct high-entropy secret so
+    that regular API consumers cannot trigger administrative operations.
+
+    When neither ``API_KEY`` nor ``ADMIN_API_KEY`` is configured (dev mode)
+    the check is skipped.
+    """
+    effective_admin_key = ADMIN_API_KEY or API_KEY
+    if effective_admin_key is None:
+        return None  # Auth disabled — dev mode
+    if key is None or not hmac.compare_digest(key, effective_admin_key):
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "code": "UNAUTHORIZED",
+                "message": "Invalid or missing admin API key. Set the X-API-Key header.",
+            },
+        )
+    return key
+
+
+# ── Lifespan & dependency ─────────────────────────────────────────────────────
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup and shutdown"""
-    # Startup
-    global model_with_lags, model_no_lags, model_advanced, feature_engineer
-    global feature_names_with_lags, feature_names_no_lags, feature_names_advanced
-
-    # Try to load ADVANCED model (best performance if available)
-    try:
-        advanced_model_path = MODEL_PATH / "xgboost_advanced_features.pkl"
-        if advanced_model_path.exists():
-            model_advanced = joblib.load(advanced_model_path)
-            print(f"✓ ADVANCED Model loaded: {advanced_model_path.name}")
-
-            with open(MODEL_PATH / "advanced_feature_names.txt", 'r') as f:
-                feature_names_advanced = [line.strip() for line in f.readlines()]
-            print(f"  - Features: {len(feature_names_advanced)} (advanced engineering)")
-    except Exception as e:
-        print(f"⚠ Could not load advanced model: {e}")
-
-    # Try to load model WITH lags (better accuracy, needs historical data)
-    try:
-        best_model_path = MODEL_PATH / "xgboost_best.pkl"
-        if not best_model_path.exists():
-            model_files = list(MODEL_PATH.glob("*_best.pkl"))
-            if model_files:
-                best_model_path = model_files[0]
-
-        if best_model_path.exists():
-            model_with_lags = joblib.load(best_model_path)
-            print(f"✓ Model WITH lags loaded: {best_model_path.name}")
-
-            with open(MODEL_PATH / "feature_names.txt", 'r') as f:
-                feature_names_with_lags = [line.strip() for line in f.readlines()]
-            print(f"  - Features: {len(feature_names_with_lags)} (includes lags)")
-    except Exception as e:
-        print(f"⚠ Could not load model with lags: {e}")
-
-    # Try to load model WITHOUT lags (works without historical data)
-    try:
-        no_lags_model_path = MODEL_PATH / "xgboost_no_lags.pkl"
-        if not no_lags_model_path.exists():
-            model_files = list(MODEL_PATH.glob("*_no_lags.pkl"))
-            if model_files:
-                no_lags_model_path = model_files[0]
-
-        if no_lags_model_path.exists():
-            model_no_lags = joblib.load(no_lags_model_path)
-            print(f"✓ Model WITHOUT lags loaded: {no_lags_model_path.name}")
-
-            with open(MODEL_PATH / "feature_names_no_lags.txt", 'r') as f:
-                feature_names_no_lags = [line.strip() for line in f.readlines()]
-            print(f"  - Features: {len(feature_names_no_lags)} (no lags)")
-    except Exception as e:
-        print(f"⚠ Could not load model without lags: {e}")
-
-    # Check if at least one model loaded
-    if model_with_lags is None and model_no_lags is None and model_advanced is None:
-        raise FileNotFoundError("No trained models found in data/models/")
-
-    # Initialize feature engineer
-    feature_engineer = FeatureEngineer()
-    print("✓ Feature Engineer initialized")
-
-    total_models = sum([model_advanced is not None, model_with_lags is not None, model_no_lags is not None])
-    print(f"\n✅ API ready with {total_models} model(s)")
-    if model_advanced:
-        print("   🔬 Using ADVANCED model (best performance)")
-
+async def lifespan(app: FastAPI):  # pragma: no cover — exercised at real startup, not by TestClient
+    """Load models on startup; log shutdown on teardown."""
+    logger.info(
+        "Starting Energy Forecast PT API — LOG_LEVEL=%s, MAX_BODY=%d bytes, "
+        "MODELS_DIR=%s, TRUST_PROXY=%s",
+        _LOG_LEVEL,
+        _MAX_REQUEST_BODY_BYTES,
+        os.environ.get("MODELS_DIR", "data/models"),
+        os.environ.get("TRUST_PROXY", "1"),
+    )
+    app.state.startup_time = time.monotonic()
+    app.state.models = _load_models()
+    # Sliding-window CI coverage tracker (168-observation = 1 week hourly window).
+    app.state.coverage_tracker = CoverageTracker(
+        window_size=int(os.environ.get("COVERAGE_WINDOW_SIZE", "168")),
+        nominal_coverage=0.90,
+        alert_threshold=float(os.environ.get("COVERAGE_ALERT_THRESHOLD", "0.80")),
+    )
     yield
-
-    # Shutdown (cleanup if needed)
-    print("Shutting down API...")
+    logger.info("Shutting down Energy Forecast PT API")
 
 
-# Initialize FastAPI app with lifespan
+def get_model_store(request: Request) -> ModelStore:
+    """FastAPI dependency: return the :class:`~src.api.store.ModelStore` from
+    ``app.state``.  Returns an empty store if called before initialisation
+    (should not happen in normal operation)."""
+    store = getattr(request.app.state, "models", None)
+    if store is None:
+        logger.warning("Model store accessed before initialisation — returning empty store")
+        return ModelStore()
+    return store
+
+
+# ── App factory ───────────────────────────────────────────────────────────────
+
 app = FastAPI(
     title="Energy Forecast PT API",
-    description="API para previsão de consumo energético em Portugal",
+    description=(
+        "Regional energy consumption forecasting for Portugal.\n\n"
+        "Provides point predictions with 90% confidence intervals for 5 Portuguese regions "
+        "(Alentejo, Algarve, Centro, Lisboa, Norte) using XGBoost/LightGBM/CatBoost ensembles.\n\n"
+        "**Authentication:** set the `X-API-Key` header when `API_KEY` env var is configured.\n\n"
+        "**Rate limiting:** 60 requests/min per IP (configurable via `RATE_LIMIT_MAX` env var)."
+    ),
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_tags=[
+        {"name": "core", "description": "Health, regions, API information"},
+        {"name": "predict", "description": "Single, batch, sequential, and explainability endpoints"},
+        {"name": "models", "description": "Model metadata, drift monitoring, and CI coverage"},
+        {"name": "monitoring", "description": "Operational metrics and coverage tracking"},
+        {"name": "admin", "description": "Privileged administrative operations (requires ADMIN_API_KEY)"},
+    ],
 )
 
-# CORS middleware
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware, max_requests=60, window_seconds=60)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-API-Key", "X-Request-ID"],
 )
 
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES)
 
-# Pydantic models for request/response
-class EnergyData(BaseModel):
-    """Input data for prediction"""
-    timestamp: datetime = Field(..., description="Timestamp for prediction")
-    region: str = Field(..., description="Region name (Alentejo, Algarve, Centro, Lisboa, Norte)")
-    temperature: Optional[float] = Field(15.0, description="Temperature in Celsius", ge=-20, le=50)
-    humidity: Optional[float] = Field(70.0, description="Humidity percentage", ge=0, le=100)
-    wind_speed: Optional[float] = Field(10.0, description="Wind speed in km/h", ge=0)
-    precipitation: Optional[float] = Field(0.0, description="Precipitation in mm", ge=0)
-    cloud_cover: Optional[float] = Field(50.0, description="Cloud cover percentage", ge=0, le=100)
-    pressure: Optional[float] = Field(1013.0, description="Atmospheric pressure in hPa", ge=900, le=1100)
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "timestamp": "2024-12-31T14:00:00",
-                "region": "Lisboa",
-                "temperature": 18.5,
-                "humidity": 65.0,
-                "wind_speed": 12.3,
-                "precipitation": 0.0,
-                "cloud_cover": 40.0,
-                "pressure": 1015.0
-            }
-        }
-    )
+if _PROMETHEUS_AVAILABLE:  # pragma: no cover
+    Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 
-class PredictionResponse(BaseModel):
-    """Prediction response"""
-    timestamp: datetime
-    region: str
-    predicted_consumption_mw: float
-    confidence_interval_lower: float
-    confidence_interval_upper: float
-    model_name: str
+# ── Shared OpenAPI response declarations ──────────────────────────────────────
+# Reusable response dict fragments for common error codes.  Attach to route
+# decorators via ``responses={...}`` so the generated OpenAPI spec documents
+# every possible status code, not just the happy path.
+
+_R_401 = {401: {"model": ErrorResponse, "description": "Invalid or missing API key (when API_KEY is set)"}}
+_R_422 = {422: {"model": ErrorResponse, "description": "Validation error — request body or query parameter is invalid"}}
+_R_503 = {503: {"model": ErrorResponse, "description": "No models loaded — API is running in degraded mode"}}
+_R_504 = {504: {"model": ErrorResponse, "description": "Prediction timed out"}}
+_R_500 = {500: {"model": ErrorResponse, "description": "Unexpected internal error — check server logs"}}
+_R_400 = {400: {"model": ErrorResponse, "description": "Bad request (e.g. batch exceeds 1 000 items)"}}
 
 
-class BatchPredictionResponse(BaseModel):
-    """Batch prediction response"""
-    predictions: List[PredictionResponse]
-    total_predictions: int
+# ── Routes ────────────────────────────────────────────────────────────────────
 
-
-@app.get("/")
+@app.get("/", tags=["core"])
 async def root():
-    """Root endpoint"""
+    """Root endpoint with basic API information."""
     return {
         "message": "Energy Forecast PT API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
 
 
-def create_features_no_lags(df: pd.DataFrame) -> pd.DataFrame:
-    """Create features WITHOUT lags (temporal + weather + interactions only)"""
-    df_features = df.copy()
+@app.get("/health", tags=["core"])
+async def health(request: Request):
+    """Health check endpoint.  Always returns 200 for liveness probes.
 
-    # Add latitude/longitude based on region (approximate)
-    region_coords = {
-        'Alentejo': (38.5, -7.9),
-        'Algarve': (37.1, -8.0),
-        'Centro': (40.2, -8.4),
-        'Lisboa': (38.7, -9.1),
-        'Norte': (41.5, -8.4)
-    }
-    df_features['latitude'] = df_features['region'].map(lambda x: region_coords.get(x, (0, 0))[0])
-    df_features['longitude'] = df_features['region'].map(lambda x: region_coords.get(x, (0, 0))[1])
+    Includes uptime, API version, model load status, and a coverage alert
+    flag so that a single endpoint can drive both liveness and readiness
+    probes as well as basic monitoring dashboards.
+    """
+    startup = getattr(request.app.state, "startup_time", None)
+    uptime_seconds = round(time.monotonic() - startup, 1) if startup is not None else None
 
-    # Weather derived features
-    df_features['temperature_feels_like'] = df_features['temperature']  # Simplified
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    coverage_summary = tracker.summary() if tracker is not None else None
+    coverage_alert = coverage_summary.get("alert", False) if coverage_summary else False
 
-    # Temporal features
-    df_features['hour'] = df_features['timestamp'].dt.hour
-    df_features['day_of_week'] = df_features['timestamp'].dt.dayofweek
-    df_features['day_of_month'] = df_features['timestamp'].dt.day
-    df_features['month'] = df_features['timestamp'].dt.month
-    df_features['quarter'] = df_features['timestamp'].dt.quarter
-    df_features['year'] = df_features['timestamp'].dt.year
-    df_features['week_of_year'] = df_features['timestamp'].dt.isocalendar().week.astype(int)
-    df_features['day_of_year'] = df_features['timestamp'].dt.dayofyear
-
-    # Holiday features (simplified - no actual holiday data)
-    df_features['is_holiday'] = 0
-    df_features['is_holiday_eve'] = 0
-    df_features['is_holiday_after'] = 0
-    df_features['days_to_holiday'] = 365
-    df_features['days_from_holiday'] = 365
-
-    # Cyclical features (using sin_ and cos_ prefix to match training)
-    df_features['sin_hour'] = np.sin(2 * np.pi * df_features['hour'] / 24)
-    df_features['cos_hour'] = np.cos(2 * np.pi * df_features['hour'] / 24)
-    df_features['sin_day_of_week'] = np.sin(2 * np.pi * df_features['day_of_week'] / 7)
-    df_features['cos_day_of_week'] = np.cos(2 * np.pi * df_features['day_of_week'] / 7)
-    df_features['sin_month'] = np.sin(2 * np.pi * df_features['month'] / 12)
-    df_features['cos_month'] = np.cos(2 * np.pi * df_features['month'] / 12)
-    df_features['sin_day_of_year'] = np.sin(2 * np.pi * df_features['day_of_year'] / 365)
-    df_features['cos_day_of_year'] = np.cos(2 * np.pi * df_features['day_of_year'] / 365)
-
-    # Also keep the old names for backward compatibility
-    df_features['hour_sin'] = df_features['sin_hour']
-    df_features['hour_cos'] = df_features['cos_hour']
-    df_features['day_of_week_sin'] = df_features['sin_day_of_week']
-    df_features['day_of_week_cos'] = df_features['cos_day_of_week']
-    df_features['month_sin'] = df_features['sin_month']
-    df_features['month_cos'] = df_features['cos_month']
-
-    # Time flags
-    df_features['is_weekend'] = (df_features['day_of_week'] >= 5).astype(int)
-    df_features['is_business_hour'] = (
-        (df_features['hour'] >= 9) & (df_features['hour'] < 18) & (df_features['day_of_week'] < 5)
-    ).astype(int)
-
-    # Periods of day
-    df_features['is_morning'] = ((df_features['hour'] >= 6) & (df_features['hour'] < 12)).astype(int)
-    df_features['is_afternoon'] = ((df_features['hour'] >= 12) & (df_features['hour'] < 18)).astype(int)
-    df_features['is_evening'] = ((df_features['hour'] >= 18) & (df_features['hour'] < 22)).astype(int)
-    df_features['is_night'] = ((df_features['hour'] >= 22) | (df_features['hour'] < 6)).astype(int)
-
-    # Interaction features
-    df_features['temp_hour'] = df_features['temperature'] * df_features['hour']
-    df_features['temp_weekend'] = df_features['temperature'] * df_features['is_weekend']
-    df_features['wind_hour'] = df_features['wind_speed'] * df_features['hour']
-
-    # One-hot encoding for region (ensure all 5 regions exist)
-    all_regions = ['Alentejo', 'Algarve', 'Centro', 'Lisboa', 'Norte']
-    for region in all_regions:
-        df_features[f'region_{region}'] = (df_features['region'] == region).astype(int)
-
-    return df_features
-
-
-@app.get("/health")
-async def health():
-    """Health check endpoint"""
+    store = getattr(request.app.state, "models", None)
+    if store is None:
+        return {
+            "status": "degraded",
+            "version": app.version,
+            "uptime_seconds": uptime_seconds,
+            "model_with_lags_loaded": False,
+            "model_no_lags_loaded": False,
+            "model_advanced_loaded": False,
+            "total_models": 0,
+            "rmse_calibrated": False,
+            "rmse_calibrated_models": [],
+            "coverage_alert": coverage_alert,
+        }
     return {
-        "status": "healthy",
-        "model_with_lags_loaded": model_with_lags is not None,
-        "model_no_lags_loaded": model_no_lags is not None,
-        "total_models": sum([model_with_lags is not None, model_no_lags is not None])
+        "status": "healthy" if store.has_any_model else "degraded",
+        "version": app.version,
+        "uptime_seconds": uptime_seconds,
+        "model_with_lags_loaded": store.model_with_lags is not None,
+        "model_no_lags_loaded": store.model_no_lags is not None,
+        "model_advanced_loaded": store.model_advanced is not None,
+        "total_models": store.total_models,
+        "rmse_calibrated": store.all_rmse_calibrated,
+        "rmse_calibrated_models": sorted(store.rmse_from_metadata),
+        "coverage_alert": coverage_alert,
     }
 
 
-@app.post("/predict", response_model=PredictionResponse)
-async def predict(data: EnergyData, use_model: str = "auto"):
-    """
-    Make a single energy consumption prediction
+@app.post("/predict", response_model=PredictionResponse, tags=["predict"],
+          responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+async def predict(
+    data: EnergyData,
+    use_model: str = "auto",
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Make a single energy consumption prediction.
 
-    Args:
-        data: Energy data including timestamp, region, and weather conditions
-        use_model: Which model to use - "auto" (default), "with_lags", or "no_lags"
+    Tries models in descending capability order (advanced → with_lags →
+    no_lags).  Returns a 90 % confidence interval alongside the point
+    estimate; the ``ci_method`` field indicates whether conformal prediction
+    or Gaussian Z × RMSE was used.
 
-    Returns:
-        Prediction with confidence interval
+    Requires ``X-API-Key`` header when ``API_KEY`` env var is set.
     """
-    # Validate region FIRST (before model check)
-    valid_regions = ['Alentejo', 'Algarve', 'Centro', 'Lisboa', 'Norte']
-    if data.region not in valid_regions:
+    if not store.has_any_model:
         raise HTTPException(
-            status_code=422,
-            detail=f"Invalid region. Must be one of: {', '.join(valid_regions)}"
+            status_code=503,
+            detail={"code": "NO_MODEL", "message": "No models loaded. The API is running in degraded mode."},
         )
-
-    # Check if at least one model is loaded
-    if model_with_lags is None and model_no_lags is None:
-        raise HTTPException(status_code=503, detail="No models loaded")
-
     try:
-        # Create DataFrame from input
-        df = pd.DataFrame([{
-            'timestamp': data.timestamp,
-            'region': data.region,
-            'temperature': data.temperature,
-            'humidity': data.humidity,
-            'wind_speed': data.wind_speed,
-            'precipitation': data.precipitation,
-            'cloud_cover': data.cloud_cover,
-            'pressure': data.pressure,
-            'consumption_mw': 0  # Dummy value
-        }])
-
-        # Decide which model to use (priority: advanced > with_lags > no_lags)
-        model_used = None
-        model_name = None
-        prediction = None
-
-        # Try ADVANCED model first (best performance if available)
-        if use_model == "auto" and model_advanced is not None and feature_engineer is not None:
-            try:
-                df_features = feature_engineer.create_all_features(df, use_advanced=True)
-                if len(df_features) > 0:
-                    X = df_features[feature_names_advanced].values
-                    prediction = model_advanced.predict(X)[0]
-                    model_used = "advanced"
-                    model_name = "XGBoost (advanced features)"
-            except Exception as e:
-                print(f"Advanced model failed: {e}")
-                pass  # Fall back to with_lags model
-
-        # Try model WITH lags (if not using advanced or if advanced failed)
-        if (prediction is None and (use_model in ["auto", "with_lags"]) and
-                model_with_lags is not None and feature_engineer is not None):
-            try:
-                df_features = feature_engineer.create_all_features(df)
-                if len(df_features) > 0:
-                    X = df_features[feature_names_with_lags].values
-                    prediction = model_with_lags.predict(X)[0]
-                    model_used = "with_lags"
-                    model_name = "XGBoost (with lags)"
-            except Exception as e:
-                print(f"With lags model failed: {e}")
-                pass  # Fall back to no_lags model
-
-        # Use model WITHOUT lags as final fallback
-        if prediction is None and model_no_lags is not None:
-            df_features = create_features_no_lags(df)
-            X = df_features[feature_names_no_lags].values
-            prediction = model_no_lags.predict(X)[0]
-            model_used = "no_lags"
-            model_name = "XGBoost (no lags)"
-
-        if prediction is None:
-            raise HTTPException(
-                status_code=500,
-                detail="Could not make prediction with available models"
-            )
-
-        # Calculate confidence interval
-        # Use different std based on model type
-        residual_std = 20.0 if model_used == "with_lags" else 50.0  # Higher uncertainty for no_lags
-        z_score = 1.645  # 90% confidence
-
-        ci_lower = prediction - z_score * residual_std
-        ci_upper = prediction + z_score * residual_std
-
-        return PredictionResponse(
-            timestamp=data.timestamp,
-            region=data.region,
-            predicted_consumption_mw=float(prediction),
-            confidence_interval_lower=float(max(0, ci_lower)),
-            confidence_interval_upper=float(ci_upper),
-            model_name=model_name
+        return await asyncio.wait_for(
+            asyncio.to_thread(_make_single_prediction, data, store, use_model),
+            timeout=PREDICTION_TIMEOUT_SECONDS,
         )
-
+    except asyncio.TimeoutError:
+        logger.error(
+            "Prediction timed out after %.1fs for region=%s",
+            PREDICTION_TIMEOUT_SECONDS, data.region,
+        )
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "PREDICTION_TIMEOUT",
+                "message": f"Prediction exceeded {PREDICTION_TIMEOUT_SECONDS}s timeout.",
+            },
+        )
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+    except Exception:
+        logger.exception("Prediction failed")
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "PREDICTION_FAILED", "message": "Prediction failed. See server logs for details."},
+        )
 
 
-@app.post("/predict/batch", response_model=BatchPredictionResponse)
-async def predict_batch(data_list: List[EnergyData]):
+@app.post("/predict/batch", response_model=BatchPredictionResponse, tags=["predict"],
+          responses={**_R_400, **_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+async def predict_batch(
+    data_list: list[EnergyData],
+    use_model: str = "auto",
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Make batch predictions for multiple data points (max 1 000).
+
+    Uses vectorised ``model.predict`` when the no-lags model is selected,
+    giving significantly better throughput than per-row calls.
+
+    Requires ``X-API-Key`` header when ``API_KEY`` env var is set.
     """
-    Make batch predictions for multiple data points
-
-    Args:
-        data_list: List of energy data points
-
-    Returns:
-        List of predictions with confidence intervals
-    """
-    # Validate input list
     if len(data_list) == 0:
         raise HTTPException(
             status_code=422,
-            detail="Empty prediction list. Please provide at least one data point"
+            detail={"code": "EMPTY_BATCH", "message": "Empty prediction list. Provide at least one data point."},
         )
-
     if len(data_list) > 1000:
         raise HTTPException(
             status_code=400,
-            detail="Maximum 1000 predictions per request"
+            detail={"code": "BATCH_TOO_LARGE", "message": "Maximum 1000 predictions per request."},
+        )
+    if not store.has_any_model:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "NO_MODEL", "message": "No models loaded. The API is running in degraded mode."},
         )
 
-    # Check if at least one model is loaded
-    if model_with_lags is None and model_no_lags is None:
-        raise HTTPException(status_code=503, detail="No models loaded")
+    batch_timeout = PREDICTION_TIMEOUT_SECONDS + len(data_list) * BATCH_TIMEOUT_PER_ITEM_S
+    try:
+        predictions = await asyncio.wait_for(
+            asyncio.to_thread(_make_batch_predictions_vectorized, data_list, store, use_model),
+            timeout=batch_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error("Batch prediction timed out after %.1fs for %d items", batch_timeout, len(data_list))
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "PREDICTION_TIMEOUT",
+                "message": f"Batch prediction exceeded {batch_timeout:.1f}s timeout.",
+            },
+        )
+    except Exception:
+        logger.exception("Batch prediction failed")
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "PREDICTION_FAILED", "message": "Batch prediction failed. See server logs for details."},
+        )
+    return BatchPredictionResponse(predictions=predictions, total_predictions=len(predictions))
 
-    predictions = []
-    for data in data_list:
-        try:
-            pred = await predict(data)
-            predictions.append(pred)
-        except Exception as e:
-            # Skip failed predictions but continue
-            print(f"Warning: Prediction failed for {data.timestamp}: {e}")
-            continue
 
-    return BatchPredictionResponse(
-        predictions=predictions,
-        total_predictions=len(predictions)
-    )
+@app.post("/predict/sequential", response_model=SequentialForecastResponse, tags=["predict"],
+          responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+async def predict_sequential(
+    request: SequentialForecastRequest,
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Sequential (lag-aware) forecast using actual historical consumption.
+
+    Unlike ``/predict/batch`` (constrained to the no-lags model), this
+    endpoint accepts a ``history`` window (≥ 48 hourly records) to build lag
+    and rolling-window features.  For multi-step forecasts each predicted
+    value is fed back as the lag input for subsequent steps (auto-regressive).
+
+    Use this endpoint when historical consumption data is available and best
+    accuracy is required.
+
+    Requires ``X-API-Key`` header when ``API_KEY`` env var is set.
+    """
+    regions = {h.region for h in request.history} | {f.region for f in request.forecast}
+    if len(regions) > 1:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "MIXED_REGIONS",
+                "message": (
+                    "All records in history and forecast must share the same region. "
+                    f"Found: {sorted(regions)}"
+                ),
+            },
+        )
+    if not store.has_any_model:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "NO_MODEL", "message": "No models loaded. The API is running in degraded mode."},
+        )
+
+    seq_timeout = PREDICTION_TIMEOUT_SECONDS + len(request.forecast) * SEQUENTIAL_TIMEOUT_PER_STEP_S
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_make_sequential_predictions, request, store),
+            timeout=seq_timeout,
+        )
+    except asyncio.TimeoutError:
+        logger.error(
+            "Sequential forecast timed out after %.1fs for %d steps",
+            seq_timeout, len(request.forecast),
+        )
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "PREDICTION_TIMEOUT",
+                "message": f"Sequential forecast exceeded {seq_timeout:.1f}s timeout.",
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "INVALID_REQUEST", "message": str(exc)})
+    except Exception:
+        logger.exception("Sequential forecast failed")
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "PREDICTION_FAILED", "message": "Sequential forecast failed. See server logs for details."},
+        )
 
 
-@app.get("/model/info")
-async def model_info():
-    """Get model information and metadata"""
-    import json
+@app.post("/predict/explain", response_model=ExplanationResponse, tags=["predict"],
+          responses={**_R_401, **_R_422, **_R_503, **_R_504, **_R_500})
+async def predict_explain(
+    data: EnergyData,
+    top_n: int = 10,
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Make a prediction and return feature-level importance explanation.
 
-    info = {
-        "models_available": {},
-        "status": "healthy"
-    }
+    Returns the standard prediction alongside the top *top_n* features ranked
+    by their contribution.
 
-    # Info about model WITH lags
-    if model_with_lags is not None:
-        metadata_path = MODEL_PATH / "training_metadata.json"
-        if metadata_path.exists():
-            with open(metadata_path, 'r') as f:
-                metadata_with_lags = json.load(f)
-            info["models_available"]["with_lags"] = metadata_with_lags
-        else:
-            info["models_available"]["with_lags"] = {
-                "model_type": type(model_with_lags).__name__,
-                "features_count": len(feature_names_with_lags) if feature_names_with_lags else 0,
-                "status": "loaded"
-            }
+    - **shap** — per-prediction SHAP values (used when ``shap`` is installed).
+    - **feature_importance** — model-wide global importances (always available
+      fallback).
 
-    # Info about model WITHOUT lags
-    if model_no_lags is not None:
-        metadata_path_no_lags = MODEL_PATH / "training_metadata_no_lags.json"
-        if metadata_path_no_lags.exists():
-            with open(metadata_path_no_lags, 'r') as f:
-                metadata_no_lags = json.load(f)
-            info["models_available"]["no_lags"] = metadata_no_lags
-        else:
-            info["models_available"]["no_lags"] = {
-                "model_type": type(model_no_lags).__name__,
-                "features_count": len(feature_names_no_lags) if feature_names_no_lags else 0,
-                "status": "loaded"
-            }
+    Requires ``X-API-Key`` header when ``API_KEY`` env var is set.
+    """
+    if top_n < 1 or top_n > 50:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PARAM", "message": "top_n must be between 1 and 50."},
+        )
+    if not store.has_any_model:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "NO_MODEL", "message": "No models loaded. The API is running in degraded mode."},
+        )
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(_explain_prediction, data, store, top_n),
+            timeout=PREDICTION_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "PREDICTION_TIMEOUT",
+                "message": f"Explanation exceeded {PREDICTION_TIMEOUT_SECONDS}s timeout.",
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Explanation failed")
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "PREDICTION_FAILED", "message": "Explanation failed. See server logs for details."},
+        )
+
+
+@app.get("/model/info", tags=["models"],
+         responses={**_R_401, **_R_503})
+async def model_info(
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Return model information, training metadata, and SHA-256 checksums.
+
+    Metadata is cached in :class:`~src.api.store.ModelStore` at startup so
+    this endpoint incurs no file I/O per request.
+    """
+    info: dict = {"models_available": {}, "status": "healthy"}
+
+    if store.model_with_lags is not None:
+        info["models_available"]["with_lags"] = store.metadata_with_lags or {
+            "model_type": type(store.model_with_lags).__name__,
+            "features_count": len(store.feature_names_with_lags or []),
+        }
+    if store.model_no_lags is not None:
+        info["models_available"]["no_lags"] = store.metadata_no_lags or {
+            "model_type": type(store.model_no_lags).__name__,
+            "features_count": len(store.feature_names_no_lags or []),
+        }
+    if store.model_advanced is not None:
+        info["models_available"]["advanced"] = store.metadata_advanced or {
+            "model_type": type(store.model_advanced).__name__,
+            "features_count": len(store.feature_names_advanced or []),
+        }
 
     if not info["models_available"]:
-        raise HTTPException(status_code=503, detail="No models loaded")
-
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "NO_MODEL", "message": "No models loaded. The API is running in degraded mode."},
+        )
+    if store.checksums:
+        info["model_checksums"] = store.checksums
     return info
 
 
-@app.get("/regions")
+@app.get("/regions", tags=["core"])
 async def get_regions():
-    """Get list of available regions"""
+    """Return the list of supported Portuguese regions."""
+    return {"regions": VALID_REGIONS}
+
+
+@app.get("/limitations", tags=["core"])
+async def get_limitations(store: ModelStore = Depends(get_model_store)):
+    """Return API rate limits, model requirements, and CI method availability."""
+    models_info = {}
+    if store.model_with_lags is not None:
+        models_info["with_lags"] = {
+            "requires": "48h historical consumption data",
+            "model": store.model_name_with_lags,
+            "rmse_mw": round(store.rmse_with_lags, 2),
+        }
+    if store.model_no_lags is not None:
+        models_info["no_lags"] = {
+            "requires": "Only current weather data",
+            "model": store.model_name_no_lags,
+            "rmse_mw": round(store.rmse_no_lags, 2),
+        }
     return {
-        "regions": [
-            "Alentejo",
-            "Algarve",
-            "Centro",
-            "Lisboa",
-            "Norte"
-        ]
+        "models": models_info,
+        "batch_limit": 1000,
+        "confidence_level": 0.90,
+        "rate_limit": (
+            f"{os.environ.get('RATE_LIMIT_MAX', 60)} requests per "
+            f"{os.environ.get('RATE_LIMIT_WINDOW', 60)}s"
+        ),
+        "authentication": (
+            "API key via X-API-Key header" if API_KEY else "disabled (set API_KEY env var)"
+        ),
+        "ci_methods_available": ["conformal" if any([
+            store.conformal_q90_advanced,
+            store.conformal_q90_with_lags,
+            store.conformal_q90_no_lags,
+        ]) else "gaussian_z_rmse"],
+        "note": (
+            "Confidence intervals use conformal prediction (distribution-free coverage) "
+            "when calibration data is available in metadata; otherwise falls back to "
+            "Gaussian Z × RMSE."
+        ),
     }
 
 
-@app.get("/limitations")
-async def get_limitations():
-    """Get API limitations and requirements"""
+@app.get("/model/drift", tags=["models"],
+         responses={**_R_401})
+async def model_drift(
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Feature distribution statistics from training, for monitoring data drift.
+
+    Returns per-feature mean, std, min, max, and quantiles observed at
+    training time.  Compare live input distributions against these baselines
+    to detect covariate shift.  The ``feature_stats`` key is populated
+    automatically when the training notebook writes it to the model metadata
+    JSON; see ``notebooks/03_model_evaluation.ipynb`` for the generation code.
+    """
+    feature_stats: dict = {}
+    source_model: str | None = None
+
+    for variant, meta in [
+        ("advanced", store.metadata_advanced),
+        ("with_lags", store.metadata_with_lags),
+        ("no_lags", store.metadata_no_lags),
+    ]:
+        if meta and "feature_stats" in meta:
+            feature_stats = meta["feature_stats"]
+            source_model = variant
+            break
+
+    if not feature_stats:
+        return {
+            "available": False,
+            "message": (
+                "Feature distribution statistics are not yet available. "
+                "To enable drift monitoring, add a 'feature_stats' key to the model "
+                "metadata JSON during training (e.g. {feature: {mean, std, min, max, q25, q75}})."
+            ),
+            "guidance": {
+                "how_to_generate": (
+                    "In your training notebook, compute df_train[feature_cols].describe() "
+                    "and save to metadata['feature_stats']."
+                ),
+                "alert_threshold": "Raise an alert when live feature mean deviates > 2σ from training mean.",
+            },
+        }
+
     return {
-        "status": "demo_mode",
-        "limitation": "This API requires historical consumption data (48h) to generate lag features",
-        "current_behavior": "Returns 400 error if historical data not available",
-        "production_solution": {
-            "option_1": "Integrate with database containing historical consumption data",
-            "option_2": "Retrain model without lag features (reduced accuracy)",
-            "option_3": "Use batch prediction with historical data included"
-        },
-        "required_data": {
-            "historical_consumption": "Last 48 hours of energy consumption data",
-            "current_weather": "Current weather conditions (temp, humidity, wind, etc.)"
-        },
-        "note": "The model achieves MAPE 0.86% with full features including lags"
+        "available": True,
+        "source_model": source_model,
+        "feature_count": len(feature_stats),
+        "feature_stats": feature_stats,
+        "usage_note": (
+            "Compare live input distributions against these training-time statistics. "
+            "Significant deviation (> 2–3σ) may indicate covariate shift and warrant retraining."
+        ),
     }
 
 
-if __name__ == "__main__":
+@app.post("/model/drift/check", tags=["models"],
+          responses={**_R_401, **_R_503})
+async def model_drift_check(
+    live_stats: dict,
+    store: ModelStore = Depends(get_model_store),
+    _key: str | None = Depends(verify_api_key),
+):
+    """Compare live feature statistics against training-time baselines.
+
+    Accepts a dictionary of ``{feature_name: {"mean": float, "std": float}}``
+    values computed from a recent production window (e.g. last 24 h of
+    requests) and returns a per-feature z-score indicating how far each
+    feature has drifted from the training distribution.
+
+    **Alerting thresholds (recommended):**
+    - ``|z| < 2`` — Normal variation.  No action needed.
+    - ``2 ≤ |z| < 3`` — Elevated drift.  Monitor closely.
+    - ``|z| ≥ 3`` — Significant drift.  Consider retraining.
+
+    Returns:
+        A dict with ``drift_scores`` (per feature) and ``alerts`` (features
+        with ``|z| ≥ 3`` that warrant immediate attention).
+    """
+    feature_stats: dict = {}
+    source_model: str | None = None
+
+    for variant, meta in [
+        ("advanced", store.metadata_advanced),
+        ("with_lags", store.metadata_with_lags),
+        ("no_lags", store.metadata_no_lags),
+    ]:
+        if meta and "feature_stats" in meta:
+            feature_stats = meta["feature_stats"]
+            source_model = variant
+            break
+
+    if not feature_stats:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "NO_FEATURE_STATS",
+                "message": (
+                    "Feature distribution statistics are not available. "
+                    "Add 'feature_stats' to the model metadata JSON during training."
+                ),
+            },
+        )
+
+    drift_scores: dict = {}
+    alerts: list = []
+
+    for feature, live in live_stats.items():
+        if feature not in feature_stats:
+            continue
+        training = feature_stats[feature]
+        training_mean = training.get("mean")
+        training_std = training.get("std")
+        live_mean = live.get("mean") if isinstance(live, dict) else None
+
+        if training_mean is None or training_std is None or live_mean is None:
+            continue
+        if training_std == 0:
+            drift_scores[feature] = {"z_score": None, "note": "zero training std"}
+            continue
+
+        z = (live_mean - training_mean) / training_std
+        level = "normal" if abs(z) < 2 else ("elevated" if abs(z) < 3 else "alert")
+        drift_scores[feature] = {
+            "z_score": round(z, 3),
+            "live_mean": live_mean,
+            "training_mean": training_mean,
+            "training_std": training_std,
+            "drift_level": level,
+        }
+        if level == "alert":
+            alerts.append(feature)
+
+    return {
+        "source_model": source_model,
+        "features_checked": len(drift_scores),
+        "alerts": alerts,
+        "alert_count": len(alerts),
+        "drift_scores": drift_scores,
+        "thresholds": {"normal": "|z| < 2", "elevated": "2 ≤ |z| < 3", "alert": "|z| ≥ 3"},
+    }
+
+
+@app.get("/metrics/summary", tags=["monitoring"],
+         responses={**_R_401})
+async def metrics_summary(
+    request: Request,
+    _key: str | None = Depends(verify_api_key),
+):
+    """Lightweight operational metrics — no Prometheus required.
+
+    Returns a point-in-time snapshot of key runtime indicators suitable for
+    dashboards, alerting, or a simple ``/metrics`` scrape job.  Designed as a
+    Prometheus-free alternative when the ``prometheus-fastapi-instrumentator``
+    package is not installed.
+
+    Fields returned:
+    - ``uptime_seconds`` — seconds since the API process started.
+    - ``api_version`` — semver string from the FastAPI app metadata.
+    - ``models`` — model load status and RMSE calibration summary.
+    - ``coverage`` — sliding-window empirical CI coverage summary (if available).
+    - ``config`` — key runtime config values (rate limit, body limit, etc.).
+    """
+    startup = getattr(request.app.state, "startup_time", None)
+    uptime_seconds = round(time.monotonic() - startup, 1) if startup is not None else None
+
+    store = getattr(request.app.state, "models", None)
+    models_info: dict = {
+        "total_loaded": store.total_models if store else 0,
+        "with_lags": store.model_with_lags is not None if store else False,
+        "no_lags": store.model_no_lags is not None if store else False,
+        "advanced": store.model_advanced is not None if store else False,
+        "rmse_calibrated": store.all_rmse_calibrated if store else False,
+    }
+
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    coverage_info: dict = {"available": False}
+    if tracker is not None:
+        summary = tracker.summary()
+        coverage_info = {"available": True, **summary}
+
+    return {
+        "uptime_seconds": uptime_seconds,
+        "api_version": app.version,
+        "models": models_info,
+        "coverage": coverage_info,
+        "config": {
+            "rate_limit_max": int(os.environ.get("RATE_LIMIT_MAX", "60")),
+            "rate_limit_window_seconds": int(os.environ.get("RATE_LIMIT_WINDOW", "60")),
+            "max_request_body_bytes": _MAX_REQUEST_BODY_BYTES,
+            "prediction_timeout_seconds": PREDICTION_TIMEOUT_SECONDS,
+            "log_level": _LOG_LEVEL,
+            "trust_proxy": os.environ.get("TRUST_PROXY", "1") == "1",
+            "auth_enabled": API_KEY is not None,
+        },
+    }
+
+
+# ── Admin endpoints ───────────────────────────────────────────────────────────
+
+@app.post("/admin/reload-models", tags=["admin"],
+          responses={**_R_401, **_R_503, **_R_500})
+async def admin_reload_models(
+    request: Request,
+    _key: str | None = Depends(verify_admin_key),
+):
+    """Reload all model files from disk without restarting the API.
+
+    This endpoint solves the **unrecoverable degraded mode** problem: if models
+    fail to deserialise at startup (e.g. corrupted file, missing volume), the
+    API starts degraded.  After fixing the root cause (replacing/remounting
+    model files), call this endpoint to hot-swap the ``ModelStore`` without
+    downtime.
+
+    The reload runs in a background thread so the event loop is not blocked.
+    The new store is swapped in atomically under ``_RELOAD_LOCK``, ensuring
+    that in-flight requests always see a consistent store.
+
+    **Authentication:** requires the ``X-API-Key`` header to match
+    ``ADMIN_API_KEY`` (or ``API_KEY`` when ``ADMIN_API_KEY`` is not set).
+
+    Returns:
+        JSON with ``total_models``, ``rmse_calibrated``, ``conformal_available``,
+        and per-model ``checksums``.
+
+    Raises:
+        503 — Reload succeeded but no models were found (still degraded).
+    """
+    try:
+        result = await asyncio.to_thread(reload_models, request.app.state)
+    except Exception:
+        logger.exception("Admin model reload failed")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "RELOAD_FAILED",
+                "message": "Model reload failed. Check server logs for details.",
+            },
+        )
+
+    if result["total_models"] == 0:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "NO_MODEL",
+                "message": (
+                    "Reload completed but no models were found. "
+                    "Ensure model files are present in the MODELS_DIR directory."
+                ),
+            },
+        )
+
+    logger.info(
+        "Admin reload complete: %d model(s) loaded by %s",
+        result["total_models"],
+        request.client.host if request.client else "unknown",
+    )
+
+    # Reset the coverage tracker after a model reload so stale observations
+    # from the old model do not pollute calibration of the new one.
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    if tracker is not None:
+        tracker.reset()
+        logger.info("Coverage tracker reset after model reload")
+
+    return result
+
+
+@app.get("/model/coverage", tags=["monitoring"],
+         responses={**_R_401})
+async def model_coverage(
+    request: Request,
+    _key: str | None = Depends(verify_api_key),
+):
+    """Return the sliding-window empirical CI coverage for production monitoring.
+
+    Tracks the fraction of recent predictions where the actual value fell
+    within the returned confidence interval.  A well-calibrated 90 % conformal
+    interval should show coverage ≥ 90 % (±statistical noise).
+
+    Coverage is computed over the last ``COVERAGE_WINDOW_SIZE`` predictions
+    (default 168 = 1 week of hourly data, configurable via env var).
+
+    **Alert semantics:**
+    - ``alert: false`` — Coverage within expected range. No action needed.
+    - ``alert: true`` — Coverage below ``alert_threshold`` (default 80 %).
+      Investigate distribution shift; consider recalibration or retraining.
+      Call ``POST /admin/reload-models`` after deploying a recalibrated model.
+
+    **Note:** This endpoint requires actual consumption observations to be
+    recorded via ``POST /model/coverage/record`` for the coverage to be
+    meaningful.  Without ground-truth data the window will be empty
+    (``n_observations: 0``).
+    """
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    if tracker is None:
+        return {"available": False, "message": "Coverage tracker not initialised."}
+
+    summary = tracker.summary()
+    if summary["alert"]:
+        logger.warning(
+            "CI coverage alert: %.1f%% < threshold %.1f%% (window=%d observations)",
+            (summary["coverage"] or 0) * 100,
+            summary["alert_threshold"] * 100,
+            summary["n_observations"],
+        )
+    return {"available": True, **summary}
+
+
+@app.post("/model/coverage/record", tags=["monitoring"],
+          responses={**_R_401, **_R_422, **_R_503})
+async def record_coverage_observation(
+    request: Request,
+    actual_mw: float,
+    ci_lower: float,
+    ci_upper: float,
+    _key: str | None = Depends(verify_api_key),
+):
+    """Record a ground-truth observation for coverage tracking.
+
+    Call this endpoint (or an equivalent background job) after the actual
+    consumption for a previously-predicted timestamp becomes known.  The
+    observation is added to the sliding window used by ``GET /model/coverage``.
+
+    Args:
+        actual_mw: Actual measured consumption (MW, must be ≥ 0).
+        ci_lower: Predicted CI lower bound used at prediction time.
+        ci_upper: Predicted CI upper bound used at prediction time.
+    """
+    if actual_mw < 0:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_VALUE", "message": "actual_mw must be ≥ 0."},
+        )
+    if ci_lower > ci_upper:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_VALUE", "message": "ci_lower must be ≤ ci_upper."},
+        )
+
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    if tracker is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "TRACKER_UNAVAILABLE", "message": "Coverage tracker not initialised."},
+        )
+
+    tracker.record(actual_mw, ci_lower, ci_upper)
+    return {
+        "recorded": True,
+        "within_interval": ci_lower <= actual_mw <= ci_upper,
+        "n_observations": tracker.n_observations,
+    }
+
+
+if __name__ == "__main__":  # pragma: no cover
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

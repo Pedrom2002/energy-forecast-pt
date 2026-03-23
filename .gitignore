@@ -7,31 +7,23 @@ __pycache__/
 build/
 develop-eggs/
 dist/
-downloads/
 eggs/
 .eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
+pip-wheel-metadata/
 
 # Virtual Environment
+.venv/
 venv/
 env/
 ENV/
-env.bak/
-venv.bak/
 
 # Jupyter Notebook
-.ipynb_checkpoints
-*.ipynb_checkpoints/
+.ipynb_checkpoints/
+*_executed.ipynb
 
 # IDEs
 .vscode/
@@ -39,19 +31,15 @@ venv.bak/
 *.swp
 *.swo
 *~
-.DS_Store
 
-
-# Testing
+# Testing / Linting
 .pytest_cache/
 .coverage
 .coverage.*
 htmlcov/
-.tox/
-.nox/
 coverage.xml
-*.cover
-.hypothesis/
+.mypy_cache/
+.ruff_cache/
 
 # Logs
 *.log
@@ -62,17 +50,34 @@ logs/
 .env.local
 .env.*.local
 
-# Data files (optional - uncomment if you don't want to commit data)
-# data/raw/*
-# data/processed/*
-# !data/raw/.gitkeep
-# !data/processed/.gitkeep
+# DVC cache and temp (keep .dvc/config)
+.dvc/cache/
+.dvc/tmp/
+.dvc/.gitignore
 
-# Models (large files - excluded due to GitHub 100MB limit)
-data/models/*.pkl
-data/models/*.h5
-data/models/*.pt
-data/models/*.joblib
+# Data files (managed by DVC)
+data/processed/*.parquet
+data/processed/*.csv
+!data/processed/.gitkeep
+
+# Models (large binary files)
+data/models/checkpoints/*.pkl
+data/models/checkpoints/*.h5
+data/models/checkpoints/*.pt
+data/models/checkpoints/*.joblib
+data/models/*.png
+
+# Generated outputs (plots, evaluation reports from ModelEvaluator)
+outputs/
+
+# CatBoost training artifacts (binary tfevents, tsv logs — any location in tree)
+catboost_info/
+
+# Experiment tracking
+experiments/*.json
+
+# pytest-benchmark results
+.benchmarks/
 
 # Temporary files
 *.tmp
@@ -81,18 +86,6 @@ tmp/
 temp/
 
 # OS
-Thumbs.db
 .DS_Store
-
-# Docker
-.dockerignore
-
-# Misc
-*.bak
-*.orig
-
-# Windows reserved names
-nul
-NUL
-**/nul
-**/NUL
+Thumbs.db
+desktop.ini

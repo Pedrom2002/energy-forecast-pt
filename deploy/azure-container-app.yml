@@ -28,6 +28,15 @@ spec:
           value: "info"
         - name: PYTHONUNBUFFERED
           value: "1"
+        - name: RATE_LIMIT_MAX
+          value: "60"
+        - name: RATE_LIMIT_WINDOW
+          value: "60"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: energy-forecast-secrets
+              key: api-key
         resources:
           requests:
             cpu: "500m"

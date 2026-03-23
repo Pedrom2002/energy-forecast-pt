@@ -1,0 +1,78 @@
+# DVC Pipeline Definition
+#
+# Defines the reproducible ML pipeline stages from data processing through
+# model training to evaluation.  Each stage specifies its dependencies (deps),
+# outputs (outs), parameters (params), and metrics for automatic tracking.
+#
+# Usage:
+#   dvc repro              # run the full pipeline
+#   dvc repro train        # run only the training stage
+#   dvc metrics show       # show latest metrics
+#   dvc metrics diff       # compare with previous run
+#   dvc plots show         # visualise metric history
+#
+# See: https://dvc.org/doc/user-guide/pipelines
+
+stages:
+  prepare_features:
+    cmd: python -c "
+      import sys; sys.path.insert(0, '.');
+      from src.features.feature_engineering import FeatureEngineer;
+      import pandas as pd;
+      df = pd.read_parquet('data/processed/processed_data.parquet');
+      fe = FeatureEngineer();
+      df_feat = fe.create_all_features(df);
+      df_feat.to_parquet('data/processed/features_with_lags.parquet');
+      df_no_lags = fe.create_features_no_lags(df);
+      df_no_lags.to_parquet('data/processed/features_no_lags.parquet');
+      "
+    deps:
+      - data/processed/processed_data.parquet
+      - src/features/feature_engineering.py
+    outs:
+      - data/processed/features_with_lags.parquet:
+          cache: true
+      - data/processed/features_no_lags.parquet:
+          cache: true
+
+  train:
+    cmd: python scripts/retrain.py
+    deps:
+      - data/processed/processed_data.parquet
+      - src/features/feature_engineering.py
+      - src/models/model_registry.py
+      - src/models/baselines.py
+      - src/models/feature_selection.py
+      - src/utils/reproducibility.py
+      - scripts/retrain.py
+    params:
+      - scripts/retrain.py:
+          - RANDOM_STATE
+          - OPTUNA_N_TRIALS
+          - OPTUNA_CV_FOLDS
+          - CORRELATION_THRESHOLD
+    outs:
+      - data/models/checkpoints/best_model.pkl:
+          cache: true
+      - data/models/checkpoints/best_model_no_lags.pkl:
+          cache: true
+      - data/models/features/feature_names.txt
+      - data/models/features/feature_names_no_lags.txt
+    metrics:
+      - data/models/metadata/training_metadata.json:
+          cache: false
+      - data/models/metadata/training_metadata_no_lags.json:
+          cache: false
+
+  evaluate:
+    cmd: python -c "
+      import json;
+      for f in ['training_metadata.json', 'training_metadata_no_lags.json']:
+        with open(f'data/models/metadata/{f}') as fh:
+          m = json.load(fh);
+          tm = m.get('test_metrics', {});
+          print(f'{f}: RMSE={tm.get(\"rmse\", \"N/A\")}, MAPE={tm.get(\"mape\", \"N/A\")}%, R²={tm.get(\"r2\", \"N/A\")}')
+      "
+    deps:
+      - data/models/metadata/training_metadata.json
+      - data/models/metadata/training_metadata_no_lags.json

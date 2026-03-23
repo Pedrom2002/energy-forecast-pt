@@ -1,0 +1,560 @@
+{
+  "best_model": "CatBoost",
+  "best_model_key": "catboost",
+  "model_file": "best_model_advanced.pkl",
+  "n_features": 42,
+  "training_date": "2026-03-23 04:04:54 UTC",
+  "pipeline_version": "v5",
+  "random_seed": 42,
+  "data_hash": "9032a48ebf2bdaef0e3a89e44fef098725e912cb901aead6f69123e00f894d4d",
+  "n_train": 122475,
+  "n_val": 26245,
+  "n_test": 26245,
+  "test_metrics": {
+    "mae": 57.6629,
+    "rmse": 82.9342,
+    "mape": 4.4904,
+    "r2": 0.9908,
+    "nrmse": 0.0607,
+    "mase": 0.0627
+  },
+  "conformal_q90": 137.99,
+  "cv_scores": {
+    "xgboost": [
+      85.9709,
+      83.9617,
+      81.7019,
+      82.211,
+      82.2102
+    ],
+    "lightgbm": [
+      85.4246,
+      84.2624,
+      82.5763,
+      82.7303,
+      82.9367
+    ],
+    "catboost": [
+      85.0636,
+      83.1418,
+      80.956,
+      80.6037,
+      81.3881
+    ],
+    "random_forest": [
+      87.4249,
+      84.5837,
+      82.5292,
+      83.1573,
+      82.5895
+    ]
+  },
+  "feature_importance_top10": [
+    {
+      "feature": "consumption_mw_lag_1",
+      "importance": 28.44196223958889
+    },
+    {
+      "feature": "latitude",
+      "importance": 27.603890445935463
+    },
+    {
+      "feature": "hour_cos",
+      "importance": 14.042218603046965
+    },
+    {
+      "feature": "hour_sin",
+      "importance": 3.842387051049139
+    },
+    {
+      "feature": "hour",
+      "importance": 3.83836474031224
+    },
+    {
+      "feature": "consumption_mw_rolling_max_12",
+      "importance": 3.1728429974741457
+    },
+    {
+      "feature": "is_business_hour",
+      "importance": 2.1908826236140224
+    },
+    {
+      "feature": "consumption_mw_lag_48",
+      "importance": 1.8902064324547672
+    },
+    {
+      "feature": "consumption_mw_lag_6",
+      "importance": 1.8652564060771566
+    },
+    {
+      "feature": "is_weekend",
+      "importance": 1.8490117595427746
+    }
+  ],
+  "features": [
+    "consumption_mw_lag_1",
+    "latitude",
+    "hour_cos",
+    "consumption_mw_lag_48",
+    "consumption_mw_rolling_max_12",
+    "is_business_hour",
+    "consumption_mw_lag_6",
+    "hour",
+    "hour_sin",
+    "consumption_mw_lag_12",
+    "is_weekend",
+    "day_sin",
+    "day_of_week",
+    "consumption_mw_rolling_min_24",
+    "longitude",
+    "temp_x_weekend",
+    "temp_x_hour",
+    "consumption_mw_rolling_std_3",
+    "consumption_mw_rolling_std_12",
+    "day_of_year_cos",
+    "temp_x_holiday",
+    "is_holiday",
+    "temperature",
+    "humidity",
+    "days_to_holiday",
+    "temp_deviation_24h",
+    "days_from_holiday",
+    "hour_x_dow",
+    "month_cos",
+    "consumption_mw_rolling_std_6",
+    "day_cos",
+    "day_of_month",
+    "month",
+    "temp_volatility_12h",
+    "wind_x_hour",
+    "days_to_nearest_holiday",
+    "humidity_diff_1h",
+    "pressure",
+    "wind_diff_1h",
+    "wind_volatility_12h",
+    "dew_point",
+    "is_holiday_after"
+  ],
+  "feature_stats": {
+    "consumption_mw_lag_1": {
+      "mean": 1327.0459967173529,
+      "std": 846.4847975236034,
+      "min": 150.0,
+      "max": 3964.6383047696413,
+      "q25": 598.6398955506702,
+      "q75": 1899.981190662536
+    },
+    "latitude": {
+      "mean": 39.2,
+      "std": 1.5126136320951227,
+      "min": 37.1,
+      "max": 41.5,
+      "q25": 38.5,
+      "q75": 40.2
+    },
+    "hour_cos": {
+      "mean": 0.0001357940428744776,
+      "std": 0.7070964740225415,
+      "min": -1.0,
+      "max": 1.0,
+      "q25": -0.7071067811865475,
+      "q75": 0.7071067811865476
+    },
+    "consumption_mw_lag_48": {
+      "mean": 1326.6702261574605,
+      "std": 846.3294959136592,
+      "min": 150.0,
+      "max": 3964.6383047696413,
+      "q25": 598.457795527057,
+      "q75": 1899.5900110759972
+    },
+    "consumption_mw_rolling_max_12": {
+      "mean": 1692.9138445368524,
+      "std": 997.655724839724,
+      "min": 335.56436251052816,
+      "max": 3964.6383047696413,
+      "q25": 735.6595288334743,
+      "q75": 2523.0582873694025
+    },
+    "is_business_hour": {
+      "mean": 0.26778509951586876,
+      "std": 0.4428049683474035,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 1.0
+    },
+    "consumption_mw_lag_6": {
+      "mean": 1326.9973599320854,
+      "std": 846.4890798750939,
+      "min": 150.0,
+      "max": 3964.6383047696413,
+      "q25": 598.6333185286187,
+      "q75": 1899.8280285836995
+    },
+    "hour": {
+      "mean": 11.497848305540613,
+      "std": 6.922600659345397,
+      "min": 0.0,
+      "max": 23.0,
+      "q25": 5.0,
+      "q75": 17.0
+    },
+    "hour_sin": {
+      "mean": 0.00017697024215473526,
+      "std": 0.7071170530162603,
+      "min": -1.0,
+      "max": 1.0,
+      "q25": -0.7071067811865471,
+      "q75": 0.7071067811865476
+    },
+    "consumption_mw_lag_12": {
+      "mean": 1327.114429860837,
+      "std": 846.5169531613664,
+      "min": 150.0,
+      "max": 3964.6383047696413,
+      "q25": 598.65407450494,
+      "q75": 1900.004351964298
+    },
+    "is_weekend": {
+      "mean": 0.2859064012910167,
+      "std": 0.45184502984080377,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 1.0
+    },
+    "day_sin": {
+      "mean": -0.0002102828086250929,
+      "std": 0.707127909643958,
+      "min": -0.9749279121818236,
+      "max": 0.9749279121818236,
+      "q25": -0.7818314824680299,
+      "q75": 0.7818314824680298
+    },
+    "day_of_week": {
+      "mean": 3.00080688542227,
+      "std": 2.000336011267365,
+      "min": 0.0,
+      "max": 6.0,
+      "q25": 1.0,
+      "q75": 5.0
+    },
+    "consumption_mw_rolling_min_24": {
+      "mean": 799.3706912825136,
+      "std": 483.2573398508085,
+      "min": 150.0,
+      "max": 2047.507964006978,
+      "q25": 356.96787422212344,
+      "q75": 1187.0212997647834
+    },
+    "longitude": {
+      "mean": -8.360000000000001,
+      "std": 0.4223742416388573,
+      "min": -9.1,
+      "max": -7.9,
+      "q25": -8.4,
+      "q75": -8.0
+    },
+    "temp_x_weekend": {
+      "mean": 4.802351381140498,
+      "std": 8.30718285446667,
+      "min": -0.26523135111482965,
+      "max": 32.74267078633968,
+      "q25": 0.0,
+      "q75": 9.11563243945318
+    },
+    "temp_x_hour": {
+      "mean": 194.67492377978496,
+      "std": 135.5590720352376,
+      "min": -5.569858373411423,
+      "max": 644.0249314542027,
+      "q25": 81.62246788063058,
+      "q75": 290.30049701592486
+    },
+    "consumption_mw_rolling_std_3": {
+      "mean": 98.20851271155419,
+      "std": 82.81265202610352,
+      "min": 0.0,
+      "max": 776.1058672601538,
+      "q25": 37.978386501187686,
+      "q75": 136.08116399105603
+    },
+    "consumption_mw_rolling_std_12": {
+      "mean": 247.91214530574536,
+      "std": 163.358935357443,
+      "min": 32.57430442145253,
+      "max": 906.351093861743,
+      "q25": 105.35843926066532,
+      "q75": 345.9217676471681
+    },
+    "day_of_year_cos": {
+      "mean": 0.02498742036044497,
+      "std": 0.6980922688302457,
+      "min": -0.9999629591162655,
+      "max": 1.0,
+      "q25": -0.6584015846980489,
+      "q75": 0.7146733860429609
+    },
+    "temp_x_holiday": {
+      "mean": 0.5827873597574262,
+      "std": 3.2854855095539897,
+      "min": 0.0,
+      "max": 32.738516141319636,
+      "q25": 0.0,
+      "q75": 0.0
+    },
+    "is_holiday": {
+      "mean": 0.03469607315761162,
+      "std": 0.18300889504352866,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 0.0
+    },
+    "temperature": {
+      "mean": 16.800758540633502,
+      "std": 6.3191790381871735,
+      "min": -0.26523135111482965,
+      "max": 34.40805086653181,
+      "q25": 11.676726463699811,
+      "q75": 21.92409050525932
+    },
+    "humidity": {
+      "mean": 70.34999185640689,
+      "std": 13.564865132327574,
+      "min": 29.15720615788816,
+      "max": 100.0,
+      "q25": 60.38777784909805,
+      "q75": 80.36668309503203
+    },
+    "days_to_holiday": {
+      "mean": 18.5771920387305,
+      "std": 10.987490391387361,
+      "min": 0.0,
+      "max": 30.0,
+      "q25": 8.0,
+      "q75": 30.0
+    },
+    "temp_deviation_24h": {
+      "mean": 0.005193790895319429,
+      "std": 2.5831077905870434,
+      "min": -8.914380481258736,
+      "max": 8.65404505675285,
+      "q25": -1.9988036138221847,
+      "q75": 2.0027036488774006
+    },
+    "days_from_holiday": {
+      "mean": 19.150887573964496,
+      "std": 10.647215276008822,
+      "min": 1.0,
+      "max": 30.0,
+      "q25": 9.0,
+      "q75": 30.0
+    },
+    "hour_x_dow": {
+      "mean": 34.49636901559978,
+      "std": 33.93680426859543,
+      "min": 0.0,
+      "max": 138.0,
+      "q25": 6.0,
+      "q75": 54.0
+    },
+    "month_cos": {
+      "mean": 6.241280461771317e-05,
+      "std": 0.6988328826934106,
+      "min": -1.0,
+      "max": 1.0,
+      "q25": -0.5000000000000004,
+      "q75": 0.5000000000000001
+    },
+    "consumption_mw_rolling_std_6": {
+      "mean": 156.91136366744345,
+      "std": 116.91179285629913,
+      "min": 3.893976320482169,
+      "max": 752.4349398687567,
+      "q25": 65.13935578725031,
+      "q75": 216.44358670691958
+    },
+    "day_cos": {
+      "mean": 0.00016769494401790524,
+      "std": 0.7070856009438408,
+      "min": -0.9009688679024191,
+      "max": 1.0,
+      "q25": -0.900968867902419,
+      "q75": 0.6234898018587336
+    },
+    "day_of_month": {
+      "mean": 15.6831629908553,
+      "std": 8.759698628686886,
+      "min": 1.0,
+      "max": 31.0,
+      "q25": 8.0,
+      "q75": 23.0
+    },
+    "month": {
+      "mean": 6.110274341043572,
+      "std": 3.4694853425649894,
+      "min": 1.0,
+      "max": 12.0,
+      "q25": 3.0,
+      "q75": 9.0
+    },
+    "temp_volatility_12h": {
+      "mean": 2.2161986501789617,
+      "std": 0.506271537819826,
+      "min": 0.5315721303880007,
+      "max": 4.3106897565793085,
+      "q25": 1.8493290972489254,
+      "q75": 2.570443720203473
+    },
+    "wind_x_hour": {
+      "mean": 120.24559629320954,
+      "std": 95.11831047941129,
+      "min": 0.0,
+      "max": 562.2297358291952,
+      "q25": 42.07541113214732,
+      "q75": 179.9262333666551
+    },
+    "days_to_nearest_holiday": {
+      "mean": 12.853953738569123,
+      "std": 9.87786764430995,
+      "min": 0.0,
+      "max": 30.0,
+      "q25": 4.0,
+      "q75": 21.0
+    },
+    "humidity_diff_1h": {
+      "mean": -0.0013176840348524909,
+      "std": 7.25971126138021,
+      "min": -30.69838293443867,
+      "max": 30.006544110057455,
+      "q25": -4.909158379494816,
+      "q75": 4.914597188490742
+    },
+    "pressure": {
+      "mean": 1013.4390599162809,
+      "std": 4.637411475940891,
+      "min": 995.0545812409528,
+      "max": 1030.6195578309478,
+      "q25": 1010.0538504514357,
+      "q75": 1016.8925028004976
+    },
+    "wind_diff_1h": {
+      "mean": 2.5244005891027626e-05,
+      "std": 4.198079525584524,
+      "min": -17.620171305885407,
+      "max": 16.90810775407864,
+      "q25": -2.8383536683813437,
+      "q75": 2.8459639951600777
+    },
+    "wind_volatility_12h": {
+      "mean": 2.9054074229896867,
+      "std": 0.6154318800542664,
+      "min": 0.8674952926618575,
+      "max": 5.45635903354568,
+      "q25": 2.4758022901238967,
+      "q75": 3.3110174665606813
+    },
+    "dew_point": {
+      "mean": 10.985423452793713,
+      "std": 3.830272845260178,
+      "min": -2.4915764032556513,
+      "max": 23.720266011530978,
+      "q25": 8.115627324379219,
+      "q75": 13.858485488406512
+    },
+    "is_holiday_after": {
+      "mean": 0.03469607315761162,
+      "std": 0.18300889504352866,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 0.0
+    }
+  },
+  "baseline_comparison": {
+    "persistence_lag1": {
+      "mae": 868.3543,
+      "rmse": 1202.0528,
+      "mape": 49.4715,
+      "r2": -0.9254,
+      "nrmse": 0.8797
+    },
+    "seasonal_naive_daily": {
+      "mae": 861.0331,
+      "rmse": 1103.7988,
+      "mape": 79.7068,
+      "r2": -0.6235,
+      "nrmse": 0.8078
+    },
+    "seasonal_naive_weekly": {
+      "mae": 906.1151,
+      "rmse": 1158.3031,
+      "mape": 87.8663,
+      "r2": -0.7878,
+      "nrmse": 0.8477
+    },
+    "moving_average_24h": {
+      "mae": 719.6859,
+      "rmse": 910.4721,
+      "mape": 65.3464,
+      "r2": -0.1046,
+      "nrmse": 0.6663
+    },
+    "moving_average_168h": {
+      "mae": 717.1108,
+      "rmse": 888.2047,
+      "mape": 70.1637,
+      "r2": -0.0513,
+      "nrmse": 0.65
+    }
+  },
+  "reproducibility": {
+    "seed": 42,
+    "python_version": "3.13.3 (tags/v3.13.3:6280bb5, Apr  8 2025, 14:47:33) [MSC v.1943 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy_version": "2.3.3",
+    "sklearn_version": "1.7.2",
+    "timestamp_utc": "2026-03-23T03:23:07.113494+00:00",
+    "git_commit": "6b26ee1053cb671ce9058304e6033b14faa43f6e",
+    "hostname": "Pedro"
+  },
+  "feature_selection": {
+    "original_n_features": 83,
+    "selected_n_features": 42,
+    "removed_by_correlation": [
+      "temperature_feels_like",
+      "comfort_index",
+      "effective_temperature",
+      "temp_humidity_ratio",
+      "wind_chill",
+      "precip_temp_index",
+      "solar_proxy",
+      "pressure_relative",
+      "quarter",
+      "day_of_year",
+      "week_of_year",
+      "day_of_year_sin",
+      "consumption_mw_lag_2",
+      "consumption_mw_lag_3",
+      "consumption_mw_lag_24",
+      "consumption_mw_rolling_mean_3",
+      "consumption_mw_rolling_min_3",
+      "consumption_mw_rolling_max_3",
+      "consumption_mw_rolling_mean_6",
+      "consumption_mw_rolling_min_6",
+      "consumption_mw_rolling_max_6",
+      "consumption_mw_rolling_mean_12",
+      "consumption_mw_rolling_min_12",
+      "consumption_mw_rolling_mean_24",
+      "consumption_mw_rolling_std_24",
+      "consumption_mw_rolling_max_24",
+      "consumption_mw_rolling_mean_48",
+      "consumption_mw_rolling_std_48",
+      "consumption_mw_rolling_max_48",
+      "consumption_mw_rolling_min_48"
+    ],
+    "correlation_threshold": 0.95
+  }
+}

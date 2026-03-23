@@ -1,0 +1,247 @@
+{
+  "best_model_key": "catboost",
+  "k_optimal": 30,
+  "n_features_original": 71,
+  "n_features_optimized": 30,
+  "feature_names": [
+    "latitude",
+    "consumption_mw_lag_1",
+    "cos_hour",
+    "hour_cos",
+    "hour",
+    "is_business_hour",
+    "consumption_mw_lag_24",
+    "consumption_mw_rolling_max_48",
+    "longitude",
+    "consumption_mw_rolling_min_3",
+    "hour_sin",
+    "day_sin",
+    "consumption_mw_rolling_mean_3",
+    "consumption_mw_rolling_max_24",
+    "sin_day_of_week",
+    "consumption_mw_rolling_max_3",
+    "consumption_mw_rolling_std_48",
+    "day_of_week",
+    "consumption_mw_rolling_std_24",
+    "consumption_mw_lag_2",
+    "sin_hour",
+    "consumption_mw_rolling_mean_48",
+    "consumption_mw_rolling_mean_24",
+    "consumption_mw_lag_48",
+    "is_weekend",
+    "consumption_mw_lag_3",
+    "consumption_mw_rolling_mean_6",
+    "cos_day_of_year",
+    "consumption_mw_rolling_min_6",
+    "consumption_mw_rolling_std_6"
+  ],
+  "test_metrics": {
+    "mae": 57.8687342767393,
+    "rmse": 83.48020177454434,
+    "mape": 4.5381888206251455,
+    "r2": 0.9907135004084889,
+    "nrmse": 0.06109454483130176
+  },
+  "performance_comparison": [
+    {
+      "K": 10,
+      "MAPE": 5.166843644672499,
+      "RMSE": 93.29497739530709,
+      "MAE": 64.35287032190378,
+      "R2": 0.9884015062878756,
+      "Latencia_ms": 7.45502999634482
+    },
+    {
+      "K": 20,
+      "MAPE": 4.5946258728118305,
+      "RMSE": 84.22225871785334,
+      "MAE": 58.49895500855065,
+      "R2": 0.9905476709313707,
+      "Latencia_ms": 9.839579981053248
+    },
+    {
+      "K": 30,
+      "MAPE": 4.5381888206251455,
+      "RMSE": 83.48020177454434,
+      "MAE": 57.8687342767393,
+      "R2": 0.9907135004084889,
+      "Latencia_ms": 19.17801001109183
+    },
+    {
+      "K": 40,
+      "MAPE": 4.492437263092312,
+      "RMSE": 82.61918536184665,
+      "MAE": 57.29842967065446,
+      "R2": 0.99090407479213,
+      "Latencia_ms": 17.991929972777143
+    },
+    {
+      "K": 50,
+      "MAPE": 4.497483919838533,
+      "RMSE": 82.9598429666306,
+      "MAE": 57.49715369634608,
+      "R2": 0.9908289110347632,
+      "Latencia_ms": 25.394620007136837
+    },
+    {
+      "K": 71,
+      "MAPE": 4.422693873033467,
+      "RMSE": 81.32079383170013,
+      "MAE": 56.3223384216023,
+      "R2": 0.9911877201061517,
+      "Latencia_ms": 32.71768999984488
+    }
+  ],
+  "feature_importances": [
+    {
+      "feature": "latitude",
+      "importance_norm": 0.26049855093478236,
+      "cumulative": 0.26049855093478236
+    },
+    {
+      "feature": "consumption_mw_lag_1",
+      "importance_norm": 0.24167010180718673,
+      "cumulative": 0.5021686527419691
+    },
+    {
+      "feature": "cos_hour",
+      "importance_norm": 0.08806579778589915,
+      "cumulative": 0.5902344505278683
+    },
+    {
+      "feature": "hour_cos",
+      "importance_norm": 0.04291572281085737,
+      "cumulative": 0.6331501733387257
+    },
+    {
+      "feature": "hour",
+      "importance_norm": 0.03934846821726067,
+      "cumulative": 0.6724986415559864
+    },
+    {
+      "feature": "is_business_hour",
+      "importance_norm": 0.03767596327103788,
+      "cumulative": 0.7101746048270242
+    },
+    {
+      "feature": "consumption_mw_lag_24",
+      "importance_norm": 0.031701077774904746,
+      "cumulative": 0.7418756826019289
+    },
+    {
+      "feature": "consumption_mw_rolling_max_48",
+      "importance_norm": 0.031325762623772624,
+      "cumulative": 0.7732014452257016
+    },
+    {
+      "feature": "longitude",
+      "importance_norm": 0.02072643642491399,
+      "cumulative": 0.7939278816506156
+    },
+    {
+      "feature": "consumption_mw_rolling_min_3",
+      "importance_norm": 0.020389571421181373,
+      "cumulative": 0.8143174530717969
+    },
+    {
+      "feature": "hour_sin",
+      "importance_norm": 0.020224005964546706,
+      "cumulative": 0.8345414590363436
+    },
+    {
+      "feature": "day_sin",
+      "importance_norm": 0.019351147624738236,
+      "cumulative": 0.8538926066610818
+    },
+    {
+      "feature": "consumption_mw_rolling_mean_3",
+      "importance_norm": 0.01697690652199866,
+      "cumulative": 0.8708695131830805
+    },
+    {
+      "feature": "consumption_mw_rolling_max_24",
+      "importance_norm": 0.013304697294204587,
+      "cumulative": 0.8841742104772851
+    },
+    {
+      "feature": "sin_day_of_week",
+      "importance_norm": 0.012447503079248136,
+      "cumulative": 0.8966217135565332
+    },
+    {
+      "feature": "consumption_mw_rolling_max_3",
+      "importance_norm": 0.011402440475081628,
+      "cumulative": 0.9080241540316148
+    },
+    {
+      "feature": "consumption_mw_rolling_std_48",
+      "importance_norm": 0.011070368806904462,
+      "cumulative": 0.9190945228385193
+    },
+    {
+      "feature": "day_of_week",
+      "importance_norm": 0.00969288816412904,
+      "cumulative": 0.9287874110026484
+    },
+    {
+      "feature": "consumption_mw_rolling_std_24",
+      "importance_norm": 0.009041509772175558,
+      "cumulative": 0.9378289207748239
+    },
+    {
+      "feature": "consumption_mw_lag_2",
+      "importance_norm": 0.00894909634331608,
+      "cumulative": 0.94677801711814
+    },
+    {
+      "feature": "sin_hour",
+      "importance_norm": 0.008331287851961628,
+      "cumulative": 0.9551093049701016
+    },
+    {
+      "feature": "consumption_mw_rolling_mean_48",
+      "importance_norm": 0.007519389714499947,
+      "cumulative": 0.9626286946846015
+    },
+    {
+      "feature": "consumption_mw_rolling_mean_24",
+      "importance_norm": 0.007419387307866351,
+      "cumulative": 0.970048081992468
+    },
+    {
+      "feature": "consumption_mw_lag_48",
+      "importance_norm": 0.00468362122938355,
+      "cumulative": 0.9747317032218515
+    },
+    {
+      "feature": "is_weekend",
+      "importance_norm": 0.0031531704708806316,
+      "cumulative": 0.9778848736927321
+    },
+    {
+      "feature": "consumption_mw_lag_3",
+      "importance_norm": 0.0024297293629290586,
+      "cumulative": 0.9803146030556612
+    },
+    {
+      "feature": "consumption_mw_rolling_mean_6",
+      "importance_norm": 0.0015238806816234224,
+      "cumulative": 0.9818384837372847
+    },
+    {
+      "feature": "cos_day_of_year",
+      "importance_norm": 0.0014202936277368458,
+      "cumulative": 0.9832587773650215
+    },
+    {
+      "feature": "consumption_mw_rolling_min_6",
+      "importance_norm": 0.0013616744646462878,
+      "cumulative": 0.9846204518296678
+    },
+    {
+      "feature": "consumption_mw_rolling_std_6",
+      "importance_norm": 0.0013276716430180688,
+      "cumulative": 0.9859481234726859
+    }
+  ]
+}

@@ -12,7 +12,7 @@
   "containerDefinitions": [
     {
       "name": "energy-forecast-api",
-      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/energy-forecast-api:latest",
+      "image": "ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/energy-forecast-api:IMAGE_TAG",
       "essential": true,
       "portMappings": [
         {
@@ -28,13 +28,27 @@
         {
           "name": "PYTHONUNBUFFERED",
           "value": "1"
+        },
+        {
+          "name": "RATE_LIMIT_MAX",
+          "value": "60"
+        },
+        {
+          "name": "RATE_LIMIT_WINDOW",
+          "value": "60"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "API_KEY",
+          "valueFrom": "arn:aws:ssm:REGION:ACCOUNT_ID:parameter/energy-forecast/api-key"
         }
       ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/energy-forecast-api",
-          "awslogs-region": "us-east-1",
+          "awslogs-region": "REGION",
           "awslogs-stream-prefix": "ecs"
         }
       },

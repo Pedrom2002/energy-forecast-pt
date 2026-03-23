@@ -1,249 +1,1003 @@
-"""
-Feature Engineering Module
+"""Feature Engineering Module.
+
 Creates temporal features, lags, rolling windows and interactions
+for hourly energy consumption forecasting in Portugal.
 """
-import pandas as pd
+from __future__ import annotations
+
+import logging
+from typing import TypedDict
+
 import numpy as np
-from typing import List, Dict
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constants: physical bounds, default parameters, feature bounds
+# ---------------------------------------------------------------------------
+
+# Approximate coordinates for Portuguese regions
+REGION_COORDS: dict[str, tuple[float, float]] = {
+    "Alentejo": (38.5, -7.9),
+    "Algarve": (37.1, -8.0),
+    "Centro": (40.2, -8.4),
+    "Lisboa": (38.7, -9.1),
+    "Norte": (41.5, -8.4),
+}
+
+# Standard atmospheric pressure (hPa) -- fixed reference to avoid data leakage
+STANDARD_PRESSURE_HPA: float = 1013.25
+
+# Portuguese public holidays (fixed dates)
+PT_FIXED_HOLIDAYS: list[tuple[int, int]] = [
+    (1, 1),    # Ano Novo
+    (4, 25),   # Dia da Liberdade
+    (5, 1),    # Dia do Trabalhador
+    (6, 10),   # Dia de Portugal
+    (8, 15),   # Assuncao de Nossa Senhora
+    (10, 5),   # Implantacao da Republica
+    (11, 1),   # Todos os Santos
+    (12, 1),   # Restauracao da Independencia
+    (12, 8),   # Imaculada Conceicao
+    (12, 25),  # Natal
+]
+
+# All known Portuguese region names (used for one-hot encoding)
+ALL_REGIONS: list[str] = ["Alentejo", "Algarve", "Centro", "Lisboa", "Norte"]
+
+# -- Lag & rolling window defaults ------------------------------------------
+DEFAULT_LAGS: list[int] = [1, 2, 3, 6, 12, 24, 48]
+"""Default lag offsets (hours) for consumption autoregressive features."""
+
+ROLLING_WINDOWS: list[int] = [3, 6, 12, 24, 48]
+"""Default rolling-window sizes (hours) for consumption summary statistics."""
+
+ROLLING_MIN_PERIODS: int = 1
+"""Minimum number of valid observations required for rolling calculations."""
+
+# -- Winsorization / soft-clipping bounds -----------------------------------
+TEMP_CLIP_MIN: float = -10.0
+TEMP_CLIP_MAX: float = 45.0
+HUMIDITY_CLIP_MIN: float = 5.0
+HUMIDITY_CLIP_MAX: float = 100.0
+WIND_SPEED_CLIP_MIN: float = 0.0
+WIND_SPEED_CLIP_MAX: float = 120.0
+PRECIP_CLIP_MIN: float = 0.0
+PRECIP_CLIP_MAX: float = 100.0
+PRESSURE_CLIP_MIN: float = 960.0
+PRESSURE_CLIP_MAX: float = 1050.0
+
+WINSORIZE_RULES: dict[str, tuple[float, float]] = {
+    "temperature": (TEMP_CLIP_MIN, TEMP_CLIP_MAX),
+    "humidity": (HUMIDITY_CLIP_MIN, HUMIDITY_CLIP_MAX),
+    "wind_speed": (WIND_SPEED_CLIP_MIN, WIND_SPEED_CLIP_MAX),
+    "precipitation": (PRECIP_CLIP_MIN, PRECIP_CLIP_MAX),
+    "pressure": (PRESSURE_CLIP_MIN, PRESSURE_CLIP_MAX),
+}
+"""Per-column (lower, upper) bounds for soft winsorization."""
+
+# -- Hard validation bounds (used in _validate_weather_columns) -------------
+TEMP_VALID_MIN: float = -50.0
+TEMP_VALID_MAX: float = 60.0
+TEMP_WARN_MIN: float = -10.0
+TEMP_WARN_MAX: float = 45.0
+WIND_SPEED_WARN_MAX: float = 150.0
+PRECIP_WARN_MAX: float = 200.0
+PRESSURE_VALID_MIN: float = 900.0
+PRESSURE_VALID_MAX: float = 1100.0
+
+# -- Dew-point Magnus formula constants ------------------------------------
+MAGNUS_B: float = 17.62
+MAGNUS_C: float = 243.12
+DEW_POINT_LOWER_BOUND: float = -80.0
+
+# -- Holiday proximity cap -------------------------------------------------
+HOLIDAY_PROXIMITY_CAP: int = 30
+"""Maximum days-to-holiday value; beyond this the proximity effect is negligible."""
+
+# -- Trend feature parameters -----------------------------------------------
+TREND_MOMENTUM_PERIODS: int = 3
+TREND_DEVIATION_WINDOW: int = 24
+TREND_VOLATILITY_WINDOW: int = 12
+
+# -- Cyclical encoding periods ----------------------------------------------
+HOURS_IN_DAY: int = 24
+DAYS_IN_WEEK: int = 7
+MONTHS_IN_YEAR: int = 12
+DAYS_IN_YEAR: int = 365
+
+# -- Output bounds for validation (Task 2) ----------------------------------
+
+class _FeatureBounds(TypedDict):
+    """Bounds specification for a single feature column."""
+
+    min: float
+    max: float
+
+
+OUTPUT_FEATURE_BOUNDS: dict[str, _FeatureBounds] = {
+    "hour": {"min": 0, "max": 23},
+    "month": {"min": 1, "max": 12},
+    "day_of_week": {"min": 0, "max": 6},
+    "quarter": {"min": 1, "max": 4},
+    "day_of_month": {"min": 1, "max": 31},
+    "week_of_year": {"min": 1, "max": 53},
+    "day_of_year": {"min": 1, "max": 366},
+    "cloud_cover": {"min": 0, "max": 100},
+    "solar_proxy": {"min": 0, "max": 100},
+    "humidity": {"min": 0, "max": 100},
+    "is_weekend": {"min": 0, "max": 1},
+    "is_holiday": {"min": 0, "max": 1},
+    "is_business_hour": {"min": 0, "max": 1},
+}
+"""Known bounds for key output features.  Values outside these are clipped."""
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _compute_easter(year: int) -> pd.Timestamp:
+    """Compute Easter Sunday date using the Anonymous Gregorian algorithm.
+
+    Args:
+        year: The calendar year.
+
+    Returns:
+        Timestamp representing Easter Sunday.
+    """
+    a = year % 19
+    b, c = divmod(year, 100)
+    d, e = divmod(b, 4)
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = divmod(c, 4)
+    l = (32 + 2 * e + 2 * i - h - k) % 7  # noqa: E741
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return pd.Timestamp(year, month, day)
+
+
+def get_portuguese_holidays(year: int) -> set[pd.Timestamp]:
+    """Return set of Portuguese public holiday dates for a given year.
+
+    Args:
+        year: The calendar year.
+
+    Returns:
+        Set of Timestamps for every Portuguese public holiday in *year*.
+    """
+    holidays: set[pd.Timestamp] = set()
+    for month, day in PT_FIXED_HOLIDAYS:
+        holidays.add(pd.Timestamp(year, month, day))
+    easter = _compute_easter(year)
+    holidays.add(easter - pd.Timedelta(days=2))  # Sexta-feira Santa
+    holidays.add(easter)                          # Pascoa
+    holidays.add(easter + pd.Timedelta(days=60))  # Corpo de Deus
+    return holidays
+
+
+def _validate_output_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Check output features for infinite values and out-of-range values.
+
+    Logs warnings for any violations and clips values to known bounds.
+    Does **not** raise errors -- this is a best-effort guard.
+
+    Args:
+        df: DataFrame of engineered features (modified in place on a copy).
+
+    Returns:
+        The DataFrame with infinite values replaced by NaN and bounded
+        features clipped.
+    """
+    df = df.copy()
+
+    # 1. Replace infinities with NaN and warn
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    inf_mask = np.isinf(df[numeric_cols])
+    n_inf = int(inf_mask.values.sum())
+    if n_inf > 0:
+        cols_with_inf = [c for c in numeric_cols if inf_mask[c].any()]
+        logger.warning(
+            "Output validation: %d infinite value(s) found in columns %s; "
+            "replacing with NaN",
+            n_inf,
+            cols_with_inf,
+        )
+        df[numeric_cols] = df[numeric_cols].replace([np.inf, -np.inf], np.nan)
+
+    # 2. Check known feature bounds and clip
+    for col, bounds in OUTPUT_FEATURE_BOUNDS.items():
+        if col not in df.columns:
+            continue
+        lo, hi = bounds["min"], bounds["max"]
+        out_of_range = (df[col] < lo) | (df[col] > hi)
+        n_oor = int(out_of_range.sum())
+        if n_oor > 0:
+            logger.warning(
+                "Output validation: %d value(s) in '%s' outside [%.1f, %.1f]; clipping",
+                n_oor,
+                col,
+                lo,
+                hi,
+            )
+            df[col] = df[col].clip(lower=lo, upper=hi)
+
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Main class
+# ---------------------------------------------------------------------------
 
 
 class FeatureEngineer:
-    """Feature engineering for energy time series"""
+    """Feature engineering pipeline for hourly energy consumption forecasting.
 
-    def __init__(self, config: dict = None):
-        self.config = config or {}
+    Transforms raw input data (timestamp + weather observations) into the rich
+    feature matrix expected by the trained models.  Features are organised into
+    six groups, each capturing a distinct driver of energy demand:
+
+    1. **Temporal** -- hour, day-of-week, month, cyclical sin/cos encodings.
+       Cyclical encoding (sin/cos) preserves the circular topology of periodic
+       variables so that, e.g., 23:00 and 00:00 are treated as adjacent rather
+       than at opposite extremes of a linear scale.
+    2. **Lag** -- ``consumption_mw`` shifted by 1, 2, 3, 6, 12, 24, 48 hours.
+       Autocorrelation in energy demand is strong at daily (24 h) and weekly
+       (168 h) periodicities; 7 lags capture short-term momentum.
+    3. **Rolling window** -- mean, std, min, max of past consumption over 3, 6,
+       12, 24, 48-hour windows.  Rolling statistics summarise recent load
+       trends without leaking future values (shift(1) applied before rolling).
+    4. **Weather-derived** -- dew point (Magnus formula), heat index (NWS
+       Steadman), wind chill (Environment Canada), comfort index (Thom), and
+       solar proxy (100 - cloud cover).  These non-linear transformations
+       capture physiological comfort effects that drive HVAC load.
+    5. **Holiday** -- Portuguese public holidays (fixed + Easter-derived),
+       eve/after flags, and days-to-nearest-holiday.  Holiday effects on demand
+       can reach 20-30 % deviation from weekday baselines.
+    6. **Interaction** -- temperature x weekend, temperature x hour, etc.
+       Cross terms let the model learn that peak-demand temperature sensitivity
+       differs between working days and weekends.
+
+    Example::
+
+        fe = FeatureEngineer()
+        df_features = fe.create_features_no_lags(df)   # no history required
+        df_features = fe.create_all_features(df)        # full feature set
+    """
+
+    def __init__(self) -> None:
+        """Initialise the feature engineer (no configuration required)."""
+
+    @staticmethod
+    def _validate_weather_columns(df: pd.DataFrame) -> None:
+        """Validate that weather columns contain physically plausible values.
+
+        Hard out-of-range inputs cause a ``ValueError``.  Soft out-of-range
+        values (technically possible but unusual) are logged as warnings.
+
+        Args:
+            df: Raw input DataFrame with weather columns.
+
+        Raises:
+            ValueError: If any weather column contains values outside the
+                hard physical bounds (e.g. humidity > 100, negative wind
+                speed, pressure outside [900, 1100] hPa).
+        """
+        if "humidity" in df.columns:
+            invalid = (df["humidity"] < 0) | (df["humidity"] > 100)
+            if invalid.any():
+                bad = df.loc[invalid, "humidity"].tolist()[:5]
+                raise ValueError(
+                    f"humidity must be in [0, 100]. Found {invalid.sum()} invalid value(s): {bad}"
+                )
+
+        if "temperature" in df.columns:
+            invalid = (df["temperature"] < TEMP_VALID_MIN) | (df["temperature"] > TEMP_VALID_MAX)
+            if invalid.any():
+                bad = df.loc[invalid, "temperature"].tolist()[:5]
+                raise ValueError(
+                    f"temperature must be in [{TEMP_VALID_MIN}, {TEMP_VALID_MAX}] C. "
+                    f"Found {invalid.sum()} invalid value(s): {bad}"
+                )
+            unusual = (df["temperature"] < TEMP_WARN_MIN) | (df["temperature"] > TEMP_WARN_MAX)
+            if unusual.any():
+                logger.warning(
+                    "temperature: %d value(s) outside typical Portuguese range [%s, %s] C",
+                    unusual.sum(),
+                    TEMP_WARN_MIN,
+                    TEMP_WARN_MAX,
+                )
+
+        if "wind_speed" in df.columns:
+            invalid = df["wind_speed"] < 0
+            if invalid.any():
+                raise ValueError(
+                    f"wind_speed cannot be negative. Found {invalid.sum()} invalid value(s)."
+                )
+            extreme = df["wind_speed"] > WIND_SPEED_WARN_MAX
+            if extreme.any():
+                logger.warning(
+                    "wind_speed: %d value(s) exceed %s km/h (possible sensor error)",
+                    extreme.sum(),
+                    WIND_SPEED_WARN_MAX,
+                )
+
+        if "precipitation" in df.columns:
+            invalid = df["precipitation"] < 0
+            if invalid.any():
+                raise ValueError(
+                    f"precipitation cannot be negative. Found {invalid.sum()} invalid value(s)."
+                )
+            extreme = df["precipitation"] > PRECIP_WARN_MAX
+            if extreme.any():
+                logger.warning(
+                    "precipitation: %d value(s) exceed %s mm/h (extreme event or sensor error)",
+                    extreme.sum(),
+                    PRECIP_WARN_MAX,
+                )
+
+        if "pressure" in df.columns:
+            invalid = (df["pressure"] < PRESSURE_VALID_MIN) | (df["pressure"] > PRESSURE_VALID_MAX)
+            if invalid.any():
+                bad = df.loc[invalid, "pressure"].tolist()[:5]
+                raise ValueError(
+                    f"pressure must be in [{PRESSURE_VALID_MIN}, {PRESSURE_VALID_MAX}] hPa. "
+                    f"Found {invalid.sum()} invalid value(s): {bad}"
+                )
+
+        if "cloud_cover" in df.columns:
+            invalid = (df["cloud_cover"] < 0) | (df["cloud_cover"] > 100)
+            if invalid.any():
+                bad = df.loc[invalid, "cloud_cover"].tolist()[:5]
+                raise ValueError(
+                    f"cloud_cover must be in [0, 100]. Found {invalid.sum()} invalid value(s): {bad}"
+                )
+
+    @staticmethod
+    def _winsorize_weather_columns(df: pd.DataFrame) -> pd.DataFrame:
+        """Clip extreme weather values to physically plausible bounds (soft cap).
+
+        This is an *optional* step applied before feature creation when the
+        caller passes ``winsorize=True`` to :meth:`create_features_no_lags` or
+        :meth:`create_all_features`.
+
+        The clipping bounds are defined in :data:`WINSORIZE_RULES`.
+
+        Args:
+            df: Input DataFrame with weather columns.
+
+        Returns:
+            A copy of *df* with extreme weather values clipped.
+        """
+        df = df.copy()
+        for col, (lo, hi) in WINSORIZE_RULES.items():
+            if col in df.columns:
+                n_clipped = ((df[col] < lo) | (df[col] > hi)).sum()
+                if n_clipped > 0:
+                    logger.debug(
+                        "Winsorizing %s: %d value(s) clipped to [%.1f, %.1f]",
+                        col, n_clipped, lo, hi,
+                    )
+                df[col] = df[col].clip(lower=lo, upper=hi)
+        return df
 
     def create_temporal_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Creates temporal features"""
+        """Create temporal features from the ``timestamp`` column.
+
+        Includes raw calendar fields (hour, day_of_week, month, etc.) and
+        their cyclical sin/cos encodings.
+
+        Args:
+            df: DataFrame with a ``timestamp`` column.
+
+        Returns:
+            DataFrame augmented with temporal feature columns.
+        """
         df = df.copy()
-        df['hour'] = df['timestamp'].dt.hour
-        df['day_of_week'] = df['timestamp'].dt.dayofweek
-        df['day_of_month'] = df['timestamp'].dt.day
-        df['month'] = df['timestamp'].dt.month
-        df['quarter'] = df['timestamp'].dt.quarter
-        df['is_weekend'] = (df['day_of_week'] >= 5).astype(int)
-        df['week_of_year'] = df['timestamp'].dt.isocalendar().week
+        ts = df["timestamp"]
+
+        df["hour"] = ts.dt.hour
+        df["day_of_week"] = ts.dt.dayofweek
+        df["day_of_month"] = ts.dt.day
+        df["month"] = ts.dt.month
+        df["quarter"] = ts.dt.quarter
+        df["year"] = ts.dt.year
+        df["week_of_year"] = ts.dt.isocalendar().week.astype(int)
+        df["day_of_year"] = ts.dt.dayofyear
+        df["is_weekend"] = (df["day_of_week"] >= 5).astype(int)
+        df["is_business_hour"] = (
+            (df["hour"] >= 9) & (df["hour"] < 18) & (df["day_of_week"] < 5)
+        ).astype(int)
 
         # Cyclical encoding to capture periodic nature
-        df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
-        df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
-        df['day_sin'] = np.sin(2 * np.pi * df['day_of_week'] / 7)
-        df['day_cos'] = np.cos(2 * np.pi * df['day_of_week'] / 7)
-        df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
-        df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+        df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / HOURS_IN_DAY)
+        df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / HOURS_IN_DAY)
+        df["day_sin"] = np.sin(2 * np.pi * df["day_of_week"] / DAYS_IN_WEEK)
+        df["day_cos"] = np.cos(2 * np.pi * df["day_of_week"] / DAYS_IN_WEEK)
+        df["month_sin"] = np.sin(2 * np.pi * df["month"] / MONTHS_IN_YEAR)
+        df["month_cos"] = np.cos(2 * np.pi * df["month"] / MONTHS_IN_YEAR)
+        df["day_of_year_sin"] = np.sin(2 * np.pi * df["day_of_year"] / DAYS_IN_YEAR)
+        df["day_of_year_cos"] = np.cos(2 * np.pi * df["day_of_year"] / DAYS_IN_YEAR)
+
+        # Legacy aliases for backward compatibility with models trained before
+        # the cyclic feature renaming (sin_hour -> hour_sin, etc.).
+        df["sin_hour"] = df["hour_sin"]
+        df["cos_hour"] = df["hour_cos"]
+        df["sin_day_of_week"] = df["day_sin"]
+        df["cos_day_of_week"] = df["day_cos"]
+        df["day_of_week_sin"] = df["day_sin"]
+        df["day_of_week_cos"] = df["day_cos"]
+        df["sin_month"] = df["month_sin"]
+        df["cos_month"] = df["month_cos"]
+        df["sin_day_of_year"] = df["day_of_year_sin"]
+        df["cos_day_of_year"] = df["day_of_year_cos"]
 
         return df
 
-    def create_lag_features(self, df: pd.DataFrame, lags: List[int] = None,
-                           target_col: str = 'consumption_mw') -> pd.DataFrame:
-        """Creates lag features by region"""
+    def create_lag_features(
+        self,
+        df: pd.DataFrame,
+        lags: list[int] | None = None,
+        target_col: str = "consumption_mw",
+    ) -> pd.DataFrame:
+        """Create lagged consumption features, computed independently per region.
+
+        Default lags ``[1, 2, 3, 6, 12, 24, 48]`` capture:
+
+        - **1-3 h** -- short-term momentum (e.g. industrial ramp-up/down).
+        - **6 h** -- half-day periodicity.
+        - **12 h** -- twice-daily peak structure (morning + evening peak).
+        - **24 h** -- same-hour-yesterday (strongest autocorrelation peak).
+        - **48 h** -- two-day-ago same hour (smooths day-to-day variability).
+
+        Lags are computed per region because mixing regions would create
+        spurious cross-region correlations.  At least 48 rows of history are
+        required to avoid NaN warm-up values at prediction time.
+
+        Args:
+            df: DataFrame with ``region`` and *target_col* columns.
+            lags: List of lag offsets in hours.  Defaults to
+                :data:`DEFAULT_LAGS`.
+            target_col: Name of the target column to lag.
+
+        Returns:
+            DataFrame augmented with lag feature columns.
+        """
         if lags is None:
-            lags = [1, 2, 3, 6, 12, 24, 48]  # Removed lag_168 to keep more data
+            lags = DEFAULT_LAGS
 
         df = df.copy()
 
-        # Process each region separately
-        dfs_by_region = []
-        for region in df['region'].unique():
-            df_region = df[df['region'] == region].copy()
-
-            # Create lags for this region
+        dfs_by_region: list[pd.DataFrame] = []
+        for region in df["region"].unique():
+            df_region = df[df["region"] == region].copy()
             for lag in lags:
-                df_region[f'{target_col}_lag_{lag}'] = df_region[target_col].shift(lag)
-
+                df_region[f"{target_col}_lag_{lag}"] = df_region[target_col].shift(lag)
             dfs_by_region.append(df_region)
 
-        # Concatenate all regions
         df_result = pd.concat(dfs_by_region, ignore_index=True)
-
-        # Sort by timestamp to maintain original order
-        df_result = df_result.sort_values('timestamp').reset_index(drop=True)
-
+        df_result = df_result.sort_values("timestamp").reset_index(drop=True)
         return df_result
 
-    def create_rolling_features(self, df: pd.DataFrame, windows: List[int] = None,
-                               target_col: str = 'consumption_mw') -> pd.DataFrame:
-        """Creates rolling statistics by region"""
+    def create_rolling_features(
+        self,
+        df: pd.DataFrame,
+        windows: list[int] | None = None,
+        target_col: str = "consumption_mw",
+    ) -> pd.DataFrame:
+        """Create rolling-window statistics of consumption, per region.
+
+        Computes mean, std, min, and max over configurable windows.
+        ``shift(1)`` is applied to the target *before* rolling so that
+        the current row's value is never included -- this prevents target
+        leakage during training and ensures inference-time behaviour matches
+        the training pipeline.
+
+        Args:
+            df: DataFrame with ``region`` and *target_col* columns.
+            windows: List of window sizes in hours.  Defaults to
+                :data:`ROLLING_WINDOWS`.
+            target_col: Name of the target column to compute statistics on.
+
+        Returns:
+            DataFrame augmented with rolling statistic columns.
+        """
         if windows is None:
-            windows = [3, 6, 12, 24, 48]  # Removed window_168 to keep more data
+            windows = ROLLING_WINDOWS
 
         df = df.copy()
 
-        # Process each region separately
-        dfs_by_region = []
-        for region in df['region'].unique():
-            df_region = df[df['region'] == region].copy()
-
-            # Create rolling features for this region
+        dfs_by_region: list[pd.DataFrame] = []
+        for region in df["region"].unique():
+            df_region = df[df["region"] == region].copy()
+            # Shift by 1 to exclude current value (prevent target leakage)
+            shifted = df_region[target_col].shift(1)
             for window in windows:
-                rolling = df_region[target_col].rolling(window=window, min_periods=1)
-                df_region[f'{target_col}_rolling_mean_{window}'] = rolling.mean()
-                df_region[f'{target_col}_rolling_std_{window}'] = rolling.std()
-                df_region[f'{target_col}_rolling_min_{window}'] = rolling.min()
-                df_region[f'{target_col}_rolling_max_{window}'] = rolling.max()
-
+                rolling = shifted.rolling(window=window, min_periods=ROLLING_MIN_PERIODS)
+                df_region[f"{target_col}_rolling_mean_{window}"] = rolling.mean()
+                df_region[f"{target_col}_rolling_std_{window}"] = rolling.std()
+                df_region[f"{target_col}_rolling_min_{window}"] = rolling.min()
+                df_region[f"{target_col}_rolling_max_{window}"] = rolling.max()
             dfs_by_region.append(df_region)
 
-        # Concatenate all regions
         df_result = pd.concat(dfs_by_region, ignore_index=True)
-
-        # Sort by timestamp to maintain original order
-        df_result = df_result.sort_values('timestamp').reset_index(drop=True)
-
+        df_result = df_result.sort_values("timestamp").reset_index(drop=True)
         return df_result
 
     def create_weather_derived_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Creates derived meteorological features based on known formulas
+        """Create derived meteorological features based on standard formulas.
+
+        References:
+            - Dew point: Magnus formula (Lawrence 2005, BAMS)
+            - Heat index: NWS Steadman (1979) equation, valid for T > 26 C,
+              RH > 40%
+            - Wind chill: Environment Canada / NWS formula (2001)
+            - Comfort index: Thom's discomfort index (1959)
+
+        Args:
+            df: DataFrame with weather observation columns.
+
+        Returns:
+            DataFrame augmented with derived weather feature columns.
         """
         df = df.copy()
 
-        if 'temperature' in df.columns and 'humidity' in df.columns:
-            T = df['temperature']
-            RH = df['humidity']
+        if "temperature" in df.columns and "humidity" in df.columns:
+            T = df["temperature"]
+            RH = df["humidity"]
 
-            # Heat Index
-            df['heat_index'] = (
-                -8.78469475556 +
-                1.61139411 * T +
-                2.33854883889 * RH +
-                -0.14611605 * T * RH
+            # --- Dew point via Magnus formula (Lawrence 2005) ---
+            _gamma = np.log(np.clip(RH, 1.0, 100.0) / 100.0) + (MAGNUS_B * T) / (MAGNUS_C + T)
+            df["dew_point"] = (MAGNUS_C * _gamma / (MAGNUS_B - _gamma)).clip(
+                lower=DEW_POINT_LOWER_BOUND, upper=T,
             )
 
-            # Dew Point
-            df['dew_point'] = T - ((100 - RH) / 5)
-
-            # Comfort Index
-            df['comfort_index'] = T - (0.55 - 0.0055 * RH) * (T - 14.5)
-
-            # Effective temperature
-            df['effective_temperature'] = T - 0.4 * (T - 10) * (1 - RH / 100)
-
-            # Ratios
-            df['temp_humidity_ratio'] = T / (RH + 1)
-
-        if 'wind_speed' in df.columns and 'temperature' in df.columns:
-            V = df['wind_speed']
-            T = df['temperature']
-
-            # Wind Chill
-            df['wind_chill'] = (
-                13.12 + 0.6215 * T - 11.37 * (V ** 0.16) + 0.3965 * T * (V ** 0.16)
+            # --- Heat index via NWS Steadman (1979) equation ---
+            _T_f = T * 9.0 / 5.0 + 32.0
+            _hi_f = (
+                -42.379
+                + 2.04901523 * _T_f
+                + 10.14333127 * RH
+                - 0.22475541 * _T_f * RH
+                - 0.00683783 * _T_f ** 2
+                - 0.05481717 * RH ** 2
+                + 0.00122874 * _T_f ** 2 * RH
+                + 0.00085282 * _T_f * RH ** 2
+                - 0.00000199 * _T_f ** 2 * RH ** 2
             )
+            df["heat_index"] = (_hi_f - 32.0) * 5.0 / 9.0
 
-        if 'pressure' in df.columns:
-            # Relative pressure (difference from mean)
-            df['pressure_relative'] = df['pressure'] - df['pressure'].mean()
+            # Thom's discomfort index
+            df["comfort_index"] = T - (0.55 - 0.0055 * RH) * (T - 14.5)
+            df["effective_temperature"] = T - 0.4 * (T - 10) * (1 - RH / 100)
+            df["temp_humidity_ratio"] = T / (RH + 1)
 
-        if 'cloud_cover' in df.columns:
-            # Solar radiation proxy (inverse of cloud cover)
-            df['solar_proxy'] = 100 - df['cloud_cover']
+        if "wind_speed" in df.columns and "temperature" in df.columns:
+            V = df["wind_speed"]
+            T = df["temperature"]
+            df["wind_chill"] = 13.12 + 0.6215 * T - 11.37 * (V ** 0.16) + 0.3965 * T * (V ** 0.16)
 
-        if 'precipitation' in df.columns and 'temperature' in df.columns:
-            # Weighted precipitation index
-            df['precip_temp_index'] = df['precipitation'] * (1 + df['temperature'] / 100)
+        if "pressure" in df.columns:
+            df["pressure_relative"] = df["pressure"] - STANDARD_PRESSURE_HPA
+
+        if "cloud_cover" in df.columns:
+            df["solar_proxy"] = 100 - df["cloud_cover"]
+
+        if "precipitation" in df.columns and "temperature" in df.columns:
+            df["precip_temp_index"] = df["precipitation"] * (1 + df["temperature"] / 100)
 
         return df
 
     def create_trend_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Creates trend, variation and momentum features
+        """Create trend, variation and momentum features.
+
+        Computes first/second differences, percentage-change momentum,
+        deviation from rolling mean, and rolling volatility for weather
+        variables.
+
+        Args:
+            df: DataFrame with ``region``, ``timestamp``, and weather columns.
+
+        Returns:
+            DataFrame augmented with trend feature columns.
         """
         df = df.copy()
 
-        # Process by region to maintain temporal order
-        dfs_by_region = []
-        for region in df['region'].unique():
-            df_region = df[df['region'] == region].copy().sort_values('timestamp')
+        dfs_by_region: list[pd.DataFrame] = []
+        for region in df["region"].unique():
+            df_region = df[df["region"] == region].copy().sort_values("timestamp")
 
-            # First-order differences (variation)
-            if 'temperature' in df_region.columns:
-                df_region['temp_diff_1h'] = df_region['temperature'].diff(1)
-                df_region['temp_diff2_1h'] = df_region['temp_diff_1h'].diff(1)
-                df_region['temp_momentum'] = df_region['temperature'].pct_change(periods=3) * 100
-                df_region['temp_deviation_24h'] = (
-                    df_region['temperature'] - df_region['temperature'].rolling(24, min_periods=1).mean()
+            if "temperature" in df_region.columns:
+                df_region["temp_diff_1h"] = df_region["temperature"].diff(1)
+                df_region["temp_diff2_1h"] = df_region["temp_diff_1h"].diff(1)
+                df_region["temp_momentum"] = (
+                    df_region["temperature"].pct_change(periods=TREND_MOMENTUM_PERIODS) * 100
                 )
-                df_region['temp_volatility_12h'] = df_region['temperature'].rolling(12, min_periods=1).std()
+                df_region["temp_deviation_24h"] = (
+                    df_region["temperature"]
+                    - df_region["temperature"]
+                    .rolling(TREND_DEVIATION_WINDOW, min_periods=ROLLING_MIN_PERIODS)
+                    .mean()
+                )
+                df_region["temp_volatility_12h"] = (
+                    df_region["temperature"]
+                    .rolling(TREND_VOLATILITY_WINDOW, min_periods=ROLLING_MIN_PERIODS)
+                    .std()
+                )
 
-            if 'humidity' in df_region.columns:
-                df_region['humidity_diff_1h'] = df_region['humidity'].diff(1)
+            if "humidity" in df_region.columns:
+                df_region["humidity_diff_1h"] = df_region["humidity"].diff(1)
 
-            if 'wind_speed' in df_region.columns:
-                df_region['wind_diff_1h'] = df_region['wind_speed'].diff(1)
-                df_region['wind_momentum'] = df_region['wind_speed'].pct_change(periods=3) * 100
-                df_region['wind_volatility_12h'] = df_region['wind_speed'].rolling(12, min_periods=1).std()
+            if "wind_speed" in df_region.columns:
+                df_region["wind_diff_1h"] = df_region["wind_speed"].diff(1)
+                df_region["wind_momentum"] = (
+                    df_region["wind_speed"].pct_change(periods=TREND_MOMENTUM_PERIODS) * 100
+                )
+                df_region["wind_volatility_12h"] = (
+                    df_region["wind_speed"]
+                    .rolling(TREND_VOLATILITY_WINDOW, min_periods=ROLLING_MIN_PERIODS)
+                    .std()
+                )
 
-            if 'pressure' in df_region.columns:
-                df_region['pressure_diff_1h'] = df_region['pressure'].diff(1)
+            if "pressure" in df_region.columns:
+                df_region["pressure_diff_1h"] = df_region["pressure"].diff(1)
 
             dfs_by_region.append(df_region)
 
         df_result = pd.concat(dfs_by_region, ignore_index=True)
-        df_result = df_result.sort_values('timestamp').reset_index(drop=True)
-
+        df_result = df_result.sort_values("timestamp").reset_index(drop=True)
         return df_result
 
-    def create_interaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Creates interaction features"""
+    def create_holiday_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create Portuguese holiday features from timestamp.
+
+        Handles both timezone-aware and timezone-naive timestamps by converting
+        to UTC-normalized tz-naive dates before comparing with holiday dates.
+
+        Args:
+            df: DataFrame with a ``timestamp`` column.
+
+        Returns:
+            DataFrame augmented with holiday feature columns including
+            ``is_holiday``, ``is_holiday_eve``, ``is_holiday_after``,
+            ``days_to_nearest_holiday``, ``days_to_holiday``, and
+            ``days_from_holiday``.
+        """
         df = df.copy()
+        ts = df["timestamp"]
 
-        if 'temperature' in df.columns and 'is_weekend' in df.columns:
-            df['temp_x_weekend'] = df['temperature'] * df['is_weekend']
+        # Build holiday set for all years in the data.
+        ts_naive = ts.dt.tz_localize(None) if ts.dt.tz is not None else ts
+        years = ts_naive.dt.year.unique()
+        all_holidays: set[pd.Timestamp] = set()
+        for year in years:
+            all_holidays.update(get_portuguese_holidays(year))
 
-        if 'temperature' in df.columns and 'is_holiday' in df.columns:
-            df['temp_x_holiday'] = df['temperature'] * df['is_holiday']
+        dates = ts_naive.dt.normalize()
+        df["is_holiday"] = dates.isin(all_holidays).astype(int)
 
-        if 'hour' in df.columns and 'day_of_week' in df.columns:
-            df['hour_x_dow'] = df['hour'] * df['day_of_week']
+        # Day before/after holiday
+        holiday_eves = {h - pd.Timedelta(days=1) for h in all_holidays}
+        holiday_afters = {h + pd.Timedelta(days=1) for h in all_holidays}
+        df["is_holiday_eve"] = dates.isin(holiday_eves).astype(int)
+        df["is_holiday_after"] = dates.isin(holiday_afters).astype(int)
+
+        # Distance to nearest holiday, capped at HOLIDAY_PROXIMITY_CAP days.
+        holiday_list = sorted(all_holidays)
+        if holiday_list:
+            holiday_index = pd.DatetimeIndex(holiday_list)
+            holiday_idx = np.searchsorted(holiday_index, dates)
+            holiday_idx = np.clip(holiday_idx, 0, len(holiday_list) - 1)
+            dist_right = np.abs((holiday_index[holiday_idx] - dates).dt.days)
+            idx_left = np.clip(holiday_idx - 1, 0, len(holiday_list) - 1)
+            dist_left = np.abs((holiday_index[idx_left] - dates).dt.days)
+            df["days_to_nearest_holiday"] = np.minimum(dist_right, dist_left).clip(
+                upper=HOLIDAY_PROXIMITY_CAP,
+            )
+            df["days_to_holiday"] = dist_right.clip(upper=HOLIDAY_PROXIMITY_CAP)
+            df["days_from_holiday"] = dist_left.clip(upper=HOLIDAY_PROXIMITY_CAP)
+        else:
+            df["days_to_nearest_holiday"] = HOLIDAY_PROXIMITY_CAP
+            df["days_to_holiday"] = HOLIDAY_PROXIMITY_CAP
+            df["days_from_holiday"] = HOLIDAY_PROXIMITY_CAP
 
         return df
 
-    def create_all_features(self, df: pd.DataFrame, use_advanced: bool = False) -> pd.DataFrame:
-        """
-        Complete feature engineering pipeline
+    def create_ewma_features(
+        self,
+        df: pd.DataFrame,
+        spans: list[int] | None = None,
+        target_col: str = "consumption_mw",
+    ) -> pd.DataFrame:
+        """Create exponentially weighted moving average features, per region.
+
+        EWMA gives more weight to recent observations, capturing momentum
+        and trend changes faster than simple rolling averages.  Combined
+        with rolling features, this gives the model both smoothed and
+        momentum-aware inputs.
+
+        ``shift(1)`` is applied before EWMA to prevent target leakage.
 
         Args:
-            df: DataFrame with data
-            use_advanced: If True, creates derived meteorological and trend features
-        """
-        print("Creating features...")
+            df: DataFrame with ``region`` and *target_col* columns.
+            spans: List of EWMA span parameters (in hours).  Defaults to
+                ``[6, 12, 24, 48]``.
+            target_col: Name of the target column.
 
-        # Reset index at start to avoid issues
+        Returns:
+            DataFrame augmented with EWMA feature columns.
+        """
+        if spans is None:
+            spans = [6, 12, 24, 48]
+
+        df = df.copy()
+
+        dfs_by_region: list[pd.DataFrame] = []
+        for region in df["region"].unique():
+            df_region = df[df["region"] == region].copy()
+            shifted = df_region[target_col].shift(1)
+            for span in spans:
+                df_region[f"{target_col}_ewma_{span}"] = shifted.ewm(
+                    span=span, min_periods=1,
+                ).mean()
+            dfs_by_region.append(df_region)
+
+        df_result = pd.concat(dfs_by_region, ignore_index=True)
+        df_result = df_result.sort_values("timestamp").reset_index(drop=True)
+        return df_result
+
+    def create_consumption_diff_features(
+        self,
+        df: pd.DataFrame,
+        target_col: str = "consumption_mw",
+    ) -> pd.DataFrame:
+        """Create consumption difference (rate of change) features, per region.
+
+        First-order differences capture the direction and magnitude of
+        load changes, which is useful for predicting ramp events.
+
+        Args:
+            df: DataFrame with ``region`` and *target_col* columns.
+
+        Returns:
+            DataFrame augmented with diff feature columns.
+        """
+        df = df.copy()
+
+        dfs_by_region: list[pd.DataFrame] = []
+        for region in df["region"].unique():
+            df_region = df[df["region"] == region].copy()
+            shifted = df_region[target_col].shift(1)
+            # Hour-over-hour change
+            df_region[f"{target_col}_diff_1"] = shifted.diff(1)
+            # Day-over-day change (same hour)
+            df_region[f"{target_col}_diff_24"] = shifted.diff(24)
+            # Rolling range (max - min) over 24h window
+            rolling_24 = shifted.rolling(window=24, min_periods=1)
+            df_region[f"{target_col}_range_24"] = rolling_24.max() - rolling_24.min()
+            dfs_by_region.append(df_region)
+
+        df_result = pd.concat(dfs_by_region, ignore_index=True)
+        df_result = df_result.sort_values("timestamp").reset_index(drop=True)
+        return df_result
+
+    def create_interaction_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create pairwise interaction features between weather and temporal variables.
+
+        Multiplicative cross-terms let the model learn that the *effect* of one
+        variable depends on the *value* of another:
+
+        - ``temp_x_weekend``: temperature effect differs on weekends.
+        - ``temp_x_holiday``: holidays shift load profiles.
+        - ``hour_x_dow``: hour-of-day x day-of-week interactions.
+        - ``temp_x_hour``: temperature sensitivity varies by hour.
+        - ``wind_x_hour``: wind chill felt most during commute hours.
+
+        Args:
+            df: DataFrame with weather and temporal columns.
+
+        Returns:
+            DataFrame augmented with interaction feature columns.
+        """
+        df = df.copy()
+
+        if "temperature" in df.columns and "is_weekend" in df.columns:
+            df["temp_x_weekend"] = df["temperature"] * df["is_weekend"]
+
+        if "temperature" in df.columns and "is_holiday" in df.columns:
+            df["temp_x_holiday"] = df["temperature"] * df["is_holiday"]
+
+        if "hour" in df.columns and "day_of_week" in df.columns:
+            df["hour_x_dow"] = df["hour"] * df["day_of_week"]
+
+        if "temperature" in df.columns and "hour" in df.columns:
+            df["temp_x_hour"] = df["temperature"] * df["hour"]
+
+        if "wind_speed" in df.columns and "hour" in df.columns:
+            df["wind_x_hour"] = df["wind_speed"] * df["hour"]
+
+        return df
+
+    def create_features_no_lags(self, df: pd.DataFrame, winsorize: bool = False) -> pd.DataFrame:
+        """Create features WITHOUT lags -- temporal + weather + interactions only.
+
+        Used for predictions when no historical consumption data is available
+        (batch endpoint, first-call inference, and as the ultimate fallback).
+
+        This method delegates interaction feature creation to
+        :meth:`create_interaction_features` and then adds legacy aliases
+        (``temp_hour``, ``temp_weekend``, ``wind_hour``) that preserve
+        backward compatibility with the no-lags model checkpoint.
+
+        Args:
+            df: Input DataFrame with timestamp, region, and weather columns.
+            winsorize: When True, clip extreme weather values to conservative
+                operational bounds before feature creation (see
+                :meth:`_winsorize_weather_columns`).  Recommended when the
+                input comes from external sources that may contain sensor
+                errors.
+
+        Returns:
+            DataFrame with the full no-lags feature set, validated for
+            infinities and out-of-range values.
+        """
+        self._validate_weather_columns(df)
+        df_features = df.copy()
+        if winsorize:
+            df_features = self._winsorize_weather_columns(df_features)
+
+        # Region coordinates
+        df_features["latitude"] = df_features["region"].map(
+            lambda x: REGION_COORDS.get(x, (0, 0))[0]
+        )
+        df_features["longitude"] = df_features["region"].map(
+            lambda x: REGION_COORDS.get(x, (0, 0))[1]
+        )
+
+        # Simplified feels-like temperature
+        df_features["temperature_feels_like"] = df_features["temperature"]
+
+        # Reuse temporal features from main pipeline
+        df_features = self.create_temporal_features(df_features)
+
+        # Real Portuguese holidays
+        df_features = self.create_holiday_features(df_features)
+
+        # Periods of day
+        df_features["is_morning"] = (
+            (df_features["hour"] >= 6) & (df_features["hour"] < 12)
+        ).astype(int)
+        df_features["is_afternoon"] = (
+            (df_features["hour"] >= 12) & (df_features["hour"] < 18)
+        ).astype(int)
+        df_features["is_evening"] = (
+            (df_features["hour"] >= 18) & (df_features["hour"] < 22)
+        ).astype(int)
+        df_features["is_night"] = (
+            (df_features["hour"] >= 22) | (df_features["hour"] < 6)
+        ).astype(int)
+
+        # Delegate interaction features to the shared method (Task 1 refactor)
+        df_features = self.create_interaction_features(df_features)
+
+        # Legacy aliases for backward compatibility with no-lags model checkpoint.
+        # The no-lags model was trained with column names ``temp_hour``,
+        # ``temp_weekend``, ``wind_hour`` instead of the ``_x_`` naming
+        # convention used by create_interaction_features.
+        if "temp_x_hour" in df_features.columns:
+            df_features["temp_hour"] = df_features["temp_x_hour"]
+        if "temp_x_weekend" in df_features.columns:
+            df_features["temp_weekend"] = df_features["temp_x_weekend"]
+        if "wind_x_hour" in df_features.columns:
+            df_features["wind_hour"] = df_features["wind_x_hour"]
+
+        # One-hot encoding for region
+        for region in ALL_REGIONS:
+            df_features[f"region_{region}"] = (df_features["region"] == region).astype(int)
+
+        # Output bounds validation (Task 2)
+        df_features = _validate_output_features(df_features)
+
+        return df_features
+
+    def create_all_features(
+        self,
+        df: pd.DataFrame,
+        use_advanced: bool = False,
+        winsorize: bool = False,
+    ) -> pd.DataFrame:
+        """Complete feature engineering pipeline.
+
+        Args:
+            df: DataFrame with raw input data (timestamp, region, weather,
+                consumption_mw).
+            use_advanced: When True, also creates derived meteorological
+                features (dew point, heat index, wind chill, comfort index)
+                and trend/momentum features (temperature diff, volatility).
+                Required when using the ``advanced`` model variant.
+            winsorize: When True, clip extreme weather values to conservative
+                operational bounds before any feature creation (see
+                :meth:`_winsorize_weather_columns`).  Recommended for
+                production inputs from external sources.
+
+        Returns:
+            DataFrame with the full feature set, validated for infinities
+            and out-of-range values.  Rows with NaN from lag/rolling warm-up
+            are removed.
+        """
+        self._validate_weather_columns(df)
         df = df.copy()
         df = df.reset_index(drop=True)
+        if winsorize:
+            df = self._winsorize_weather_columns(df)
 
-        # Advanced meteorological features (if requested)
+        # Region coordinates and simplified feels-like temperature are needed by
+        # all model variants -- add them here so create_all_features produces
+        # the same base columns as create_features_no_lags.
+        df["latitude"] = df["region"].map(
+            lambda x: REGION_COORDS.get(x, (0, 0))[0]
+        )
+        df["longitude"] = df["region"].map(
+            lambda x: REGION_COORDS.get(x, (0, 0))[1]
+        )
+        df["temperature_feels_like"] = df["temperature"]
+
         if use_advanced:
             df = self.create_weather_derived_features(df)
-            print("  - Weather derived features")
+            logger.debug("Created weather derived features")
 
         df = self.create_temporal_features(df)
-        print("  - Temporal features")
+        logger.debug("Created temporal features")
+
+        df = self.create_holiday_features(df)
+        logger.debug("Created holiday features")
 
         df = self.create_lag_features(df)
-        print("  - Lag features")
+        logger.debug("Created lag features")
 
         df = self.create_rolling_features(df)
-        print("  - Rolling features")
+        logger.debug("Created rolling features")
 
-        # Trend features (if requested)
+        df = self.create_ewma_features(df)
+        logger.debug("Created EWMA features")
+
+        df = self.create_consumption_diff_features(df)
+        logger.debug("Created consumption diff features")
+
         if use_advanced:
             df = self.create_trend_features(df)
-            print("  - Trend features")
+            logger.debug("Created trend features")
 
         df = self.create_interaction_features(df)
-        print("  - Interaction features")
+        logger.debug("Created interaction features")
 
-        # Remove rows with NaN caused by lags (ignore holiday_name which is NaN for non-holidays)
+        # Non-linear temperature response (U-shaped: heating at low T, cooling at high T)
+        if "temperature" in df.columns:
+            df["temperature_squared"] = df["temperature"] ** 2
+
+        # Remove rows with NaN caused by lags (ignore non-numeric columns).
         initial_len = len(df)
-
-        # Identify numeric columns to check NaN (exclude holiday_name)
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-
-        # Drop only where numeric features have NaN
         df = df.dropna(subset=numeric_cols)
         df = df.reset_index(drop=True)
-        print(f"  - Removed {initial_len - len(df)} rows with NaN")
+
+        removed = initial_len - len(df)
+        if removed > 0:
+            logger.debug("Removed %d rows with NaN from lag/rolling features", removed)
+        if len(df) == 0:
+            logger.warning(
+                "create_all_features: all %d input rows dropped after NaN removal. "
+                "This happens when input has fewer rows than the largest lag (48). "
+                "Use create_features_no_lags() for single-point inference.",
+                initial_len,
+            )
+
+        # Output bounds validation (Task 2)
+        df = _validate_output_features(df)
 
         return df

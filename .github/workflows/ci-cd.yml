@@ -2,79 +2,123 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
 
 env:
   DOCKER_IMAGE: energy-forecast-api
   REGISTRY: ghcr.io
+  PYTHON_VERSION: "3.11"
 
 jobs:
   test:
-    name: Run Tests
+    name: Tests
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Run tests
-        run: |
-          pytest tests/ --cov=src --cov-report=xml --cov-report=html
+      - name: Run tests with coverage threshold
+        env:
+          # Disable rate limiting in CI so that running all tests in one session
+          # (385+ requests in < 60 s) never triggers 429 Too Many Requests.
+          RATE_LIMIT_MAX: "999999"
+          RATE_LIMIT_WINDOW: "60"
+          LOG_LEVEL: "WARNING"
+        run: pytest tests/ --cov=src --cov-report=xml --cov-report=term-missing --cov-fail-under=85
 
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
         with:
           file: ./coverage.xml
           flags: unittests
-          name: codecov-umbrella
         if: always()
 
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 30
+
   lint:
-    name: Lint Code
+    name: Lint & Type Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install linting tools
         run: |
-          pip install flake8 black isort
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install pre-commit
 
-      - name: Run black
-        run: black --check src/
+      - name: Run pre-commit hooks (all files)
+        run: pre-commit run --all-files
 
-      - name: Run isort
-        run: isort --check-only src/
+      - name: Check formatting (black)
+        run: black --check src/ tests/
 
-      - name: Run flake8
-        run: flake8 src/ --max-line-length=120 --ignore=E203,W503
+      - name: Check imports (isort)
+        run: isort --check-only src/ tests/
+
+      - name: Lint (ruff)
+        run: ruff check src/ tests/
+
+      - name: Type check (mypy)
+        run: mypy src/ --ignore-missing-imports
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          pip install -r requirements.txt
+
+      - name: Audit dependencies
+        run: pip-audit --strict
 
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: [test, lint]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, lint, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -95,9 +139,11 @@ jobs:
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -107,41 +153,181 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-dev:
-    name: Deploy to Development
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.58.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}:latest
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Generate SBOM with Trivy
+        uses: aquasecurity/trivy-action@0.58.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}:latest
+          format: cyclonedx
+          output: sbom.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+          retention-days: 90
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    needs: [test, lint, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Download previous benchmark baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: .benchmark-baseline/
+        continue-on-error: true  # no baseline yet on first run
+
+      - name: Run benchmarks
+        env:
+          RATE_LIMIT_MAX: "999999"
+          RATE_LIMIT_WINDOW: "60"
+          LOG_LEVEL: "WARNING"
+        run: |
+          pytest tests/test_performance.py::TestBenchmarks \
+            --benchmark-autosave \
+            --benchmark-json=benchmark-results.json \
+            -v
+
+      - name: Compare against baseline (regression detection)
+        run: |
+          if [ -f ".benchmark-baseline/benchmark-baseline.json" ]; then
+            python - <<'EOF'
+          import json, sys
+
+          with open("benchmark-results.json") as f:
+              current = json.load(f)
+          with open(".benchmark-baseline/benchmark-baseline.json") as f:
+              baseline = json.load(f)
+
+          REGRESSION_THRESHOLD = 1.20  # 20 % slowdown triggers failure
+
+          baseline_map = {b["name"]: b["stats"]["mean"] for b in baseline.get("benchmarks", [])}
+          regressions = []
+          for bench in current.get("benchmarks", []):
+              name = bench["name"]
+              mean = bench["stats"]["mean"]
+              if name in baseline_map:
+                  ratio = mean / baseline_map[name]
+                  status = "PASS" if ratio < REGRESSION_THRESHOLD else "FAIL"
+                  print(f"{status}: {name}: {mean*1000:.2f}ms vs baseline {baseline_map[name]*1000:.2f}ms (ratio={ratio:.2f}x)")
+                  if status == "FAIL":
+                      regressions.append(name)
+
+          if regressions:
+              print(f"\nREGRESSION DETECTED in {len(regressions)} benchmark(s): {regressions}")
+              sys.exit(1)
+          else:
+              print("\nAll benchmarks within acceptable range.")
+          EOF
+          else
+            echo "No baseline found — skipping comparison (first run)."
+          fi
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+          retention-days: 90
+
+      - name: Promote results to baseline (master only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: cp benchmark-results.json benchmark-baseline.json
+
+      - name: Upload benchmark baseline
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: benchmark-baseline.json
+          retention-days: 365
+          overwrite: true
+
+  deploy:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.ref == 'refs/heads/develop'
-    environment:
-      name: development
-      url: https://dev-energy-forecast.example.com
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    environment: staging
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Deploy to development server
+      - name: Wait for image to be available
         run: |
-          echo "Deploying to development environment..."
-          # Add deployment script here (SSH, kubectl, AWS CLI, etc.)
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository }}:${{ github.sha }}"
+          echo "Waiting for $IMAGE ..."
+          for i in $(seq 1 10); do
+            docker manifest inspect "$IMAGE" && break || true
+            echo "Not yet available — retrying ($i/10)..."
+            sleep 15
+          done
 
-  deploy-prod:
+      - name: Run smoke tests against staging
+        env:
+          SMOKE_TEST_URL: ${{ vars.STAGING_URL }}
+          API_KEY: ${{ secrets.STAGING_API_KEY }}
+          SMOKE_FAIL_DEPLOY: "1"
+          MAX_RETRIES: "10"
+          RETRY_SLEEP: "10"
+        run: |
+          if [ -z "${SMOKE_TEST_URL}" ]; then
+            echo "STAGING_URL variable not configured — skipping smoke tests."
+            exit 0
+          fi
+          bash scripts/smoke_test.sh "${SMOKE_TEST_URL}"
+
+  deploy-production:
     name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [build]
-    if: github.ref == 'refs/heads/main'
-    environment:
-      name: production
-      url: https://energy-forecast.example.com
+    needs: [deploy]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    environment: production  # requires manual approval gate in GitHub Environments
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Deploy to production server
+      - name: Run smoke tests against production
+        env:
+          SMOKE_TEST_URL: ${{ vars.PRODUCTION_URL }}
+          API_KEY: ${{ secrets.PRODUCTION_API_KEY }}
+          SMOKE_FAIL_DEPLOY: "1"
+          MAX_RETRIES: "10"
+          RETRY_SLEEP: "15"
         run: |
-          echo "Deploying to production environment..."
-          # Add deployment script here
-
-      - name: Notify deployment
-        run: |
-          echo "Deployment completed successfully!"
-          # Add notification (Slack, Discord, Email, etc.)
+          if [ -z "${SMOKE_TEST_URL}" ]; then
+            echo "PRODUCTION_URL variable not configured — skipping smoke tests."
+            exit 0
+          fi
+          bash scripts/smoke_test.sh "${SMOKE_TEST_URL}"

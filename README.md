@@ -1,142 +1,136 @@
-# Energy Forecast PT 🇵🇹⚡
+# Energy Forecast PT
 
-Energy consumption forecasting system for Portugal by region using Machine Learning.
+Energy consumption forecasting system for Portugal by region using gradient-boosted tree models (CatBoost, XGBoost, LightGBM).
 
-## 📚 Documentation
+Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter tuning, permutation-importance feature selection, conformal prediction calibration, and file-based experiment tracking.
 
-**All documentation is now in the [`docs/`](docs/) folder:**
+## Key Results
 
-- **[docs/EXECUTIVE_SUMMARY.md](docs/EXECUTIVE_SUMMARY.md)** ⭐ **START HERE** - Complete 30-page technical overview
-- **[docs/DOCUMENTATION_GUIDE.md](docs/DOCUMENTATION_GUIDE.md)** - Navigation guide for all docs
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture and design
-- **[docs/MODEL_CARD.md](docs/MODEL_CARD.md)** - Model metadata and performance
-- **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment guides (Docker, Cloud)
-- **[docs/README.md](docs/README.md)** - Documentation index
+| Variant | MAE (MW) | RMSE (MW) | MAPE | R² | Features |
+|---------|----------|-----------|------|-----|----------|
+| **with_lags** | 57.53 | 82.80 | 4.49% | 0.9909 | 39 |
+| **no_lags** | 55.74 | 81.00 | 4.33% | 0.9913 | 27 |
+| **advanced** | 57.66 | 82.93 | 4.49% | 0.9908 | 42 |
 
----
+- **90.7% RMSE improvement** over best baseline (Moving Average 168h)
+- **MASE < 0.07** across all variants (vs seasonal naive 24h)
+- **90% conformal prediction intervals** with distribution-free coverage guarantee
+- **5 regions**: Alentejo, Algarve, Centro, Lisboa, Norte
+- **175,205 samples** across 4 years (2021-2024), hourly granularity
 
-## 🎯 Key Features
+## Prerequisites
 
-- **Model**: XGBoost (best of 4 models tested)
-- **Performance**: MAPE 0.86%, R² 0.9995
-- **Data**: 174,965 training samples (~99.9% retention after feature engineering)
-- **Regions**: Alentejo, Algarve, Centro, Lisboa, Norte
-- **Features**: 68+ engineered features (temporal, lags, rolling windows, interactions)
+- **Python 3.11+**
+- `git`
+- (Optional) Docker for containerised deployment
+- (Optional) Redis for distributed rate limiting
 
-## 📊 Model Performance
-
-### Model WITH Lags (High Precision)
-| Metric | Value | Description |
-|--------|-------|-------------|
-| **MAE** | 10.65 MW | Mean absolute error |
-| **RMSE** | 20.25 MW | Root mean squared error |
-| **MAPE** | 0.86% | Mean absolute percentage error ✅ |
-| **R²** | 0.9995 | Coefficient of determination |
-| **Requires** | 48h history | Past consumption data |
-
-### Model WITHOUT Lags (Works without History)
-| Metric | Expected Value | Description |
-|--------|-------|-------------|
-| **MAPE** | ~3-8% | Percentage error (higher than model with lags) |
-| **Features** | ~35 | Only temporal + weather + interactions |
-| **Requires** | No history | ✅ Works with current weather only |
-
-**Available models:** Random Forest, XGBoost ✅, LightGBM, CatBoost
-
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Installation
 
 ```bash
-# Create virtual environment
-python -m venv venv
-.\venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux/Mac
 
-# Install dependencies
 pip install -r requirements.txt
+pip install -r requirements-dev.txt   # for tests and lint
 
-# Run tests (optional)
-pytest -v
+cp .env.example .env
 ```
 
-### 2. Train Models (optional)
+### 2. Train Models
 
-**Minimum Sequence (Baseline):**
 ```bash
-# 1. Exploratory data analysis
-jupyter notebook notebooks/01_exploratory_data_analysis.ipynb
+# Full pipeline (baselines, 5-fold CV, feature selection, conformal calibration)
+python scripts/retrain.py
 
-# 2. Train baseline model WITH lags
-jupyter notebook notebooks/02_model_training.ipynb
+# Fast iteration (skip Optuna tuning)
+python scripts/retrain.py --skip-optuna
 
-# 3. Evaluate baseline model
-jupyter notebook notebooks/04_model_evaluation.ipynb
+# Skip advanced variant
+python scripts/retrain.py --skip-optuna --skip-advanced
 
-# ✅ You now have a functional model in data/models/
+# Also train horizon-specific models (1h, 6h, 12h, 24h)
+python scripts/retrain.py --skip-optuna --multistep
 ```
 
-**Complete Sequence (Optimized):**
+This produces:
+- `data/models/checkpoints/best_model.pkl` (with lags)
+- `data/models/checkpoints/best_model_no_lags.pkl` (no lags)
+- `data/models/checkpoints/best_model_advanced.pkl` (advanced features)
+- Metadata, feature names, and experiment logs in `data/models/` and `experiments/`
+
+### 3. Run Analysis Notebooks (optional)
+
 ```bash
-# After baseline (1-2-4), continue with:
+# Generate notebooks (analysis-only, no model training)
+python scripts/generate_notebooks.py
 
-# 5. Advanced feature engineering
-jupyter notebook notebooks/05_advanced_feature_engineering.ipynb
-
-# 6. Hyperparameter optimization
-jupyter notebook notebooks/06_hyperparameter_tuning.ipynb
-
-# 7. Detailed error analysis
-jupyter notebook notebooks/07_error_analysis.ipynb
-
-# 8. Model ensemble (optional)
-jupyter notebook notebooks/08_model_stacking.ipynb
+# Run all analysis notebooks
+python run_notebooks.py
 ```
 
-**Alternative Model (Without History):**
-```bash
-# 3. Train model WITHOUT lags
-jupyter notebook notebooks/03_model_training_no_lags.ipynb
-```
+Notebooks:
+| # | Name | Purpose |
+|---|------|---------|
+| 01 | Exploratory Data Analysis | EDA, distributions, temporal patterns, correlations |
+| 02 | Model Evaluation | Load and compare all 3 model variants |
+| 03 | Advanced Feature Analysis | Feature correlations, mutual information, importance |
+| 04 | Error Analysis | Error by region, hour, season; residual diagnostics |
+| 05 | Robust Validation | Walk-forward CV, seasonal backtest, seed stability |
 
-### 3. Run API
+### 4. Run API
 
 ```bash
-# Start server
 uvicorn src.api.main:app --reload
-
-# API will automatically load available models from data/models/:
-# - Model WITH lags (if available): xgboost_best.pkl
-# - Model WITHOUT lags (if available): xgboost_no_lags.pkl
 ```
 
-✅ API available at: **http://localhost:8000**
-📚 Interactive documentation: **http://localhost:8000/docs**
+- API: **http://localhost:8000**
+- Interactive docs: **http://localhost:8000/docs**
+- Health check: **http://localhost:8000/health**
 
-**API Behavior:**
-- If only model WITHOUT lags available: uses this one (always works)
-- If both available: tries WITH lags first, fallback to WITHOUT lags
-- `auto` mode (default): automatically chooses the best available model
+The API auto-loads models from `data/models/checkpoints/` and selects the best available: advanced > with_lags > no_lags.
 
-## 📡 API Endpoints
+## API Endpoints
 
-### `GET /`
-Basic API information
+### Core
 
-### `GET /health`
-Health check - verifies if model is loaded
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | API info |
+| `GET` | `/health` | Liveness probe (version, uptime, model status, coverage alert) |
+| `GET` | `/regions` | List of 5 valid regions |
+| `GET` | `/limitations` | Rate limits, model requirements, CI method |
+| `GET` | `/model/info` | Model metadata, training metrics, SHA-256 checksums |
+| `GET` | `/model/drift` | Training-time feature distribution baselines |
+| `POST` | `/model/drift/check` | Compare live features against training baseline (z-score) |
 
-### `GET /regions`
-List of 5 available regions
+### Predictions
 
-### `GET /model/info`
-Model metadata (training date, metrics, etc.)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/predict` | Single prediction with 90% CI |
+| `POST` | `/predict/batch` | Batch predictions (up to 1000 items, vectorised) |
+| `POST` | `/predict/sequential` | Lag-aware auto-regressive forecast with history |
+| `POST` | `/predict/explain` | Prediction + top-N feature importance (SHAP or global) |
 
-### `GET /limitations`
-Current limitations and API requirements
+### Monitoring
 
-### `POST /predict`
-**Make a single prediction**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/metrics/summary` | Operational metrics snapshot |
+| `GET` | `/model/coverage` | Sliding-window empirical CI coverage (168 observations) |
+| `POST` | `/model/coverage/record` | Record actual observation for coverage tracking |
+
+### Admin (requires `ADMIN_API_KEY`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/admin/reload-models` | Hot-reload models from disk without restart |
+
+### Example: `POST /predict`
 
 **Request:**
 ```json
@@ -160,293 +154,255 @@ Current limitations and API requirements
   "predicted_consumption_mw": 2850.5,
   "confidence_interval_lower": 2817.2,
   "confidence_interval_upper": 2883.8,
-  "model_name": "XGBoost"
+  "ci_method": "conformal",
+  "ci_lower_clipped": false,
+  "model_name": "CatBoost (with lags)",
+  "confidence_level": 0.90
 }
 ```
 
-### `POST /predict/batch`
-**Make batch predictions** (maximum 1000 per request)
+## ML Pipeline (v5)
 
-**Request:** Array of objects (same format as `/predict`)
+The training pipeline (`scripts/retrain.py`) executes 12 steps per model variant:
 
-**Response:**
-```json
-{
-  "predictions": [
-    {
-      "timestamp": "2024-12-31T14:00:00",
-      "region": "Lisboa",
-      "predicted_consumption_mw": 2850.5,
-      "confidence_interval_lower": 2817.2,
-      "confidence_interval_upper": 2883.8,
-      "model_name": "XGBoost"
-    },
-    ...
-  ],
-  "total_predictions": 2
-}
+```
+1.  Set global seed (42) for reproducibility
+2.  Load data + compute SHA-256 hash
+3.  Feature engineering (temporal, lags, rolling, weather-derived, holidays, interactions)
+4.  Temporal split 70/15/15 (no shuffling)
+5.  Baseline evaluation (persistence, seasonal naive daily/weekly, MA 24h/168h)
+6.  Model selection via 5-fold time-series CV (XGBoost, LightGBM, CatBoost, RF)
+7.  Optuna hyperparameter optimisation (50 trials, 5 CV folds, TPE sampler)
+8.  Feature selection (correlation filter |r|>0.95 + permutation importance)
+9.  Final training on train+val with best model + best params
+10. Test evaluation (MAE, RMSE, MAPE, R², NRMSE, MASE) + conformal q90
+11. Save artefacts (checkpoint, features, metadata with feature_stats)
+12. Log to experiment tracker (experiments/<run_id>.json)
 ```
 
-## 📁 Project Structure
+See [docs/ML_PIPELINE.md](docs/ML_PIPELINE.md) for full technical details.
+
+## Project Structure
 
 ```
 energy-forecast-pt/
-├── 📂 src/
-│   ├── 📂 api/
-│   │   └── main.py                     # FastAPI application
-│   ├── 📂 features/
-│   │   └── feature_engineering.py      # Feature pipeline
-│   ├── 📂 models/
-│   │   └── evaluation.py               # Metrics and visualizations
-│   └── 📂 utils/
-│       ├── config.py
-│       ├── logger.py
-│       └── metrics.py
+├── src/
+│   ├── api/
+│   │   ├── main.py                    # FastAPI app, routes, lifespan
+│   │   ├── middleware.py              # Rate limiting, security headers
+│   │   ├── prediction.py             # Inference, CI computation
+│   │   ├── schemas.py                # Pydantic request/response models
+│   │   └── store.py                  # ModelStore, hot-reload, checksums
+│   ├── features/
+│   │   └── feature_engineering.py    # 71 features (temporal, lags, rolling, weather, holidays)
+│   ├── models/
+│   │   ├── baselines.py             # 5 baseline models (persistence, seasonal, MA)
+│   │   ├── evaluation.py            # Metrics, CV, CoverageTracker
+│   │   ├── experiment_tracker.py    # File-based experiment logging
+│   │   ├── feature_selection.py     # Correlation filter + permutation importance
+│   │   ├── metadata.py             # Model metadata I/O
+│   │   └── model_registry.py       # Model factory, training, Optuna search spaces
+│   └── utils/
+│       ├── config.py / config_loader.py
+│       ├── logger.py                # Structured logging
+│       ├── metrics.py               # MAE, RMSE, MAPE, R², NRMSE, MASE
+│       └── reproducibility.py       # Global seeds, environment snapshots, data hashing
 │
-├── 📂 data/
-│   ├── 📂 processed/
-│   │   └── processed_data.parquet      # Processed data
-│   └── 📂 models/                       # ⭐ Trained models
-│       ├── xgboost_best.pkl            # Model WITH lags
-│       ├── xgboost_no_lags.pkl         # Model WITHOUT lags ✅
-│       ├── feature_names.txt
-│       ├── feature_names_no_lags.txt
-│       ├── training_metadata.json
-│       └── training_metadata_no_lags.json
+├── scripts/
+│   ├── retrain.py                   # Production training pipeline (v5)
+│   └── generate_notebooks.py        # Generate analysis notebooks
 │
-├── 📂 notebooks/
-│   ├── 01_exploratory_data_analysis.ipynb    # 📊 Complete EDA
-│   ├── 02_model_training.ipynb               # 🤖 Baseline WITH lags
-│   ├── 03_model_training_no_lags.ipynb       # ⚡ Baseline WITHOUT lags
-│   ├── 04_model_evaluation.ipynb             # 📊 Baseline evaluation
-│   ├── 05_advanced_feature_engineering.ipynb # 🔬 Advanced features
-│   ├── 06_hyperparameter_tuning.ipynb        # 📈 Optuna tuning
-│   ├── 07_error_analysis.ipynb               # 🔍 Error analysis
-│   ├── 08_model_stacking.ipynb               # 🎯 Ensembling
-│   ├── 09_performance_optimization.ipynb     # ⚡ Optimization
-│   ├── 10_multistep_forecasting.ipynb        # 📈 Multi-step
-│   └── 11_robust_validation.ipynb            # 🧪 Robust validation
+├── notebooks/                        # Analysis-only (no model training/saving)
+│   ├── 01_exploratory_data_analysis.ipynb
+│   ├── 02_model_evaluation.ipynb
+│   ├── 03_advanced_feature_analysis.ipynb
+│   ├── 04_error_analysis.ipynb
+│   └── 05_robust_validation.ipynb
 │
-├── 📂 tests/                              # ✅ Automated tests
-│   ├── test_api.py                       # API tests
-│   ├── test_feature_engineering.py       # Feature tests
-│   └── test_models.py                    # Model tests
+├── data/
+│   ├── processed/
+│   │   └── processed_data.parquet   # 175,205 rows, hourly, 5 regions
+│   └── models/
+│       ├── checkpoints/             # .pkl model files
+│       ├── features/                # feature name lists
+│       └── metadata/                # training metadata JSON
 │
-├── 📂 docs/                              # 📚 Complete documentation
-│   ├── EXECUTIVE_SUMMARY.md             # ⭐ Main technical doc (30 pages)
-│   ├── DOCUMENTATION_GUIDE.md           # Navigation guide
-│   ├── ARCHITECTURE.md                  # System architecture
-│   ├── MODEL_CARD.md                    # Model metadata
-│   ├── DEPLOYMENT.md                    # Deployment guides
-│   ├── README.md                        # Documentation index
-│   └── INDEX.md                         # Alternative navigation
+├── experiments/                      # Experiment tracking logs
+│   ├── index.json                   # Summary of all runs
+│   └── <run_id>.json               # Full experiment record per run
 │
-├── 📂 deploy/                            # Deployment scripts
-│   ├── deploy-aws.sh
-│   ├── deploy-azure.sh
-│   └── deploy-gcp.sh
+├── tests/                            # 649 tests (pytest)
+│   ├── test_api.py
+│   ├── test_feature_engineering.py
+│   ├── test_model_registry.py
+│   └── ...
 │
-├── requirements.txt
-├── Dockerfile
+├── docs/
+│   ├── ML_PIPELINE.md              # Complete ML pipeline reference (12 steps)
+│   ├── DATA_DICTIONARY.md          # All data schemas, features, metadata
+│   ├── MODEL_CARD.md               # Model capabilities, limitations, ethics
+│   ├── ARCHITECTURE.md             # System architecture
+│   ├── DEPLOYMENT.md               # Cloud deployment guides
+│   ├── MONITORING.md               # Production monitoring
+│   ├── SECURITY.md                 # Security architecture
+│   └── CONTRIBUTING.md             # Contribution guidelines
+│
+├── deploy/
+│   ├── deploy-aws.sh / aws-ecs.yml
+│   ├── deploy-azure.sh / azure-container-app.yml
+│   └── deploy-gcp.sh / gcp-cloud-run.yml
+│
+├── dvc.yaml                         # DVC pipeline (data versioning)
+├── Dockerfile                       # Multi-stage, non-root, healthcheck
 ├── docker-compose.yml
-├── pytest.ini
-└── README.md (this file)
+├── requirements.txt
+├── requirements-dev.txt
+├── pyproject.toml                   # Centralised tool config (black, ruff, mypy, pytest)
+├── .pre-commit-config.yaml          # Pre-commit hooks (black, isort, ruff, bandit)
+└── .github/workflows/ci-cd.yml     # CI/CD (tests, lint, security, Docker, deploy)
 ```
 
-## 🔧 Testing the API
+## Authentication & Rate Limiting
 
-### Option 1: PowerShell Script (Windows) ⭐
+- Set `API_KEY` env var to enable API key auth via `X-API-Key` header
+- Set `ADMIN_API_KEY` for privileged endpoints (falls back to `API_KEY`)
+- Rate limiting: 60 req/min per IP (configurable via `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`)
+- Set `REDIS_URL` for distributed rate limiting (auto-fallback to in-memory)
+- All env vars documented in [`.env.example`](.env.example)
 
-```powershell
-# Run comprehensive test suite
-.\test_api.ps1
-```
-
-Or test a single endpoint:
-
-```powershell
-# Simple one-liner
-Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -ContentType "application/json" -Body '{"timestamp":"2025-01-15T14:00:00","region":"Lisboa","temperature":18.5,"humidity":65.0,"wind_speed":12.3,"precipitation":0.0,"cloud_cover":40.0,"pressure":1015.0}'
-
-# Or more readable format
-$body = @{
-    timestamp = "2025-01-15T14:00:00"
-    region = "Lisboa"
-    temperature = 18.5
-    humidity = 65.0
-    wind_speed = 12.3
-    precipitation = 0.0
-    cloud_cover = 40.0
-    pressure = 1015.0
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:8000/predict" -Method Post -ContentType "application/json" -Body $body
-```
-
-### Option 2: Python Script
+## Testing
 
 ```bash
-python test_api.py
+# Run all 649 tests
+pytest -v
+
+# With coverage report
+pytest --cov=src --cov-report=html --cov-fail-under=85
+
+# Specific test suites
+pytest tests/test_api.py -v
+pytest tests/test_feature_engineering.py -v
+pytest tests/test_model_registry.py -v
 ```
 
-### Option 3: cURL (Linux/Mac/Git Bash)
-
-```bash
-curl -X POST "http://localhost:8000/predict" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "timestamp": "2025-01-15T14:00:00",
-    "region": "Lisboa",
-    "temperature": 18.5,
-    "humidity": 65.0,
-    "wind_speed": 12.3,
-    "precipitation": 0.0,
-    "cloud_cover": 40.0,
-    "pressure": 1015.0
-  }'
-```
-
-**Note for Windows PowerShell users:** Use `curl.exe` instead of `curl` for the traditional curl syntax.
-
-### Option 4: Python Code
-
-```python
-import requests
-
-response = requests.post(
-    "http://localhost:8000/predict",
-    json={
-        "timestamp": "2025-01-15T14:00:00",
-        "region": "Lisboa",
-        "temperature": 18.5,
-        "humidity": 65.0,
-        "wind_speed": 12.3,
-        "precipitation": 0.0,
-        "cloud_cover": 40.0,
-        "pressure": 1015.0
-    }
-)
-
-result = response.json()
-print(f"Prediction: {result['predicted_consumption_mw']:.2f} MW")
-print(f"Interval: [{result['confidence_interval_lower']:.2f}, {result['confidence_interval_upper']:.2f}] MW")
-```
-
-## 🛠️ Tech Stack
-
-| Category | Technologies |
-|----------|--------------|
-| **API** | FastAPI, Uvicorn, Pydantic |
-| **ML Models** | XGBoost, LightGBM, CatBoost, Random Forest |
-| **Data Processing** | Pandas, NumPy, Scikit-learn |
-| **Visualization** | Matplotlib, Seaborn |
-| **Feature Engineering** | Lags (1-48h), Rolling Windows (3-48h), Temporal features |
-
-## 📊 Model Features
-
-The model uses **multiple feature categories**:
-
-1. **Temporal**: hour, day of week, month, quarter, year, holidays
-2. **Meteorological**: temperature, humidity, wind speed, precipitation, cloud cover, atmospheric pressure
-3. **Lags**: historical consumption values (1h, 2h, 3h, 6h, 12h, 24h, 48h ago)
-4. **Rolling Statistics**: moving averages and standard deviations in windows of 3h, 6h, 12h, 24h, 48h
-5. **Interactions**: combinations between temporal and meteorological features
-
-## 📝 Important Notes
-
-- ✅ **No Data Leakage**: Model uses only historical data
-- ✅ **High Data Retention**: 99.9% of data preserved after feature engineering
-- ✅ **Temporal Split**: 70% train / 15% validation / 15% test
-- ✅ **Production Ready**: Calibrated confidence intervals (93.1% coverage)
-- ⚠️ **IMPORTANT - Lag Dependency**: Best model **requires 48h consumption history** to generate complete features (lags and rolling windows)
-
-### 🎯 Two Available Models
-
-The API supports **two models** with different trade-offs:
-
-#### 1. Model WITH Lags (High Precision) ⭐
-- **Advantage**: MAPE 0.86% (excellent precision)
-- **Limitation**: Requires 48h consumption history
-- **Use**: Production with historical database
-- **Features**: 68+ (temporal + weather + lags + rolling windows)
-
-#### 2. Model WITHOUT Lags (No History) ✅
-- **Advantage**: Works without any history
-- **Trade-off**: MAPE ~3-8% (lower precision)
-- **Use**: Demo, testing, or when history not available
-- **Features**: ~35 (only temporal + weather + interactions)
-
-## 🚀 Production Deployment
-
-This project is ready for deployment with Docker and CI/CD!
-
-### Quick Start with Docker
+## Docker Deployment
 
 ```bash
 # Build and run
 docker build -t energy-forecast-api .
 docker run -d -p 8000:8000 energy-forecast-api
 
-# Or with docker-compose
+# Or with docker-compose (includes nginx for production)
 docker-compose up -d
+docker-compose --profile production up -d
 ```
 
 ### Cloud Deployment
 
-We support automatic deployment on:
+| Platform | Command | Guide |
+|----------|---------|-------|
+| AWS ECS Fargate | `./deploy/deploy-aws.sh` | [deploy/aws-ecs.yml](deploy/aws-ecs.yml) |
+| Azure Container Apps | `./deploy/deploy-azure.sh` | [deploy/azure-container-app.yml](deploy/azure-container-app.yml) |
+| GCP Cloud Run | `./deploy/deploy-gcp.sh` | [deploy/gcp-cloud-run.yml](deploy/gcp-cloud-run.yml) |
 
-- **AWS ECS Fargate:** `./deploy/deploy-aws.sh`
-- **Azure Container Apps:** `./deploy/deploy-azure.sh`
-- **GCP Cloud Run:** `./deploy/deploy-gcp.sh`
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete guides.
 
-### CI/CD
+## Reproducibility
 
-The project includes GitHub Actions for automatic CI/CD:
-- ✅ Automated tests
-- ✅ Lint (black, flake8, isort)
-- ✅ Automatic Docker build
-- ✅ Production deployment
+Every training run is fully reproducible:
 
-**See complete guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-
----
-
-## 🧪 Tests
-
-The project includes **automated tests** with pytest:
+| Mechanism | Description |
+|-----------|-------------|
+| **Global seed** | `set_global_seed(42)` — numpy, random, PYTHONHASHSEED |
+| **Data hashing** | SHA-256 of input DataFrame, X_train, y_train |
+| **Environment snapshot** | Python version, git commit, package versions |
+| **Experiment tracking** | Full config, metrics, artefacts in `experiments/<run_id>.json` |
+| **DVC pipeline** | `dvc repro` for end-to-end reproducible runs |
 
 ```bash
-# Run all tests
-pytest -v
-
-# With code coverage
-pytest --cov=src --cov-report=html
-
-# Run specific tests
-pytest tests/test_api.py
-pytest tests/test_feature_engineering.py
-pytest tests/test_models.py
+# Reproduce a past experiment
+cat experiments/index.json               # find run_id
+cat experiments/<run_id>.json            # see full config + metrics
+python scripts/retrain.py               # retrain with same seed
 ```
 
-**Coverage:**
-- ✅ API endpoints (health, predict, batch, model info)
-- ✅ Feature engineering (temporal, lags, rolling, interactions)
-- ✅ Model evaluation (metrics, edge cases)
-- ✅ Input validation and error handling
+## CI/CD Pipeline
+
+GitHub Actions (`.github/workflows/ci-cd.yml`):
+
+| Stage | Tools | Threshold |
+|-------|-------|-----------|
+| **Tests** | pytest + coverage | 85% minimum |
+| **Lint** | black, isort, ruff, mypy | Zero errors |
+| **Security** | pip-audit, bandit, detect-secrets | Strict |
+| **Build** | Docker + Trivy scan + SBOM | No CRITICAL/HIGH CVEs |
+| **Benchmark** | pytest-benchmark | 20% regression threshold |
+| **Deploy** | Staging (auto) → Production (manual approval) | Smoke tests |
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ML_PIPELINE.md](docs/ML_PIPELINE.md) | Complete 12-step pipeline reference |
+| [DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md) | All data schemas, features, metadata formats |
+| [MODEL_CARD.md](docs/MODEL_CARD.md) | Model capabilities, limitations, ethical considerations |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture and component design |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker + cloud deployment guides |
+| [MONITORING.md](docs/MONITORING.md) | Production monitoring and alerting |
+| [SECURITY.md](docs/SECURITY.md) | Security architecture |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | Branch conventions, PR checklist |
+
+## Troubleshooting
+
+### API starts in degraded mode
+
+No models found in `data/models/checkpoints/`. Train first:
+```bash
+python scripts/retrain.py --skip-optuna
+```
+
+### Confidence intervals say `rmse_calibrated: false`
+
+Metadata files missing. Retrain to regenerate:
+```bash
+python scripts/retrain.py --skip-optuna
+```
+
+### Rate limiting returns `429 Too Many Requests`
+
+```bash
+export RATE_LIMIT_MAX=120      # max requests per window
+export RATE_LIMIT_WINDOW=60    # window in seconds
+```
+
+### Sequential forecasting degrades beyond 24h
+
+Expected behaviour — auto-regressive feedback accumulates error. For horizons > 48h, use `/predict/batch` with the no-lags model instead. Providing 7+ days of history (168 rows) improves accuracy.
+
+## Tech Stack
+
+| Category | Technologies |
+|----------|--------------|
+| **ML** | CatBoost, XGBoost, LightGBM, scikit-learn, Optuna |
+| **API** | FastAPI, Uvicorn, Pydantic |
+| **Data** | Pandas, NumPy, Parquet |
+| **Reproducibility** | DVC, file-based experiment tracker, global seeds |
+| **Monitoring** | Prometheus, conformal coverage tracking, drift detection |
+| **DevOps** | Docker, GitHub Actions, Trivy, pip-audit, bandit |
+| **Cloud** | AWS ECS, Azure Container Apps, GCP Cloud Run |
+
+## Hardware Requirements
+
+| Resource | Minimum | Recommended |
+|----------|---------|-------------|
+| CPU | 2 cores | 4 cores |
+| RAM | 4 GB | 8 GB |
+| Disk | ~500 MB | ~500 MB |
+| GPU | Not required | Not required |
 
 ---
 
-## 📞 Support
-
-- 📖 **Complete Documentation**: [docs/](docs/) folder
-- 📄 **API Documentation**: http://localhost:8000/docs
-- 🔍 **Model Details**: [docs/MODEL_CARD.md](docs/MODEL_CARD.md)
-- 🏥 **Health Check**: `GET /health`
-- 🧪 **Tests**: Run `pytest -v`
-- 🚀 **Deployment Guide**: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-
----
-
-**Last Updated**: January 2025
-**Version**: 1.0
 **Author**: Pedro Marques
+**Version**: 2.0.0
+**Pipeline**: v5
+**Last Updated**: March 2026

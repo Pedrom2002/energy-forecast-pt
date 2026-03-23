@@ -1,0 +1,93 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "energy-forecast-pt"
+version = "1.0.0"
+description = "Energy consumption forecasting system for Portugal by region"
+requires-python = ">=3.11"
+authors = [{ name = "Pedro Marques" }]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers --tb=short -ra --timeout=60 --benchmark-disable"
+filterwarnings = [
+    "ignore::ResourceWarning",
+    "ignore::sklearn.exceptions.UndefinedMetricWarning",
+    "ignore::UserWarning:sklearn",
+    # asyncio.to_thread coroutine left unawaited when asyncio.wait_for is mocked
+    # with a synchronous side_effect in TestPredictionErrorPaths — benign in tests.
+    "ignore:coroutine.*was never awaited:RuntimeWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "api: marks tests related to API endpoints",
+    "features: marks tests related to feature engineering",
+    "models: marks tests related to model evaluation",
+]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/venv/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+fail_under = 85
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "xgboost.*",
+    "catboost.*",
+    "lightgbm.*",
+    "sklearn.*",
+    "pandas.*",
+    "numpy.*",
+    "uvicorn.*",
+    "yaml.*",
+    "joblib.*",
+]
+ignore_missing_imports = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]  # Allow assert statements
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "A", "C4", "SIM"]
+ignore = ["E203", "S101"]

@@ -1,0 +1,10 @@
+outs:
+- md5: null
+  size: null
+  hash: md5
+  path: processed_data.parquet
+  desc: >-
+    Processed energy consumption dataset for Portugal.
+    175,205 hourly samples across 5 regions (2021-2024).
+    Columns: timestamp, region, consumption_mw, temperature,
+    humidity, wind_speed, precipitation, cloud_cover, pressure.
