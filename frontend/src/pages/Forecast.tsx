@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { api, type EnergyData, type PredictionResponse, REGIONS, type Region } from '../api/client';
 import { Card } from '../components/Card';
-import { TrendingUp, Play } from 'lucide-react';
+import { ChartSkeleton } from '../components/ChartSkeleton';
+import { toast } from '../components/Toast';
+import { formatMW, formatNumber, formatDateShort, exportCSV } from '../utils/format';
+import { TrendingUp, Play, AlertTriangle, Info, Download, HelpCircle } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -24,13 +27,13 @@ function generateHistory(region: Region, hours: number) {
     records.push({
       timestamp: d.toISOString().slice(0, 19),
       region,
-      temperature: 15 + 8 * Math.sin(((hour - 6) / 24) * Math.PI * 2) + (Math.random() - 0.5) * 2,
-      humidity: 65 + 15 * Math.cos(((hour - 14) / 24) * Math.PI * 2),
-      wind_speed: 10 + Math.random() * 8,
-      precipitation: Math.random() < 0.1 ? Math.random() * 3 : 0,
-      cloud_cover: 40 + Math.random() * 30,
-      pressure: 1010 + Math.random() * 8,
-      consumption_mw: baseConsumption + (Math.random() - 0.5) * 200,
+      temperature: +(15 + 8 * Math.sin(((hour - 6) / 24) * Math.PI * 2) + (Math.random() - 0.5) * 2).toFixed(1),
+      humidity: +(65 + 15 * Math.cos(((hour - 14) / 24) * Math.PI * 2)).toFixed(1),
+      wind_speed: +(10 + Math.random() * 8).toFixed(1),
+      precipitation: +(Math.random() < 0.1 ? Math.random() * 3 : 0).toFixed(1),
+      cloud_cover: +(40 + Math.random() * 30).toFixed(1),
+      pressure: +(1010 + Math.random() * 8).toFixed(1),
+      consumption_mw: +(baseConsumption + (Math.random() - 0.5) * 200).toFixed(1),
     });
   }
   return records;
@@ -46,12 +49,12 @@ function generateForecastItems(region: Region, hours: number): EnergyData[] {
     items.push({
       timestamp: d.toISOString().slice(0, 19),
       region,
-      temperature: 15 + 8 * Math.sin(((hour - 6) / 24) * Math.PI * 2) + (Math.random() - 0.5) * 3,
-      humidity: 65 + 15 * Math.cos(((hour - 14) / 24) * Math.PI * 2),
-      wind_speed: 10 + Math.random() * 10,
-      precipitation: Math.random() < 0.15 ? Math.random() * 5 : 0,
-      cloud_cover: 40 + Math.random() * 30,
-      pressure: 1010 + Math.random() * 10,
+      temperature: +(15 + 8 * Math.sin(((hour - 6) / 24) * Math.PI * 2) + (Math.random() - 0.5) * 3).toFixed(1),
+      humidity: +(65 + 15 * Math.cos(((hour - 14) / 24) * Math.PI * 2)).toFixed(1),
+      wind_speed: +(10 + Math.random() * 10).toFixed(1),
+      precipitation: +(Math.random() < 0.15 ? Math.random() * 5 : 0).toFixed(1),
+      cloud_cover: +(40 + Math.random() * 30).toFixed(1),
+      pressure: +(1010 + Math.random() * 10).toFixed(1),
     });
   }
   return items;
@@ -66,8 +69,14 @@ export default function Forecast() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [modelName, setModelName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  // Interactive legend state
+  const [visibleSeries, setVisibleSeries] = useState({ actual: true, predicted: true, ci: true });
+  const [showTable, setShowTable] = useState(false);
 
   const handleForecast = async () => {
+    if (submitting) return; // debounce
+    setSubmitting(true);
     setLoading(true);
     setError(null);
     try {
@@ -77,23 +86,43 @@ export default function Forecast() {
       setResults(res.predictions);
       setHistoryData(history.map((h) => ({ timestamp: h.timestamp, consumption_mw: h.consumption_mw })));
       setModelName(res.model_name);
+      toast.success(`Forecast gerado: ${res.predictions.length} previsoes para ${region}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(msg);
+      toast.error('Falha ao gerar forecast');
     } finally {
       setLoading(false);
+      setTimeout(() => setSubmitting(false), 1000); // 1s debounce
     }
+  };
+
+  const handleExportCSV = () => {
+    if (!results.length) return;
+    exportCSV(
+      `forecast_${region}_${new Date().toISOString().slice(0, 10)}.csv`,
+      ['timestamp', 'region', 'predicted_mw', 'ci_lower', 'ci_upper', 'model', 'ci_method'],
+      results.map((r) => [
+        r.timestamp, r.region,
+        r.predicted_consumption_mw.toFixed(2),
+        r.confidence_interval_lower.toFixed(2),
+        r.confidence_interval_upper.toFixed(2),
+        r.model_name, r.ci_method,
+      ]),
+    );
+    toast.success('CSV exportado com sucesso');
   };
 
   const chartData = [
     ...historyData.map((h) => ({
-      time: new Date(h.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      time: formatDateShort(h.timestamp),
       actual: h.consumption_mw,
       predicted: null as number | null,
       ciUpper: null as number | null,
       ciLower: null as number | null,
     })),
     ...results.map((r) => ({
-      time: new Date(r.timestamp).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      time: formatDateShort(r.timestamp),
       actual: null as number | null,
       predicted: r.predicted_consumption_mw,
       ciUpper: r.confidence_interval_upper,
@@ -102,179 +131,341 @@ export default function Forecast() {
   ];
 
   const nowLabel = historyData.length > 0
-    ? new Date(historyData[historyData.length - 1].timestamp).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    ? formatDateShort(historyData[historyData.length - 1].timestamp)
     : '';
+
+  const toggleSeries = (key: keyof typeof visibleSeries) => {
+    setVisibleSeries((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary">Forecast Sequencial</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Forecast Sequencial</h1>
         <p className="text-sm text-text-secondary mt-1">
           Previsao lag-aware autoregressiva com historico e intervalos de confianca
         </p>
       </div>
 
       <Card title="Configuracao">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleForecast(); }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Regiao</label>
+            <label htmlFor="fc-region" className="block text-xs font-medium text-text-secondary mb-1.5">Regiao</label>
             <select
+              id="fc-region"
               value={region}
               onChange={(e) => setRegion(e.target.value as Region)}
-              className="block w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 focus:outline-none transition"
+              className="block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm shadow-xs cursor-pointer
+                focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition"
             >
               {REGIONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Historico (horas)</label>
-            <input
-              type="number"
-              value={historyHours}
-              onChange={(e) => setHistoryHours(Math.max(48, parseInt(e.target.value) || 48))}
-              min={48}
-              max={336}
-              className="block w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 focus:outline-none transition"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1.5">Previsao (horas)</label>
-            <input
-              type="number"
-              value={forecastHours}
-              onChange={(e) => setForecastHours(Math.min(168, Math.max(1, parseInt(e.target.value) || 1)))}
-              min={1}
-              max={168}
-              className="block w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 focus:outline-none transition"
-            />
-          </div>
+          <ValidatedNumberInput
+            id="fc-history"
+            label="Historico (horas)"
+            value={historyHours}
+            onChange={setHistoryHours}
+            min={48}
+            max={336}
+            help="Min. 48h (lags)"
+          />
+          <ValidatedNumberInput
+            id="fc-forecast"
+            label="Previsao (horas)"
+            value={forecastHours}
+            onChange={setForecastHours}
+            min={1}
+            max={168}
+            help="Max. 168h (1 semana)"
+          />
           <div className="flex items-end">
             <button
-              onClick={handleForecast}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 text-white font-medium py-2.5 px-4 rounded-lg transition shadow-sm"
+              type="submit"
+              disabled={loading || submitting}
+              className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed
+                text-white font-medium min-h-[44px] px-4 rounded-lg transition-all duration-200 shadow-sm cursor-pointer
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+                active:scale-[0.97]"
+              aria-busy={loading}
             >
               {loading ? (
-                <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full" />
+                <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" role="status">
+                  <span className="sr-only">A gerar forecast...</span>
+                </div>
               ) : (
                 <>
-                  <Play className="w-4 h-4" />
-                  Executar Forecast
+                  <Play className="w-4 h-4" aria-hidden="true" />
+                  Executar
                 </>
               )}
             </button>
           </div>
+        </form>
+
+        <div className="flex items-start gap-2 mt-4 p-3 bg-primary-50 rounded-lg text-xs text-primary-700">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+          <p>Dados meteorologicos simulados para demonstracao. Em producao, integre com dados reais de estacoes meteorologicas.</p>
         </div>
-        <p className="text-xs text-text-muted mt-3">
-          Dados meteorologicos simulados para demonstracao. Em producao, integre com dados reais.
-        </p>
       </Card>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <p className="text-sm text-red-700">{error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
+          <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-red-800">Erro no forecast</p>
+            <p className="text-sm text-red-600 mt-0.5">{error}</p>
+            <div className="flex gap-3 mt-3">
+              <button
+                type="button"
+                onClick={handleForecast}
+                className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
+              >
+                Tentar novamente
+              </button>
+              <button
+                type="button"
+                onClick={() => { setForecastHours(12); setHistoryHours(48); }}
+                className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
+              >
+                Reduzir parametros
+              </button>
+              <a
+                href="/monitoring"
+                className="text-xs font-medium text-red-700 hover:text-red-900 underline"
+              >
+                Ver estado da API
+              </a>
+            </div>
+          </div>
         </div>
       )}
 
-      {chartData.length > 0 && (
+      {loading && <ChartSkeleton height={380} />}
+
+      {chartData.length > 0 && !loading && (
         <Card
           title="Grafico de Previsao"
           subtitle={`Modelo: ${modelName} | Regiao: ${region}`}
+          action={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowTable(!showTable)}
+                className="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary cursor-pointer
+                  min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
+                aria-label={showTable ? 'Mostrar grafico' : 'Mostrar tabela de dados'}
+              >
+                <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                {showTable ? 'Grafico' : 'Tabela'}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
+                  min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
+                aria-label="Exportar forecast como CSV"
+              >
+                <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                CSV
+              </button>
+            </div>
+          }
         >
-          <div className="h-[400px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
-                  </linearGradient>
-                  <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="time"
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  interval="preserveStartEnd"
-                  tickCount={8}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: '#94a3b8' }}
-                  label={{ value: 'MW', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#94a3b8' } }}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: '8px',
-                    border: '1px solid #e2e8f0',
-                    fontSize: '12px',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,.1)',
-                  }}
-                />
-                {nowLabel && (
-                  <ReferenceLine x={nowLabel} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: 'Agora', fill: '#64748b', fontSize: 10 }} />
-                )}
-                <Area
-                  type="monotone"
-                  dataKey="ciUpper"
-                  stroke="none"
-                  fill="url(#ciGrad)"
-                  name="CI Superior"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="ciLower"
-                  stroke="none"
-                  fill="transparent"
-                  name="CI Inferior"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="actual"
-                  stroke="#22c55e"
-                  fill="url(#actualGrad)"
-                  strokeWidth={2}
-                  name="Consumo Real"
-                  dot={false}
-                  connectNulls={false}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="predicted"
-                  stroke="#3b82f6"
-                  fill="none"
-                  strokeWidth={2}
-                  strokeDasharray="5 3"
-                  name="Previsao"
-                  dot={false}
-                  connectNulls={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex items-center justify-center gap-6 mt-4 text-xs text-text-muted">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-0.5 bg-green-500 rounded" /> Consumo Real
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-0.5 bg-blue-500 rounded border-dashed" style={{ borderTop: '2px dashed #3b82f6', height: 0 }} /> Previsao
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 bg-blue-100 rounded" /> IC 90%
-            </span>
-          </div>
+          <p className="sr-only">
+            Grafico de area mostrando {historyData.length} horas de historico e {results.length} horas de previsao
+            para a regiao {region}. Previsao media: {results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0} MW.
+          </p>
+
+          {showTable ? (
+            /* Data table alternative — accessibility: data-table */
+            <div className="overflow-x-auto -mx-5 sm:-mx-6 px-5 sm:px-6 max-h-[420px] overflow-y-auto">
+              <table className="w-full text-sm" aria-label="Dados do forecast">
+                <thead className="sticky top-0 bg-surface">
+                  <tr className="border-b border-border">
+                    <th scope="col" className="text-left py-2 px-3 text-xs font-medium text-text-muted">Hora</th>
+                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Consumo Real</th>
+                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Previsao</th>
+                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Inferior</th>
+                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Superior</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {chartData.map((d, i) => (
+                    <tr key={i} className="border-b border-border/30 hover:bg-surface-dim transition-colors">
+                      <td className="py-1.5 px-3 font-mono text-xs text-text-secondary tabular-nums">{d.time}</td>
+                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-energy-green font-medium">{d.actual != null ? formatMW(d.actual) : '—'}</td>
+                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-primary-600 font-medium">{d.predicted != null ? formatMW(d.predicted) : '—'}</td>
+                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-text-muted hidden sm:table-cell">{d.ciLower != null ? formatMW(d.ciLower) : '—'}</td>
+                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-text-muted hidden sm:table-cell">{d.ciUpper != null ? formatMW(d.ciUpper) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <>
+              <div className="h-[350px] sm:h-[420px]" role="img" aria-label="Grafico de previsao de consumo energetico">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.12} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                      </linearGradient>
+                      <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15} />
+                        <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+                      </linearGradient>
+                      {/* Pattern for colorblind — rule: pattern-texture */}
+                      <pattern id="ciPattern" patternUnits="userSpaceOnUse" width="6" height="6">
+                        <path d="M0,6 L6,0" stroke="#3b82f6" strokeWidth="0.5" opacity="0.3" />
+                      </pattern>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis
+                      dataKey="time"
+                      tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                      interval="preserveStartEnd"
+                      tickCount={typeof window !== 'undefined' && window.innerWidth < 640 ? 4 : 8}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                      label={{ value: 'MW', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'var(--color-text-muted)' } }}
+                      width={50}
+                      tickFormatter={(v: number) => formatNumber(v, 0)}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '8px',
+                        border: '1px solid var(--color-border)',
+                        fontSize: '12px',
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,.1)',
+                        padding: '8px 12px',
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text-primary)',
+                      }}
+                      formatter={(value: number, name: string) => [
+                        formatMW(value),
+                        name === 'actual' ? 'Consumo Real' : name === 'predicted' ? 'Previsao' : name,
+                      ]}
+                    />
+                    {nowLabel && (
+                      <ReferenceLine x={nowLabel} stroke="var(--color-text-muted)" strokeDasharray="4 4" label={{ value: 'Agora', fill: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500 }} />
+                    )}
+                    {visibleSeries.ci && (
+                      <>
+                        <Area type="monotone" dataKey="ciUpper" stroke="none" fill="url(#ciGrad)" name="CI Superior" />
+                        <Area type="monotone" dataKey="ciLower" stroke="none" fill="transparent" name="CI Inferior" />
+                      </>
+                    )}
+                    {visibleSeries.actual && (
+                      <Area type="monotone" dataKey="actual" stroke="#16a34a" fill="url(#actualGrad)" strokeWidth={2} name="actual" dot={false} connectNulls={false} />
+                    )}
+                    {visibleSeries.predicted && (
+                      <Area type="monotone" dataKey="predicted" stroke="#2563eb" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Interactive legend — rule: legend-interactive */}
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 text-xs text-text-secondary">
+                <button
+                  type="button"
+                  onClick={() => toggleSeries('actual')}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-opacity ${!visibleSeries.actual ? 'opacity-40 line-through' : ''}`}
+                  aria-pressed={visibleSeries.actual}
+                  aria-label="Toggle consumo real"
+                >
+                  <span className="w-4 h-0.5 bg-energy-green rounded" aria-hidden="true" />
+                  Consumo Real
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSeries('predicted')}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-opacity ${!visibleSeries.predicted ? 'opacity-40 line-through' : ''}`}
+                  aria-pressed={visibleSeries.predicted}
+                  aria-label="Toggle previsao"
+                >
+                  <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #2563eb' }} aria-hidden="true" />
+                  Previsao
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleSeries('ci')}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-opacity ${!visibleSeries.ci ? 'opacity-40 line-through' : ''}`}
+                  aria-pressed={visibleSeries.ci}
+                  aria-label="Toggle intervalo de confianca"
+                >
+                  <span className="w-4 h-3 bg-primary-100 rounded" aria-hidden="true" />
+                  IC 90%
+                </button>
+              </div>
+            </>
+          )}
         </Card>
       )}
 
-      {chartData.length === 0 && !error && (
-        <div className="bg-white border border-border rounded-xl p-12 text-center">
-          <TrendingUp className="w-12 h-12 text-primary-200 mx-auto mb-3" />
-          <p className="text-text-muted">Configure os parametros e execute o forecast sequencial</p>
+      {chartData.length === 0 && !error && !loading && (
+        <div className="bg-surface border border-border rounded-xl p-12 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-4">
+            <TrendingUp className="w-8 h-8 text-primary-300" aria-hidden="true" />
+          </div>
+          <p className="text-sm font-medium text-text-secondary">Nenhum forecast gerado</p>
+          <p className="text-xs text-text-muted mt-1.5 max-w-xs mx-auto">Configure os parametros e execute o forecast sequencial para visualizar as previsoes</p>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Validated number input with blur validation — rule: inline-validation */
+function ValidatedNumberInput({ id, label, value, onChange, min, max, help }: {
+  id: string; label: string; value: number; onChange: (v: number) => void; min: number; max: number; help: string;
+}) {
+  const [error, setError] = useState('');
+  const [local, setLocal] = useState(String(value));
+
+  const handleBlur = () => {
+    const n = parseInt(local) || min;
+    if (n < min) {
+      setError(`Minimo: ${min}`);
+      onChange(min);
+      setLocal(String(min));
+    } else if (n > max) {
+      setError(`Maximo: ${max}`);
+      onChange(max);
+      setLocal(String(max));
+    } else {
+      setError('');
+      onChange(n);
+    }
+  };
+
+  return (
+    <div>
+      <label htmlFor={id} className="block text-xs font-medium text-text-secondary mb-1.5">{label}</label>
+      <input
+        id={id}
+        type="number"
+        value={local}
+        onChange={(e) => { setLocal(e.target.value); setError(''); }}
+        onBlur={handleBlur}
+        min={min}
+        max={max}
+        aria-describedby={`${id}-help`}
+        aria-invalid={!!error}
+        className={`block w-full rounded-lg border bg-surface px-3 min-h-[44px] text-sm shadow-xs tabular-nums
+          focus-visible:ring-2 focus-visible:outline-none transition
+          ${error ? 'border-energy-red focus-visible:border-energy-red focus-visible:ring-red-200' : 'border-border focus-visible:border-primary-500 focus-visible:ring-primary-200'}`}
+      />
+      {error ? (
+        <p className="text-[11px] text-energy-red mt-1" role="alert">{error}</p>
+      ) : (
+        <p id={`${id}-help`} className="text-[11px] text-text-muted mt-1">{help}</p>
       )}
     </div>
   );

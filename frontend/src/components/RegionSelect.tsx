@@ -1,31 +1,37 @@
 import { REGIONS, type Region } from '../api/client';
+import { MapPin } from 'lucide-react';
 
 interface RegionSelectProps {
   value: Region;
   onChange: (region: Region) => void;
   className?: string;
+  id?: string;
+  label?: string;
 }
 
-const REGION_EMOJI: Record<Region, string> = {
-  Norte: '🏔️',
-  Centro: '🏛️',
-  Lisboa: '🌉',
-  Alentejo: '🌾',
-  Algarve: '🏖️',
-};
-
-export default function RegionSelect({ value, onChange, className = '' }: RegionSelectProps) {
+export default function RegionSelect({ value, onChange, className = '', id = 'region-select', label }: RegionSelectProps) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as Region)}
-      className={`block w-full rounded-lg border border-border bg-white px-3 py-2.5 text-sm text-text-primary shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-200 focus:outline-none transition ${className}`}
-    >
-      {REGIONS.map((r) => (
-        <option key={r} value={r}>
-          {REGION_EMOJI[r]} {r}
-        </option>
-      ))}
-    </select>
+    <div>
+      {label && (
+        <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-1.5">
+          <MapPin className="w-3.5 h-3.5" aria-hidden="true" />
+          {label}
+        </label>
+      )}
+      <select
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value as Region)}
+        aria-label={label ? undefined : 'Selecionar regiao'}
+        className={`block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm text-text-primary shadow-xs cursor-pointer
+          focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition ${className}`}
+      >
+        {REGIONS.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
