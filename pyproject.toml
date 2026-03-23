@@ -33,6 +33,9 @@ markers = [
     "api: marks tests related to API endpoints",
     "features: marks tests related to feature engineering",
     "models: marks tests related to model evaluation",
+    "load: marks performance/load tests",
+    "stress: marks stress tests",
+    "property_based: marks property-based tests (Hypothesis)",
 ]
 
 [tool.coverage.run]
@@ -79,6 +82,11 @@ module = [
     "joblib.*",
 ]
 ignore_missing_imports = true
+
+[tool.mutmut]
+paths_to_mutate = "src/"
+tests_dir = "tests/"
+runner = "python -m pytest -x --timeout=30"
 
 [tool.bandit]
 exclude_dirs = ["tests"]
