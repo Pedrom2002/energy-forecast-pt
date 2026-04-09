@@ -25,11 +25,7 @@ from src.api.main import app
 # Model availability check
 # ---------------------------------------------------------------------------
 
-models_loaded = (
-    hasattr(app.state, "models")
-    and app.state.models
-    and app.state.models.total_models > 0
-)
+models_loaded = hasattr(app.state, "models") and app.state.models and app.state.models.total_models > 0
 
 skip_no_models = pytest.mark.skipif(
     not models_loaded,
@@ -173,9 +169,7 @@ class TestLatencyAssertions:
         resp = client.post("/predict/batch", json=batch)
         elapsed_ms = (time.perf_counter() - t0) * 1000
         assert resp.status_code == 200
-        assert elapsed_ms < 5000, (
-            f"POST /predict/batch (100) took {elapsed_ms:.1f} ms, limit 5000 ms"
-        )
+        assert elapsed_ms < 5000, f"POST /predict/batch (100) took {elapsed_ms:.1f} ms, limit 5000 ms"
         print(f"\n  POST /predict/batch (100): {elapsed_ms:.1f} ms")
 
     @skip_no_models
@@ -186,9 +180,7 @@ class TestLatencyAssertions:
         resp = client.post("/predict/explain", json=payload)
         elapsed_ms = (time.perf_counter() - t0) * 1000
         assert resp.status_code == 200
-        assert elapsed_ms < 2000, (
-            f"POST /predict/explain took {elapsed_ms:.1f} ms, limit 2000 ms"
-        )
+        assert elapsed_ms < 2000, f"POST /predict/explain took {elapsed_ms:.1f} ms, limit 2000 ms"
         print(f"\n  POST /predict/explain: {elapsed_ms:.1f} ms")
 
 
@@ -239,13 +231,9 @@ class TestConcurrentPredictions:
             f"max={pct['max']:.0f}ms"
         )
 
-        assert all(
-            s == 200 for s in statuses
-        ), f"Non-200 responses: {[s for s in statuses if s != 200]}"
+        assert all(s == 200 for s in statuses), f"Non-200 responses: {[s for s in statuses if s != 200]}"
         # Generous ceiling: 30 s even for 100 concurrent on slow CI
-        assert wall_ms < 30_000, (
-            f"Concurrent /predict ({num_concurrent}) took {wall_ms:.0f} ms"
-        )
+        assert wall_ms < 30_000, f"Concurrent /predict ({num_concurrent}) took {wall_ms:.0f} ms"
 
     def test_concurrent_health(self, client):
         """100 concurrent GET /health must all return 200."""
@@ -259,9 +247,7 @@ class TestConcurrentPredictions:
             for fut in as_completed(futures):
                 statuses.append(fut.result())
 
-        assert all(s == 200 for s in statuses), (
-            f"Non-200 from /health: {[s for s in statuses if s != 200]}"
-        )
+        assert all(s == 200 for s in statuses), f"Non-200 from /health: {[s for s in statuses if s != 200]}"
 
 
 # =========================================================================

@@ -115,9 +115,7 @@ class TestFeatureEngineeringToPrediction:
         numeric_cols = tail.select_dtypes(include=[np.number]).columns
         nan_counts = tail[numeric_cols].isna().sum()
         cols_with_nans = nan_counts[nan_counts > 0]
-        assert cols_with_nans.empty, (
-            f"Unexpected NaN columns after warm-up: {cols_with_nans.to_dict()}"
-        )
+        assert cols_with_nans.empty, f"Unexpected NaN columns after warm-up: {cols_with_nans.to_dict()}"
 
     def test_predict_returns_valid_response(self, valid_prediction_payload):
         """Single prediction endpoint returns all expected fields with sane values."""
@@ -131,9 +129,7 @@ class TestFeatureEngineeringToPrediction:
         assert isinstance(body["predicted_consumption_mw"], (int, float))
         assert body["predicted_consumption_mw"] > 0, "Prediction must be positive"
         assert body["confidence_interval_lower"] >= 0, "CI lower bound must be non-negative"
-        assert body["confidence_interval_upper"] > body["confidence_interval_lower"], (
-            "CI upper must exceed CI lower"
-        )
+        assert body["confidence_interval_upper"] > body["confidence_interval_lower"], "CI upper must exceed CI lower"
         assert body["confidence_level"] == 0.90
         assert body["model_name"], "model_name must not be empty"
         assert body["ci_method"] in ("conformal", "gaussian_z_rmse")
@@ -152,9 +148,7 @@ class TestFeatureEngineeringToPrediction:
         pred_cold = resp_cold.json()["predicted_consumption_mw"]
         pred_hot = resp_hot.json()["predicted_consumption_mw"]
         # The model should produce different predictions for very different inputs
-        assert pred_cold != pred_hot, (
-            "Model should be sensitive to a 33-degree temperature swing"
-        )
+        assert pred_cold != pred_hot, "Model should be sensitive to a 33-degree temperature swing"
 
 
 # ===========================================================================
@@ -173,9 +167,7 @@ class TestMultiRegionPipeline:
         for region in REGIONS:
             payload = _make_payload(region=region)
             resp = client.post("/predict", json=payload)
-            assert resp.status_code == 200, (
-                f"Region {region} failed: {resp.status_code} — {resp.text}"
-            )
+            assert resp.status_code == 200, f"Region {region} failed: {resp.status_code} — {resp.text}"
             body = resp.json()
             assert body["region"] == region
             assert body["predicted_consumption_mw"] > 0
@@ -188,9 +180,9 @@ class TestMultiRegionPipeline:
 
         # Check that region one-hot columns exist and are mutually exclusive
         region_cols = [c for c in features.columns if c.startswith("region_")]
-        assert len(region_cols) >= len(REGIONS), (
-            f"Expected at least {len(REGIONS)} region columns, got {len(region_cols)}: {region_cols}"
-        )
+        assert len(region_cols) >= len(
+            REGIONS
+        ), f"Expected at least {len(REGIONS)} region columns, got {len(region_cols)}: {region_cols}"
 
         # For each row exactly one region column should be 1.0
         region_sums = features[region_cols].sum(axis=1)
@@ -208,9 +200,7 @@ class TestMultiRegionPipeline:
             predictions[region] = resp.json()["predicted_consumption_mw"]
 
         unique_preds = set(predictions.values())
-        assert len(unique_preds) > 1, (
-            f"All regions produced identical predictions: {predictions}"
-        )
+        assert len(unique_preds) > 1, f"All regions produced identical predictions: {predictions}"
 
 
 # ===========================================================================
@@ -292,9 +282,7 @@ class TestSequentialPredictionChain:
 
     def _has_lag_model(self) -> bool:
         store = getattr(app.state, "models", None)
-        return store is not None and (
-            store.model_with_lags is not None or store.model_advanced is not None
-        )
+        return store is not None and (store.model_with_lags is not None or store.model_advanced is not None)
 
     def test_sequential_forecast_basic(self):
         """Sequential endpoint returns predictions for all forecast steps."""
@@ -312,10 +300,13 @@ class TestSequentialPredictionChain:
         ]
 
         client = TestClient(app)
-        resp = client.post("/predict/sequential", json={
-            "history": history,
-            "forecast": forecast,
-        })
+        resp = client.post(
+            "/predict/sequential",
+            json={
+                "history": history,
+                "forecast": forecast,
+            },
+        )
         assert resp.status_code == 200, f"Sequential failed: {resp.status_code} — {resp.text}"
 
         body = resp.json()
@@ -345,19 +336,20 @@ class TestSequentialPredictionChain:
         ]
 
         client = TestClient(app)
-        seq_resp = client.post("/predict/sequential", json={
-            "history": history,
-            "forecast": forecast_items,
-        })
+        seq_resp = client.post(
+            "/predict/sequential",
+            json={
+                "history": history,
+                "forecast": forecast_items,
+            },
+        )
         batch_resp = client.post("/predict/batch", json=forecast_items)
 
         if seq_resp.status_code == 200 and batch_resp.status_code == 200:
             seq_preds = [p["predicted_consumption_mw"] for p in seq_resp.json()["predictions"]]
             batch_preds = [p["predicted_consumption_mw"] for p in batch_resp.json()["predictions"]]
             # At least one prediction should differ (sequential uses lag history)
-            assert seq_preds != batch_preds, (
-                "Sequential and batch predictions should differ when lag features are used"
-            )
+            assert seq_preds != batch_preds, "Sequential and batch predictions should differ when lag features are used"
 
     def test_sequential_mixed_regions_rejected(self):
         """History and forecast with different regions should be rejected."""
@@ -371,10 +363,13 @@ class TestSequentialPredictionChain:
         ]
 
         client = TestClient(app)
-        resp = client.post("/predict/sequential", json={
-            "history": history,
-            "forecast": forecast,
-        })
+        resp = client.post(
+            "/predict/sequential",
+            json={
+                "history": history,
+                "forecast": forecast,
+            },
+        )
         assert resp.status_code == 422
         assert "region" in resp.text.lower() or "MIXED_REGIONS" in resp.text
 
@@ -427,9 +422,9 @@ class TestExplainEndpoint:
             seen_ranks.append(feat["rank"])
 
         # Ranks should be consecutive starting from 1
-        assert sorted(seen_ranks) == list(range(1, len(seen_ranks) + 1)), (
-            f"Ranks should be 1..N, got {sorted(seen_ranks)}"
-        )
+        assert sorted(seen_ranks) == list(
+            range(1, len(seen_ranks) + 1)
+        ), f"Ranks should be 1..N, got {sorted(seen_ranks)}"
 
     def test_explain_top_n_limits_features(self, valid_prediction_payload):
         """Requesting top_n=3 should return at most 3 features."""
@@ -452,9 +447,7 @@ class TestExplainEndpoint:
 
         feature_names = [f["feature"] for f in resp.json()["top_features"]]
         for name in feature_names:
-            assert isinstance(name, str) and len(name) > 0, (
-                f"Feature name must be a non-empty string, got: {name!r}"
-            )
+            assert isinstance(name, str) and len(name) > 0, f"Feature name must be a non-empty string, got: {name!r}"
 
 
 # ===========================================================================
@@ -602,15 +595,13 @@ class TestDriftDetection:
 
         check_body = check_resp.json()
         assert check_body["features_checked"] > 0
-        assert check_body["alert_count"] == 0, (
-            f"Zero-drift data should produce no alerts, got: {check_body['alerts']}"
-        )
+        assert check_body["alert_count"] == 0, f"Zero-drift data should produce no alerts, got: {check_body['alerts']}"
         # All z-scores should be near zero
         for feat, score in check_body["drift_scores"].items():
             if score.get("z_score") is not None:
-                assert abs(score["z_score"]) < 0.01, (
-                    f"Feature {feat} should have z~0 with identical means, got {score['z_score']}"
-                )
+                assert (
+                    abs(score["z_score"]) < 0.01
+                ), f"Feature {feat} should have z~0 with identical means, got {score['z_score']}"
 
     def test_drift_check_with_shifted_data_triggers_alert(self):
         """POST /model/drift/check with heavily shifted data should produce alerts."""
@@ -641,15 +632,11 @@ class TestDriftDetection:
 
         check_body = check_resp.json()
         assert check_body["features_checked"] > 0
-        assert check_body["alert_count"] > 0, (
-            "5-sigma shift should trigger at least one drift alert"
-        )
+        assert check_body["alert_count"] > 0, "5-sigma shift should trigger at least one drift alert"
         # Every checked feature should be in "alert" state
         for feat, score in check_body["drift_scores"].items():
             if score.get("z_score") is not None:
-                assert abs(score["z_score"]) >= 3.0, (
-                    f"Feature {feat} should be in alert with 5-sigma shift"
-                )
+                assert abs(score["z_score"]) >= 3.0, f"Feature {feat} should be in alert with 5-sigma shift"
                 assert score["drift_level"] == "alert"
 
 
@@ -692,11 +679,13 @@ class TestHealthEndpoint:
         assert isinstance(body["model_no_lags_loaded"], bool)
         assert isinstance(body["model_advanced_loaded"], bool)
         # At least one must be True
-        assert any([
-            body["model_with_lags_loaded"],
-            body["model_no_lags_loaded"],
-            body["model_advanced_loaded"],
-        ])
+        assert any(
+            [
+                body["model_with_lags_loaded"],
+                body["model_no_lags_loaded"],
+                body["model_advanced_loaded"],
+            ]
+        )
 
     def test_health_includes_uptime(self):
         """Health should report uptime since session preload."""
@@ -755,17 +744,15 @@ class TestModelInfo:
         body = client.get("/model/info").json()
 
         for variant_name, variant_meta in body["models_available"].items():
-            assert isinstance(variant_meta, dict), (
-                f"Variant {variant_name} metadata should be a dict"
-            )
+            assert isinstance(variant_meta, dict), f"Variant {variant_name} metadata should be a dict"
             # Should have either test_metrics (from metadata JSON) or
             # at least model_type and features_count (fallback)
             has_metrics = "test_metrics" in variant_meta
             has_fallback = "model_type" in variant_meta or "features_count" in variant_meta
             has_best_model = "best_model" in variant_meta
-            assert has_metrics or has_fallback or has_best_model, (
-                f"Variant {variant_name} has no recognisable metadata keys: {variant_meta.keys()}"
-            )
+            assert (
+                has_metrics or has_fallback or has_best_model
+            ), f"Variant {variant_name} has no recognisable metadata keys: {variant_meta.keys()}"
 
     def test_model_info_checksums_present(self):
         """SHA-256 checksums should be present for loaded models."""
@@ -853,9 +840,9 @@ class TestModelReloadSimulation:
         # Both should report the same checksums for the same variants
         for variant in reload_checksums:
             if variant in info_checksums:
-                assert reload_checksums[variant] == info_checksums[variant], (
-                    f"Checksum mismatch for {variant} between reload and info"
-                )
+                assert (
+                    reload_checksums[variant] == info_checksums[variant]
+                ), f"Checksum mismatch for {variant} between reload and info"
 
 
 # ===========================================================================
@@ -943,9 +930,7 @@ class TestPredictionEdgeCases:
 
         pred_m = resp_m.json()["predicted_consumption_mw"]
         pred_n = resp_n.json()["predicted_consumption_mw"]
-        assert pred_m != pred_n, (
-            "Midnight and noon predictions should differ due to temporal features"
-        )
+        assert pred_m != pred_n, "Midnight and noon predictions should differ due to temporal features"
 
     def test_weekday_vs_weekend_predictions_differ(self):
         """Predictions on weekday vs weekend should differ."""
@@ -961,9 +946,7 @@ class TestPredictionEdgeCases:
 
         pred_wd = resp_wd.json()["predicted_consumption_mw"]
         pred_we = resp_we.json()["predicted_consumption_mw"]
-        assert pred_wd != pred_we, (
-            "Weekday and weekend predictions should differ"
-        )
+        assert pred_wd != pred_we, "Weekday and weekend predictions should differ"
 
     def test_invalid_region_rejected(self):
         """An invalid region should be rejected by Pydantic validation."""
