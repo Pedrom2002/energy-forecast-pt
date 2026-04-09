@@ -37,7 +37,7 @@ Stack:
   - API: FastAPI + Uvicorn
   - Frontend: React 19 + TypeScript + Tailwind CSS v4
   - Features: 71 engineered
-  - Tests: 745+ backend + 71 frontend
+  - Tests: 654 backend + 81 frontend
   - Deployment: Docker, AWS/Azure/GCP ready
 ```
 

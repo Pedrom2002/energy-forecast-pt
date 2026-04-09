@@ -523,10 +523,30 @@ energy-forecast-pt/
 │   ├── 02_model_training.ipynb
 │   └── ... (9 more)
 │
-├── tests/                    # Automated tests (pytest)
+├── tests/                    # Automated tests (pytest) — 22 test files, 654 tests
 │   ├── test_api.py
+│   ├── test_api_extended.py
+│   ├── test_api_regions_and_errors.py
+│   ├── test_conformal.py
+│   ├── test_coverage_boost.py
+│   ├── test_coverage_gaps.py
+│   ├── test_edge_cases.py
+│   ├── test_evaluation_extended.py
 │   ├── test_feature_engineering.py
-│   └── test_models.py
+│   ├── test_full_integration.py
+│   ├── test_integration.py
+│   ├── test_load.py
+│   ├── test_metadata.py
+│   ├── test_metrics_extended.py
+│   ├── test_model_registry.py
+│   ├── test_models.py
+│   ├── test_new_features.py
+│   ├── test_performance.py
+│   ├── test_property_based.py
+│   ├── test_rate_limit.py
+│   ├── test_retrain_script.py
+│   ├── test_smoke.py
+│   └── test_stress.py
 │
 ├── docs/                     # Documentation (this folder)
 │   ├── PROJECT_OVERVIEW.md
