@@ -10,19 +10,20 @@
 
 ### Model Performance
 ```
-Algorithm: XGBoost (Gradient Boosting)
+Best Model: LightGBM (no_lags variant)
 Test Set Metrics:
-  - MAPE: 0.86%        ⭐ Excellent (< 1% is world-class)
-  - R²: 0.9995         ⭐ Explains 99.95% of variance
-  - MAE: 10.65 MW      Average error ±10.65 MW
-  - RMSE: 20.25 MW     Root mean squared error
+  - MAPE: 4.30%        Strong for regional hourly forecasting
+  - R²: 0.9914         Explains 99.14% of variance
+  - MAE: 55.27 MW      Average error ±55.27 MW
+  - RMSE: 80.15 MW     Root mean squared error
+  - MASE: 0.0601       6% of seasonal naive error
 
-Features: 68+ engineered features
-Training Data: 174,965 samples (99.9% retention after feature engineering)
+Features: 39 selected features (from 50 candidates)
+Training Data: 175,205 samples across 5 regions (2021-2024)
 Data Split: 70% train / 15% validation / 15% test (temporal split)
 ```
 
-**Interpretation**: For average consumption of 2500 MW, the model has an average error of only ±21.5 MW (0.86%).
+**Interpretation**: For average consumption of ~1327 MW, the model has an average error of ±55.27 MW (4.30% MAPE). This is competitive for regional hourly energy forecasting (sub-5% MAPE at regional level is considered strong).
 
 ### API Performance
 ```
@@ -52,7 +53,7 @@ Endpoints: 7 (health, predict, batch, info, etc.)
 ```
 Raw Data (Weather + Consumption)
     ↓
-Feature Engineering (68+ features)
+Feature Engineering (39 features)
     ↓
 Model Training (XGBoost + Optuna optimization)
     ↓
@@ -93,7 +94,7 @@ Cloud Deployment (AWS/Azure/GCP)
 
 ## 🔬 Technical Highlights
 
-### Feature Engineering (68+ Features)
+### Feature Engineering (39 Features)
 
 **Categories**:
 1. **Temporal (18 features)**
@@ -132,22 +133,22 @@ Cloud Deployment (AWS/Azure/GCP)
 
 ### Model Selection
 
-**Comparison**:
+**Comparison (no_lags variant, 5-fold CV)**:
 ```
-Model          | MAPE  | R²     | Train Time | Inference | Size
----------------|-------|--------|------------|-----------|------
-Random Forest  | 1.20% | 0.9990 | 45 min     | 15ms      | 180MB
-XGBoost        | 0.86% | 0.9995 | 15 min     | 8ms       | 65MB  ✅
-LightGBM       | 0.91% | 0.9994 | 8 min      | 6ms       | 45MB
-CatBoost       | 0.94% | 0.9993 | 25 min     | 10ms      | 80MB
+Model          | Mean CV RMSE | Test MAPE | Test R²
+---------------|-------------|-----------|--------
+LightGBM       | 81.34       | 4.30%     | 0.9914  ✅
+CatBoost       | 84.00       | —         | —
+XGBoost        | 85.44       | —         | —
+Random Forest  | 89.47       | —         | —
 ```
 
-**Why XGBoost?**
-- ✅ Best performance (MAPE 0.86%)
-- ✅ Fast training and inference
+**Why LightGBM (no_lags)?**
+- ✅ Best performance across all metrics (MAPE 4.30%, RMSE 80.15)
+- ✅ No dependency on recent consumption data — works for any forecast horizon
+- ✅ Fastest training and inference
+- ✅ Most interpretable features (weather, temporal, geographic)
 - ✅ Compact model size
-- ✅ Built-in regularization (L1/L2)
-- ✅ Battle-tested in production
 
 ### Optimization with Optuna
 
@@ -184,15 +185,16 @@ Improvement:
 
 2. **Time Series Cross-Validation**
    - 5 folds
-   - MAPE: 0.86% ± 0.015 (very stable)
+   - LightGBM (no_lags) mean CV RMSE: 81.34 ± 2.25 (stable)
 
-3. **Walk-Forward Validation**
-   - Simulates incremental retraining
-   - MAPE: 0.87% ± 0.12% (consistent over time)
+3. **Per-Region Evaluation**
+   - All 5 regions evaluated independently
+   - MAPE range: 4.24% (Centro) to 4.34% (Algarve)
+   - R² range: 0.9549 (Algarve) to 0.9564 (Centro)
 
-4. **Stability Tests**
-   - 10 different random seeds
-   - MAPE: 0.86% ± 0.03% (very low variance)
+4. **Baseline Comparison (one-step-ahead)**
+   - Model RMSE 80.15 vs Seasonal Weekly 117.87 (32% improvement)
+   - MASE 0.0601 (model error is 6% of seasonal naive error)
 
 ---
 
@@ -252,104 +254,39 @@ curl -X POST "http://localhost:8000/predict" \
   "predicted_consumption_mw": 2850.5,
   "confidence_interval_lower": 2817.2,
   "confidence_interval_upper": 2883.8,
-  "model_name": "XGBoost (advanced features)"
+  "model_name": "LightGBM (no_lags)"
 }
 ```
 
 ---
 
-## 📚 Development Pipeline (11 Notebooks)
+## 📚 Development Notebooks (5 Notebooks)
 
-### Phase 1: Analysis & Baseline (Notebooks 01-04)
-**Goal**: Understand data and establish baseline model
-
-1. **01 - Exploratory Data Analysis** (~2h)
+1. **01 - Exploratory Data Analysis**
    - Statistical analysis, distributions
    - Seasonality detection (daily, weekly, annual)
    - Correlation analysis
    - ACF/PACF for lag identification
 
-2. **02 - Model Training WITH Lags** (~3h)
-   - Feature engineering (68+ features)
-   - Train 4 models (RF, XGBoost, LightGBM, CatBoost)
-   - XGBoost wins with MAPE 0.86%
-
-3. **03 - Model Training WITHOUT Lags** (~2h)
-   - Alternative model (no historical data needed)
-   - Features: ~35 (temporal + weather + interactions)
-   - MAPE: ~3-8% (fallback option)
-
-4. **04 - Model Evaluation** (~2h)
+2. **02 - Model Evaluation**
    - Detailed metrics and visualizations
+   - Comparison across model variants
    - Residual analysis
-   - Confidence intervals (93.1% coverage)
 
-### Phase 2: Optimization (Notebooks 05-06)
-**Goal**: Improve model performance
-
-5. **05 - Advanced Feature Engineering** (~3h)
+3. **03 - Advanced Feature Analysis**
+   - Feature importance and selection analysis
    - Derived meteorological features
-   - Heat Index, Wind Chill, Dew Point
-   - Feature selection (MI scores)
-   - MAPE: 0.86% → 0.84%
+   - Feature interaction effects
 
-6. **06 - Hyperparameter Tuning** (~4h)
-   - Optuna optimization (20 trials)
-   - TPE Sampler + Median Pruner
-   - Best params found
-   - MAPE: 1.15% → 0.84%
-
-### Phase 3: Advanced Analysis (Notebooks 07-09)
-**Goal**: Deep analysis and optimization
-
-7. **07 - Error Analysis** (~2h)
+4. **04 - Error Analysis**
    - Error by region, time, season
    - Worst case analysis
    - Calibration of confidence intervals
 
-8. **08 - Model Stacking** (~3h)
-   - Ensemble methods (averaging, stacking)
-   - MAPE: 0.83% (marginal gain)
-   - Decision: not used (complexity vs benefit)
-
-9. **09 - Performance Optimization** (~2h)
-   - Feature selection (68 → 52)
-   - Model compression (120MB → 65MB)
-   - Latency optimization (33% faster)
-
-### Phase 4: Advanced Capabilities (Notebooks 10-11)
-**Goal**: Multi-step and robust validation
-
-10. **10 - Multi-Step Forecasting** (~3h)
-    - Predictions 1-24h ahead
-    - Recursive vs Direct approaches
-    - Direct better for long-term
-
-11. **11 - Robust Validation** (~3h)
-    - Walk-forward validation
-    - Stability tests (10 seeds)
-    - Backtesting on different periods
-    - Result: model is stable and robust
-
-### Recommended Workflows
-
-**MVP (7 hours)**:
-```
-01 → 02 → 04
-Result: Functional model with MAPE 0.86%
-```
-
-**Optimized (17 hours)**:
-```
-01 → 02 → 04 → 05 → 06 → 11
-Result: Optimized model with MAPE 0.84%
-```
-
-**Complete (25 hours)**:
-```
-All 11 notebooks sequentially
-Result: Production-ready system with full validation
-```
+5. **05 - Robust Validation**
+   - Walk-forward validation
+   - Seasonal backtesting
+   - Model stability assessment
 
 ---
 
@@ -417,7 +354,7 @@ curl http://localhost:8000/health
 
 ### Benefits
 
-✅ **High Accuracy**: MAPE 0.86% (world-class)
+✅ **High Accuracy**: MAPE 4.30% (strong for regional hourly forecasting)
 ✅ **Fast**: < 50ms predictions (real-time)
 ✅ **Reliable**: 93.1% confidence interval coverage
 ✅ **Scalable**: 200+ req/s, cloud-ready
@@ -578,7 +515,7 @@ This project demonstrates expertise in:
 
 ### Machine Learning
 ✅ End-to-end ML pipeline
-✅ Feature engineering (68+ features)
+✅ Feature engineering (39 features)
 ✅ Model selection and comparison
 ✅ Hyperparameter optimization (Bayesian)
 ✅ Time series forecasting
@@ -627,12 +564,12 @@ This project demonstrates expertise in:
 ## ⭐ Quick Stats
 
 ```
-📊 Model Performance:      MAPE 0.86%, R² 0.9995
+📊 Model Performance:      MAPE 4.30%, R² 0.9914
 ⚡ API Latency:            < 50ms (p99)
 🚀 Throughput:             200+ req/s
 💾 Model Size:             65MB
-📝 Features:               68+
-📚 Notebooks:              11
+📝 Features:               39
+📚 Notebooks:              5
 🧪 Test Coverage:          87%
 🐳 Docker:                 ✅ Ready
 ☁️  Cloud:                 ✅ AWS/Azure/GCP

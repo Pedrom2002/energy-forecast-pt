@@ -8,7 +8,7 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        ML PIPELINE (v5)                             │
+│                        ML PIPELINE (v6)                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  1. REPRODUCIBILITY SETUP                                           │
@@ -21,7 +21,7 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 │     └── Weather column validation (hard + soft bounds)               │
 │     └── Data hash verification for reproducibility                   │
 │                                                                     │
-│  3. FEATURE ENGINEERING (71 features)                                │
+│  3. FEATURE ENGINEERING (39-52 features after selection)              │
 │     ├── Temporal (13): hour, dow, month + cyclical sin/cos           │
 │     ├── Lag (7): consumption at t-{1,2,3,6,12,24,48}h               │
 │     ├── Rolling (20): mean/std/min/max over {3,6,12,24,48}h         │

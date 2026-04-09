@@ -435,13 +435,37 @@ def _train_variant(
             print(f"  Feature selection skipped due to error: {e}")
             logger.warning("Feature selection failed", exc_info=True)
 
-    # Step 9: Final model training
-    print(f"\nRetraining {DISPLAY_NAMES[best_key]} on train+val...")
-    best_model = create_model(best_key, best_params)
+    # Step 9: Intermediate model for conformal calibration & optimal iterations
+    print(f"\nTraining intermediate {DISPLAY_NAMES[best_key]} (train + val early stopping)...")
+    intermediate_model = create_model(best_key, best_params)
+    fit_model(intermediate_model, X_train, y_train, X_val, y_val, model_key=best_key)
+
+    # Conformal calibration on held-out validation set (not test set)
+    print("\nConformal prediction calibration (on validation set)...")
+    y_pred_val = intermediate_model.predict(X_val)
+    conformal_q90 = compute_conformal_q90(y_val, y_pred_val)
+
+    # Determine optimal iteration count from early stopping
+    best_iter = None
+    for attr in ("best_iteration_", "best_iteration"):
+        attr_val = getattr(intermediate_model, attr, None)
+        if attr_val is not None:
+            best_iter = int(attr_val)
+            break
+
+    # Step 10: Final model on train+val with fixed iterations (prevents overfitting)
+    final_params = dict(best_params) if best_params else {}
+    if best_iter is not None:
+        iter_key = "iterations" if best_key == "catboost" else "n_estimators"
+        final_params[iter_key] = best_iter
+        print(f"  Using {best_iter} iterations (from early stopping)")
+
+    print(f"\nRetraining {DISPLAY_NAMES[best_key]} on train+val ({len(X_trainval)} samples)...")
+    best_model = create_model(best_key, final_params)
     fit_model(best_model, X_trainval, y_trainval, model_key=best_key)
     best_name = DISPLAY_NAMES[best_key]
 
-    # Step 10: Test evaluation
+    # Step 11: Test evaluation
     evaluator = ModelEvaluator()
     y_pred_test = best_model.predict(X_test)
     test_metrics = evaluator.calculate_metrics(y_test, y_pred_test)
@@ -455,9 +479,20 @@ def _train_variant(
         print(f"  {k}: {v:.4f}")
     print(f"\n  MASE: {mase:.4f} (< 1.0 means better than seasonal naive)")
 
-    # Conformal quantile on test set
-    print("\nComputing conformal prediction quantile...")
-    conformal_q90 = compute_conformal_q90(y_test, y_pred_test)
+    # Per-region evaluation
+    per_region_metrics = {}
+    if "region" in test.columns:
+        print("\n--- PER-REGION METRICS ---")
+        for region in sorted(test["region"].unique()):
+            mask = test["region"].values == region
+            y_r = y_test[mask]
+            y_pred_r = y_pred_test[mask]
+            r_metrics = evaluator.calculate_metrics(y_r, y_pred_r)
+            per_region_metrics[region] = {k: round(float(v), 4) for k, v in r_metrics.items()}
+            print(
+                f"  {region:15s}: RMSE={r_metrics['rmse']:.2f}, MAE={r_metrics['mae']:.2f}, "
+                f"MAPE={r_metrics['mape']:.2f}%, R²={r_metrics['r2']:.4f}"
+            )
 
     # Feature importance
     if hasattr(best_model, "feature_importances_"):
@@ -510,7 +545,7 @@ def _train_variant(
         "model_file": model_filename,
         "n_features": len(selected_feature_cols),
         "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "pipeline_version": "v5",
+        "pipeline_version": "v6",
         "random_seed": RANDOM_STATE,
         "data_hash": data_hash,
         "n_train": len(train),
@@ -526,6 +561,7 @@ def _train_variant(
             name: {k: round(float(v), 4) for k, v in metrics.items() if isinstance(v, (int, float))}
             for name, metrics in baseline_results.items()
         },
+        "per_region_metrics": per_region_metrics,
         "reproducibility": repro_info,
     }
 
@@ -561,7 +597,7 @@ def _train_variant(
         hyperparams=best_params or {},
         feature_names=selected_feature_cols,
         data_hash=data_hash,
-        tags={"variant": variant_name, "pipeline_version": "v5"},
+        tags={"variant": variant_name, "pipeline_version": "v6"},
         reproducibility_info=repro_info,
     )
 
@@ -714,7 +750,7 @@ def train_multistep_models(run_optuna: bool = False) -> dict[str, dict[str, floa
             f"{h}h": {k: round(float(v), 4) for k, v in m.items()} for h, m in zip(horizons, all_metrics.values())
         },
         "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "pipeline_version": "v5",
+        "pipeline_version": "v6",
         "random_seed": RANDOM_STATE,
     }
     meta_path = meta_dir / "metadata_multistep.json"
@@ -781,5 +817,17 @@ if __name__ == "__main__":
         print(f"\n  {variant.upper()}:")
         for k, v in metrics.items():
             print(f"    {k}: {v:.4f}")
+
+    # Cross-variant comparison: find overall best
+    main_variants = {k: v for k, v in all_results.items() if not k.startswith("horizon_")}
+    if main_variants:
+        best_variant = min(main_variants, key=lambda k: main_variants[k]["rmse"])
+        best_rmse = main_variants[best_variant]["rmse"]
+        best_mape = main_variants[best_variant]["mape"]
+        print(f"\n  {'=' * 40}")
+        print(f"  BEST OVERALL: {best_variant.upper()}")
+        print(f"    RMSE: {best_rmse:.2f}, MAPE: {best_mape:.2f}%")
+        print(f"  {'=' * 40}")
+
     print("\nDone! Models saved to data/models/")
     print("Experiment logs saved to experiments/")

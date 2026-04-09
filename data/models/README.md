@@ -41,11 +41,11 @@ If pre-trained models are available elsewhere (e.g., cloud storage, release asse
 
 When trained, this directory will contain:
 
-### Models WITH Lags (High Precision)
-- `xgboost_best.pkl` - Best XGBoost model (MAPE 0.86%)
-- `random_forest.pkl` - Random Forest model (~1.1GB)
-- `lightgbm.pkl` - LightGBM model
-- `catboost.pkl` - CatBoost model
+### Models WITH Lags
+- `best_model.pkl` - Best with_lags model, CatBoost (MAPE 4.41%)
+
+### Models WITHOUT Lags (Best Overall)
+- `best_model_no_lags.pkl` - Best overall model, LightGBM (MAPE 4.30%)
 
 ### Models WITHOUT Lags (No History Required)
 - `xgboost_no_lags.pkl` - XGBoost without lags

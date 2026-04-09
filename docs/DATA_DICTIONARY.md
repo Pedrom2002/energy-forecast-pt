@@ -116,8 +116,8 @@ data/models/
 │   ├── ensemble_stacking.pkl       # stacking meta-learner
 │   └── best_model_horizon_{1,6,12,24}h.pkl
 ├── features/
-│   ├── feature_names.txt           # 71 features (with_lags)
-│   ├── feature_names_no_lags.txt   # 54 features
+│   ├── feature_names.txt           # 52 features (with_lags)
+│   ├── feature_names_no_lags.txt   # 39 features (best model)
 │   └── advanced_feature_names.txt  # advanced set
 ├── metadata/
 │   ├── training_metadata.json      # with_lags metrics + config
@@ -134,12 +134,12 @@ data/models/
 
 ```json
 {
-  "best_model": "CatBoost",
-  "best_model_key": "catboost",
-  "model_file": "best_model.pkl",
-  "n_features": 71,
-  "training_date": "2024-12-15 10:30:00 UTC",
-  "pipeline_version": "v5",
+  "best_model": "LightGBM",
+  "best_model_key": "lightgbm",
+  "model_file": "best_model_no_lags.pkl",
+  "n_features": 39,
+  "training_date": "2026-04-09 17:43:34 UTC",
+  "pipeline_version": "v6",
   "random_seed": 42,
   "data_hash": "sha256:abc123...",
   "n_train": 122643,

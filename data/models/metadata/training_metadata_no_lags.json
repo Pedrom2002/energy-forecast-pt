@@ -2,37 +2,37 @@
   "best_model": "LightGBM",
   "best_model_key": "lightgbm",
   "model_file": "best_model_no_lags.pkl",
-  "n_features": 37,
-  "training_date": "2026-03-23 03:23:06 UTC",
-  "pipeline_version": "v5",
+  "n_features": 39,
+  "training_date": "2026-04-09 17:43:34 UTC",
+  "pipeline_version": "v6",
   "random_seed": 42,
   "data_hash": "9032a48ebf2bdaef0e3a89e44fef098725e912cb901aead6f69123e00f894d4d",
   "n_train": 122643,
   "n_val": 26281,
   "n_test": 26281,
   "test_metrics": {
-    "mae": 55.7384,
-    "rmse": 80.995,
-    "mape": 4.3302,
-    "r2": 0.9913,
-    "nrmse": 0.0593,
-    "mase": 0.0606
+    "mae": 55.2716,
+    "rmse": 80.1541,
+    "mape": 4.3042,
+    "r2": 0.9914,
+    "nrmse": 0.0587,
+    "mase": 0.0601
   },
-  "conformal_q90": 134.51,
+  "conformal_q90": 133.75,
   "cv_scores": {
     "xgboost": [
-      89.4585,
-      85.2361,
-      80.1542,
-      82.6027,
-      84.3749
+      89.2583,
+      85.4981,
+      80.4246,
+      82.0104,
+      84.1548
     ],
     "lightgbm": [
       84.3331,
       83.447,
-      78.5199,
+      78.5265,
       79.6916,
-      81.9418
+      81.9421
     ],
     "catboost": [
       88.8565,
@@ -52,43 +52,43 @@
   "feature_importance_top10": [
     {
       "feature": "day_of_year_cos",
-      "importance": 1325
+      "importance": 1210
     },
     {
       "feature": "hour_cos",
-      "importance": 1151
+      "importance": 1045
     },
     {
       "feature": "humidity",
-      "importance": 937
-    },
-    {
-      "feature": "pressure",
-      "importance": 878
-    },
-    {
-      "feature": "temperature",
-      "importance": 876
-    },
-    {
-      "feature": "longitude",
-      "importance": 852
-    },
-    {
-      "feature": "temp_x_hour",
-      "importance": 794
+      "importance": 890
     },
     {
       "feature": "latitude",
-      "importance": 765
+      "importance": 836
     },
     {
-      "feature": "hour",
-      "importance": 736
+      "feature": "temperature",
+      "importance": 813
+    },
+    {
+      "feature": "pressure",
+      "importance": 780
+    },
+    {
+      "feature": "longitude",
+      "importance": 748
+    },
+    {
+      "feature": "cloud_cover",
+      "importance": 727
+    },
+    {
+      "feature": "temp_x_hour",
+      "importance": 713
     },
     {
       "feature": "wind_x_hour",
-      "importance": 664
+      "importance": 630
     }
   ],
   "features": [
@@ -96,38 +96,40 @@
     "hour_cos",
     "longitude",
     "day_of_week",
-    "region_Lisboa",
-    "region_Centro",
-    "hour",
     "is_business_hour",
+    "hour",
+    "region_Lisboa",
     "hour_sin",
-    "region_Norte",
+    "region_Centro",
     "day_of_year_cos",
+    "region_Norte",
     "is_afternoon",
+    "is_weekend",
     "temp_x_hour",
-    "region_Algarve",
-    "region_Alentejo",
     "is_holiday",
     "temp_x_holiday",
-    "is_weekend",
-    "days_to_holiday",
-    "humidity",
-    "day_sin",
     "temperature",
-    "hour_x_dow",
+    "day_sin",
+    "humidity",
+    "week_of_year",
+    "days_to_holiday",
+    "region_Algarve",
     "temp_x_weekend",
+    "hour_x_dow",
+    "day_of_year_sin",
+    "month_cos",
     "days_from_holiday",
     "is_morning",
-    "days_to_nearest_holiday",
-    "month",
-    "wind_x_hour",
     "day_of_month",
-    "month_cos",
+    "region_Alentejo",
+    "days_to_nearest_holiday",
+    "precipitation",
     "pressure",
-    "wind_speed",
+    "wind_x_hour",
+    "cloud_cover",
+    "quarter",
     "is_holiday_eve",
     "is_evening",
-    "month_sin",
     "year"
   ],
   "feature_stats": {
@@ -163,21 +165,13 @@
       "q25": 1.0,
       "q75": 5.0
     },
-    "region_Lisboa": {
-      "mean": 0.20000134296688243,
-      "std": 0.4000010072216393,
+    "is_business_hour": {
+      "mean": 0.267720448013752,
+      "std": 0.4427710579171451,
       "min": 0.0,
       "max": 1.0,
       "q25": 0.0,
-      "q75": 0.0
-    },
-    "region_Centro": {
-      "mean": 0.20000134296688243,
-      "std": 0.4000010072216393,
-      "min": 0.0,
-      "max": 1.0,
-      "q25": 0.0,
-      "q75": 0.0
+      "q75": 1.0
     },
     "hour": {
       "mean": 11.49969111761704,
@@ -187,13 +181,13 @@
       "q25": 5.0,
       "q75": 17.0
     },
-    "is_business_hour": {
-      "mean": 0.267720448013752,
-      "std": 0.4427710579171451,
+    "region_Lisboa": {
+      "mean": 0.20000134296688243,
+      "std": 0.4000010072216393,
       "min": 0.0,
       "max": 1.0,
       "q25": 0.0,
-      "q75": 1.0
+      "q75": 0.0
     },
     "hour_sin": {
       "mean": -4.0077885232634373e-17,
@@ -203,7 +197,7 @@
       "q25": -0.7071067811865471,
       "q75": 0.7071067811865476
     },
-    "region_Norte": {
+    "region_Centro": {
       "mean": 0.20000134296688243,
       "std": 0.4000010072216393,
       "min": 0.0,
@@ -219,6 +213,14 @@
       "q25": -0.6584015846980488,
       "q75": 0.7266075247685652
     },
+    "region_Norte": {
+      "mean": 0.20000134296688243,
+      "std": 0.4000010072216393,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 0.0
+    },
     "is_afternoon": {
       "mean": 0.2499932851655878,
       "std": 0.4330088250113442,
@@ -227,6 +229,14 @@
       "q25": 0.0,
       "q75": 0.0
     },
+    "is_weekend": {
+      "mean": 0.2860788052966614,
+      "std": 0.4519266781865133,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 1.0
+    },
     "temp_x_hour": {
       "mean": 194.55755824997559,
       "std": 135.52532373332656,
@@ -234,22 +244,6 @@
       "max": 644.0249314542027,
       "q25": 81.5710244894483,
       "q75": 290.0573084424866
-    },
-    "region_Algarve": {
-      "mean": 0.19999462813247026,
-      "std": 0.3999959710429909,
-      "min": 0.0,
-      "max": 1.0,
-      "q25": 0.0,
-      "q75": 0.0
-    },
-    "region_Alentejo": {
-      "mean": 0.20000134296688243,
-      "std": 0.4000010072216393,
-      "min": 0.0,
-      "max": 1.0,
-      "q25": 0.0,
-      "q75": 0.0
     },
     "is_holiday": {
       "mean": 0.03545432569632833,
@@ -267,29 +261,13 @@
       "q25": 0.0,
       "q75": 0.0
     },
-    "is_weekend": {
-      "mean": 0.2860788052966614,
-      "std": 0.4519266781865133,
-      "min": 0.0,
-      "max": 1.0,
-      "q25": 0.0,
-      "q75": 1.0
-    },
-    "days_to_holiday": {
-      "mean": 18.574950981708792,
-      "std": 10.995063610288886,
-      "min": 0.0,
-      "max": 30.0,
-      "q25": 8.0,
-      "q75": 30.0
-    },
-    "humidity": {
-      "mean": 70.37536244464516,
-      "std": 13.571017649940018,
-      "min": 29.15720615788816,
-      "max": 100.0,
-      "q25": 60.41579607694719,
-      "q75": 80.40294907853932
+    "temperature": {
+      "mean": 16.78702772066565,
+      "std": 6.322801605232489,
+      "min": -0.26523135111482965,
+      "max": 34.40805086653181,
+      "q25": 11.660607932513651,
+      "q75": 21.914771901363054
     },
     "day_sin": {
       "mean": -0.0011561919105436372,
@@ -299,13 +277,45 @@
       "q25": -0.7818314824680299,
       "q75": 0.7818314824680298
     },
-    "temperature": {
-      "mean": 16.78702772066565,
-      "std": 6.322801605232489,
+    "humidity": {
+      "mean": 70.37536244464516,
+      "std": 13.571017649940018,
+      "min": 29.15720615788816,
+      "max": 100.0,
+      "q25": 60.41579607694719,
+      "q75": 80.40294907853932
+    },
+    "week_of_year": {
+      "mean": 24.73237355966802,
+      "std": 15.150919370466168,
+      "min": 1.0,
+      "max": 53.0,
+      "q25": 12.0,
+      "q75": 38.0
+    },
+    "days_to_holiday": {
+      "mean": 18.574950981708792,
+      "std": 10.995063610288886,
+      "min": 0.0,
+      "max": 30.0,
+      "q25": 8.0,
+      "q75": 30.0
+    },
+    "region_Algarve": {
+      "mean": 0.19999462813247026,
+      "std": 0.3999959710429909,
+      "min": 0.0,
+      "max": 1.0,
+      "q25": 0.0,
+      "q75": 0.0
+    },
+    "temp_x_weekend": {
+      "mean": 4.797702357515446,
+      "std": 8.299408326587407,
       "min": -0.26523135111482965,
-      "max": 34.40805086653181,
-      "q25": 11.660607932513651,
-      "q75": 21.914771901363054
+      "max": 32.74267078633968,
+      "q25": 0.0,
+      "q75": 9.095889671918012
     },
     "hour_x_dow": {
       "mean": 34.526872767317556,
@@ -315,13 +325,21 @@
       "q25": 6.0,
       "q75": 55.0
     },
-    "temp_x_weekend": {
-      "mean": 4.797702357515446,
-      "std": 8.299408326587407,
-      "min": -0.26523135111482965,
-      "max": 32.74267078633968,
-      "q25": 0.0,
-      "q75": 9.095889671918012
+    "day_of_year_sin": {
+      "mean": 0.08492844574577427,
+      "std": 0.7099649100874392,
+      "min": -0.9999907397361901,
+      "max": 0.9999907397361901,
+      "q25": -0.6287628145958345,
+      "q75": 0.7856498550787147
+    },
+    "month_cos": {
+      "mean": 0.0016673272524727516,
+      "std": 0.6990872714059221,
+      "min": -1.0,
+      "max": 1.0,
+      "q25": -0.5000000000000004,
+      "q75": 0.5000000000000001
     },
     "days_from_holiday": {
       "mean": 19.11941661518627,
@@ -339,30 +357,6 @@
       "q25": 0.0,
       "q75": 0.0
     },
-    "days_to_nearest_holiday": {
-      "mean": 12.836184899680374,
-      "std": 9.882596105014219,
-      "min": 0.0,
-      "max": 30.0,
-      "q25": 4.0,
-      "q75": 21.0
-    },
-    "month": {
-      "mean": 6.102307217104026,
-      "std": 3.473120178225242,
-      "min": 1.0,
-      "max": 12.0,
-      "q25": 3.0,
-      "q75": 9.0
-    },
-    "wind_x_hour": {
-      "mean": 120.25915706861413,
-      "std": 95.10265855053865,
-      "min": 0.0,
-      "max": 562.2297358291952,
-      "q25": 42.09894899580767,
-      "q75": 179.92933067835543
-    },
     "day_of_month": {
       "mean": 15.657812038355134,
       "std": 8.770714094667735,
@@ -371,13 +365,29 @@
       "q25": 8.0,
       "q75": 23.0
     },
-    "month_cos": {
-      "mean": 0.0016673272524727516,
-      "std": 0.6990872714059221,
-      "min": -1.0,
+    "region_Alentejo": {
+      "mean": 0.20000134296688243,
+      "std": 0.4000010072216393,
+      "min": 0.0,
       "max": 1.0,
-      "q25": -0.5000000000000004,
-      "q75": 0.5000000000000001
+      "q25": 0.0,
+      "q75": 0.0
+    },
+    "days_to_nearest_holiday": {
+      "mean": 12.836184899680374,
+      "std": 9.882596105014219,
+      "min": 0.0,
+      "max": 30.0,
+      "q25": 4.0,
+      "q75": 21.0
+    },
+    "precipitation": {
+      "mean": 0.6118734312918189,
+      "std": 1.4374423876999611,
+      "min": 0.0,
+      "max": 21.12118146947953,
+      "q25": 0.0,
+      "q75": 0.4107886465491771
     },
     "pressure": {
       "mean": 1013.4380359221581,
@@ -387,13 +397,29 @@
       "q25": 1010.0543315578383,
       "q75": 1016.8888027458047
     },
-    "wind_speed": {
-      "mean": 10.462244448997252,
-      "std": 4.594529180633405,
-      "min": 0.0001333477489833257,
-      "max": 27.356503008919574,
-      "q25": 7.041831732329532,
-      "q75": 13.893074676623122
+    "wind_x_hour": {
+      "mean": 120.25915706861413,
+      "std": 95.10265855053865,
+      "min": 0.0,
+      "max": 562.2297358291952,
+      "q25": 42.09894899580767,
+      "q75": 179.92933067835543
+    },
+    "cloud_cover": {
+      "mean": 57.259410763938256,
+      "std": 21.60720702321824,
+      "min": 0.0,
+      "max": 100.0,
+      "q25": 40.19747755327199,
+      "q75": 72.28031300473486
+    },
+    "quarter": {
+      "mean": 2.3762993204587577,
+      "std": 1.1230592267621653,
+      "min": 1.0,
+      "max": 4.0,
+      "q25": 1.0,
+      "q75": 3.0
     },
     "is_holiday_eve": {
       "mean": 0.03464854556686632,
@@ -411,14 +437,6 @@
       "q25": 0.0,
       "q75": 0.0
     },
-    "month_sin": {
-      "mean": 0.08397829280266597,
-      "std": 0.7100858070092695,
-      "min": -1.0,
-      "max": 1.0,
-      "q25": -0.5000000000000004,
-      "q75": 0.8660254037844386
-    },
     "year": {
       "mean": 2022.2353415164782,
       "std": 1.001756905683915,
@@ -430,64 +448,98 @@
   },
   "baseline_comparison": {
     "persistence_lag1": {
-      "mae": 748.1464,
-      "rmse": 1013.7374,
-      "mape": 53.2745,
-      "r2": -0.37,
-      "nrmse": 0.7421
+      "mae": 106.0973,
+      "rmse": 151.7391,
+      "mape": 8.3682,
+      "r2": 0.9693,
+      "nrmse": 0.1111
     },
     "seasonal_naive_daily": {
-      "mae": 848.3683,
-      "rmse": 1103.4654,
-      "mape": 68.2169,
-      "r2": -0.6233,
-      "nrmse": 0.8078
+      "mae": 132.0618,
+      "rmse": 198.4249,
+      "mape": 10.5946,
+      "r2": 0.9475,
+      "nrmse": 0.1453
     },
     "seasonal_naive_weekly": {
-      "mae": 922.822,
-      "rmse": 1175.8195,
-      "mape": 92.7591,
-      "r2": -0.8431,
-      "nrmse": 0.8608
+      "mae": 79.6951,
+      "rmse": 117.8651,
+      "mape": 6.2457,
+      "r2": 0.9815,
+      "nrmse": 0.0863
     },
     "moving_average_24h": {
-      "mae": 745.0153,
-      "rmse": 1005.1377,
-      "mape": 53.9643,
-      "r2": -0.3469,
-      "nrmse": 0.7358
+      "mae": 269.1378,
+      "rmse": 363.868,
+      "mape": 21.7703,
+      "r2": 0.8235,
+      "nrmse": 0.2664
     },
     "moving_average_168h": {
-      "mae": 717.9597,
-      "rmse": 874.6037,
-      "mape": 74.7114,
-      "r2": -0.0198,
-      "nrmse": 0.6403
+      "mae": 274.6116,
+      "rmse": 376.1006,
+      "mape": 22.5178,
+      "r2": 0.8114,
+      "nrmse": 0.2753
+    }
+  },
+  "per_region_metrics": {
+    "Alentejo": {
+      "mae": 25.0255,
+      "rmse": 31.7257,
+      "mape": 4.2944,
+      "r2": 0.955,
+      "nrmse": 0.0511
+    },
+    "Algarve": {
+      "mae": 20.9908,
+      "rmse": 26.4422,
+      "mape": 4.3417,
+      "r2": 0.9549,
+      "nrmse": 0.0511
+    },
+    "Centro": {
+      "mae": 49.4807,
+      "rmse": 62.4923,
+      "mape": 4.2351,
+      "r2": 0.9564,
+      "nrmse": 0.0503
+    },
+    "Lisboa": {
+      "mae": 105.1096,
+      "rmse": 131.953,
+      "mape": 4.3209,
+      "r2": 0.9557,
+      "nrmse": 0.051
+    },
+    "Norte": {
+      "mae": 75.7578,
+      "rmse": 95.4038,
+      "mape": 4.3288,
+      "r2": 0.9549,
+      "nrmse": 0.0512
     }
   },
   "reproducibility": {
     "seed": 42,
-    "python_version": "3.13.3 (tags/v3.13.3:6280bb5, Apr  8 2025, 14:47:33) [MSC v.1943 64 bit (AMD64)]",
+    "python_version": "3.12.3 (tags/v3.12.3:f6650f9, Apr  9 2024, 14:05:25) [MSC v.1938 64 bit (AMD64)]",
     "platform": "Windows-11-10.0.26200-SP0",
     "numpy_version": "2.3.3",
     "sklearn_version": "1.7.2",
-    "timestamp_utc": "2026-03-23T03:10:53.773786+00:00",
-    "git_commit": "6b26ee1053cb671ce9058304e6033b14faa43f6e",
+    "timestamp_utc": "2026-04-09T15:47:15.044950+00:00",
+    "git_commit": "6a5878c1aec524c9c889a383b21dfe5b8440a051",
     "hostname": "Pedro"
   },
   "feature_selection": {
     "original_n_features": 50,
-    "selected_n_features": 37,
+    "selected_n_features": 39,
     "removed_by_correlation": [
       "temperature_feels_like",
-      "quarter",
       "day_of_year",
-      "week_of_year",
-      "day_of_year_sin",
       "temp_weekend",
       "temp_hour",
       "wind_hour"
     ],
-    "correlation_threshold": 0.95
+    "correlation_threshold": 0.99
   }
 }
