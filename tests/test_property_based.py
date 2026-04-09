@@ -19,7 +19,7 @@ from pydantic import ValidationError
 from starlette.testclient import TestClient
 
 from src.api.main import app
-from src.api.schemas import VALID_REGIONS, EnergyData
+from src.api.schemas import EnergyData
 from src.features.feature_engineering import FeatureEngineer
 from src.utils.metrics import calculate_metrics
 

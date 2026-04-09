@@ -16,15 +16,12 @@ minimal_time_series) are auto-discovered from ``tests/conftest.py``.
 
 from __future__ import annotations
 
-import copy
-
 import numpy as np
 import pandas as pd
 import pytest
 from starlette.testclient import TestClient
 
 from src.api.main import app
-from src.api.schemas import VALID_REGIONS
 from src.features.feature_engineering import FeatureEngineer
 
 # ---------------------------------------------------------------------------
