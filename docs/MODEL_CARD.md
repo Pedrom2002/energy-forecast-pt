@@ -3,16 +3,16 @@
 ## Model Details
 
 **Model Name:** Energy Forecast PT - Gradient Boosted Trees
-**Model Version:** 2.0 (Pipeline v5)
-**Model Date:** March 2026
-**Model Type:** Gradient Boosting Regression (CatBoost / XGBoost / LightGBM — auto-selected)
+**Model Version:** 3.0 (Pipeline v6)
+**Model Date:** April 2026
+**Model Type:** Gradient Boosting Regression (LightGBM / CatBoost / XGBoost — auto-selected via CV)
 **License:** MIT
 
 ### Model Description
 
-Hourly energy consumption forecasting system for Portugal, segmented by 5 regions. The model uses gradient-boosted trees (CatBoost, XGBoost, LightGBM, or Random Forest — selected automatically via 5-fold time-series cross-validation) with 71 engineered features including temporal lags, rolling windows, weather-derived physiological comfort indices, Portuguese holiday features, and interaction terms.
+Hourly energy consumption forecasting system for Portugal, segmented by 5 regions. The model uses gradient-boosted trees (auto-selected via 5-fold time-series cross-validation) with 39 selected features (no_lags variant) or 52 features (with_lags variant), including temporal patterns, weather variables, Portuguese holiday features, and interaction terms.
 
-**Pipeline v5** adds: baseline model comparison, Optuna hyperparameter tuning (50 trials, 5 CV folds), permutation-importance feature selection, file-based experiment tracking, global seed management for full reproducibility, data hashing for version verification, and DVC pipeline integration.
+**Pipeline v6** adds: proper one-step-ahead baseline evaluation, conformal calibration on validation set (not test set), early stopping iteration transfer, per-region evaluation metrics, and cross-variant model comparison. Best model: LightGBM (no_lags variant).
 
 **Developed by:** Pedro Marques
 
@@ -38,7 +38,7 @@ Hourly energy consumption forecasting system for Portugal, segmented by 5 region
 | **Type** | Synthetic dataset modelled on Portuguese grid patterns |
 | **Granularity** | Hourly (8,760 h/year per region) |
 | **Size** | 174,965 training samples (~99.9 % retention after feature engineering) |
-| **Date range** | 2019-01-01 – 2023-12-31 (5 years, all 5 regions) |
+| **Date range** | 2021-01-01 – 2024-12-31 (4 years, all 5 regions) |
 | **Train / Val / Test split** | 70 % / 15 % / 15 % (temporal — no shuffle, to prevent leakage) |
 
 ### Data Sources and Provenance
@@ -88,7 +88,7 @@ planning.
 4. Lisboa
 5. Norte
 
-### Features (71 total — with lags variant)
+### Features (39 selected — no_lags variant, 52 for with_lags)
 
 See [DATA_DICTIONARY.md](DATA_DICTIONARY.md) for complete feature documentation.
 
@@ -168,28 +168,39 @@ The model supports ensemble methods via:
 
 ## Performance
 
-### Test Set Metrics
+### Test Set Metrics (Best Model: LightGBM no_lags)
 
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| **MAE** | 10.65 MW | Mean error of ~11 MW |
-| **RMSE** | 20.25 MW | Root mean squared error |
-| **MAPE** | **0.86%** | Excellent precision (< 1%) |
-| **R²** | **0.9995** | Explains 99.95% of variance |
-| **NRMSE** | ~0.4% | Normalized by mean |
+| **MAE** | 55.27 MW | Mean error of ~55 MW |
+| **RMSE** | 80.15 MW | Root mean squared error |
+| **MAPE** | **4.30%** | Strong for regional hourly forecasting |
+| **R²** | **0.9914** | Explains 99.14% of variance |
+| **NRMSE** | 0.0587 | Normalized by range |
+| **MASE** | 0.0601 | 6% of seasonal naive error |
+
+### Per-Region Metrics (no_lags)
+
+| Region | RMSE (MW) | MAE (MW) | MAPE | R² |
+|--------|-----------|----------|------|-----|
+| Alentejo | 31.73 | 25.03 | 4.29% | 0.9550 |
+| Algarve | 26.44 | 20.99 | 4.34% | 0.9549 |
+| Centro | 62.49 | 49.48 | 4.24% | 0.9564 |
+| Lisboa | 131.95 | 105.11 | 4.32% | 0.9557 |
+| Norte | 95.40 | 75.76 | 4.33% | 0.9549 |
 
 ### Performance Interpretation
 
-**MAPE 0.86%** means:
-- For consumption of 2500 MW, average error of **+/-21.5 MW**
-- For consumption of 1500 MW, average error of **+/-12.9 MW**
+**MAPE 4.30%** means:
+- For consumption of 2500 MW (Lisboa peak), average error of **~108 MW**
+- For consumption of 600 MW (Algarve), average error of **~26 MW**
+- Per-region R² ~0.955 (honest metric, not inflated by inter-region variance)
 
 ### Confidence Intervals
 
-Calibrated 90% confidence intervals:
-- **Coverage (Gaussian Z × RMSE):** 93.1 % — slightly above the nominal 90 %,
-  indicating mildly conservative intervals due to right-skewed residuals.
-- **Width (Gaussian):** ±33 MW average (Lisboa, peak hour).
+Conformal prediction intervals (distribution-free):
+- **Conformal q90:** 133.75 MW — prediction ± 133.75 MW covers 90% of outcomes
+- **Calibrated on validation set** (not test set) for proper coverage guarantees.
 
 #### Empirical CI Coverage
 
@@ -244,41 +255,36 @@ Region scaling (from training residual CV, data-driven when available in metadat
 
 ### Model Stability
 
-**Stability Test (10 seeds):**
-- MAPE: 0.86% +/- 0.03% (low variance)
-- R²: 0.9995 ± 0.00002
-
-**Walk-Forward Validation (5 folds):**
-- MAPE: 0.88% +/- 0.12%
-- Model stable over time
+**5-Fold Time-Series CV (no_lags LightGBM):**
+- Mean RMSE: 81.34 ± 2.25 (low variance)
+- CatBoost (with_lags) CV RMSE: 81.75 ± 2.11
 
 ---
 
-## Model Without Lags (best_model_no_lags.pkl)
+## Model Without Lags — PRIMARY MODEL (best_model_no_lags.pkl)
 
-Alternative model for inference without historical consumption data. Uses only temporal, meteorological, and interaction features.
+**This is the best-performing model** (Pipeline v6). Uses temporal, meteorological, geographic, and interaction features — no historical consumption data required.
 
-### Test Set Metrics (No-Lags Model)
+### Test Set Metrics (No-Lags Model — LightGBM)
 
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| **MAE** | ~57 MW | Mean error ~4x higher than the model with lags |
-| **RMSE** | ~87 MW | See `data/models/metadata/training_metadata_no_lags.json` for exact value |
-| **MAPE** | ~4.5% (3-8% by region) | Test-set average 4.5%; varies by region from 3-8% |
-| **R²** | ~0.991 | Explains ~99% of variance |
-| **Features** | ~35 | Temporal + meteorological + interactions (no lags/rolling) |
+| **MAE** | 55.27 MW | Best across all variants |
+| **RMSE** | 80.15 MW | 32% improvement over best baseline (Seasonal Weekly 117.87) |
+| **MAPE** | **4.30%** | Best across all variants |
+| **R²** | **0.9914** | Best across all variants |
+| **MASE** | 0.0601 | 6% of seasonal naive error |
+| **Features** | 39 | Temporal + meteorological + geographic + interactions |
 
-> **Note:** Exact metrics available in `data/models/metadata/training_metadata_no_lags.json`
-> under the `test_metrics` field. The RMSE from this table is loaded automatically by the API at
-> startup to calibrate confidence intervals -- `rmse_calibrated: true` in `/health` confirms
-> it was read from metadata and not from the fallback value (86.55 MW).
+> **Note:** Exact metrics in `data/models/metadata/training_metadata_no_lags.json`.
+> The RMSE is loaded by the API at startup to calibrate confidence intervals.
 
 ### When to use the no-lags model
 
 | Scenario | Recommended Model |
 |----------|-------------------|
-| Production with historical database | With lags (MAPE 0.86%) |
-| Demo / prototyping | Without lags (MAPE ~4.5%) |
+| Production (any scenario) | **Without lags (MAPE 4.30%)** — recommended |
+| Production with historical database | With lags (MAPE 4.41%) |
 | First startup (no history) | Without lags |
 | Forecast for new installation | Without lags |
 
@@ -290,8 +296,8 @@ Alternative model for inference without historical consumption data. Uses only t
 
 **Model WITH Lags (best_model.pkl):**
 - Requires **48h of consumption history**
-- Without history, use the alternative model (best_model_no_lags.pkl)
-- Performance degrades without lags (MAPE ~4.5% vs 0.86%)
+- Without history, use the no_lags model (best_model_no_lags.pkl) — which is actually the best overall model
+- The no_lags model (MAPE 4.30%) outperforms with_lags (MAPE 4.41%)
 
 ### 2. **Geographic Scope**
 
@@ -399,7 +405,7 @@ Alternative model for inference without historical consumption data. Uses only t
    - Include event data (sporting calendar)
    - Test deep learning (LSTM, Transformers)
 
-2. **Infrastructure (implemented in v5):**
+2. **Infrastructure (implemented in v6):**
    - File-based experiment tracking (see `experiments/`)
    - DVC pipeline for data versioning (`dvc.yaml`)
    - Reproducibility module with global seeds
@@ -445,8 +451,8 @@ Alternative model for inference without historical consumption data. Uses only t
 
 Located in `data/models/checkpoints/`:
 
-- `best_model.pkl` -- Model with lags (MAPE 0.86%)
-- `best_model_no_lags.pkl` -- Model without lags (MAPE ~4.5%)
+- `best_model.pkl` -- Model with lags, CatBoost (MAPE 4.41%)
+- `best_model_no_lags.pkl` -- **Best model**, LightGBM no_lags (MAPE 4.30%)
 - `best_model_advanced.pkl` -- Model with advanced features
 - `best_model_optimized.pkl` -- Optimized model (Optuna tuning)
 - `ensemble_stacking.pkl` - Model ensemble (optional)

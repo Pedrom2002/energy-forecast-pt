@@ -26,17 +26,17 @@ Complete technical documentation for the Energy Forecast PT project.
 ### Project Metrics
 
 ```
-Model Performance (3 variants):
-  - MAPE: 4.33% - 4.49%
-  - R²: 0.9908 - 0.9913
-  - RMSE: 81.00 - 82.93 MW
-  - 90% conformal prediction intervals
+Model Performance (2 variants, pipeline v6):
+  - Best: LightGBM no_lags — MAPE 4.30%, R² 0.9914, RMSE 80.15 MW
+  - With lags: CatBoost — MAPE 4.41%, R² 0.9911, RMSE 81.63 MW
+  - 90% conformal prediction intervals (q90 = 133.75 MW)
+  - 32% RMSE improvement over best baseline
 
 Stack:
-  - ML: CatBoost + XGBoost + LightGBM, Python 3.11+
+  - ML: LightGBM + CatBoost + XGBoost, Python 3.11+
   - API: FastAPI + Uvicorn
   - Frontend: React 19 + TypeScript + Tailwind CSS v4
-  - Features: 71 engineered
+  - Features: 39 selected (no_lags) / 52 (with_lags)
   - Tests: 654 backend + 81 frontend
   - Deployment: Docker, AWS/Azure/GCP ready
 ```
@@ -70,7 +70,7 @@ Stack:
 
 Use the Portuguese docs with translation tools:
 - **PROJECT_OVERVIEW.md** - Full project details
-- **FEATURE_ENGINEERING.md** - All 68+ features explained
+- **FEATURE_ENGINEERING.md** - All 39-52 features explained
 - **MODELS_AND_METHODOLOGY.md** - ML methodology in depth
 - **API_DOCUMENTATION.md** - Complete API reference
 - **NOTEBOOKS_GUIDE.md** - Development notebooks guide
@@ -163,7 +163,7 @@ curl -X POST "http://localhost:8000/predict" \
 ### EXECUTIVE_SUMMARY.md (English) ⭐
 **30 pages** - Complete technical summary covering:
 - Project overview and results
-- Feature engineering (68+ features)
+- Feature engineering (39-52 features)
 - Model comparison and selection
 - API endpoints and usage
 - Deployment options
@@ -188,7 +188,7 @@ curl -X POST "http://localhost:8000/predict" \
 
 ### FEATURE_ENGINEERING.md (Portuguese)
 **~100 pages** - Detailed feature engineering:
-- All 68+ features explained
+- All 39-52 features explained
 - Temporal features (18)
 - Lag features (7)
 - Rolling windows (20)
@@ -243,7 +243,7 @@ curl -X POST "http://localhost:8000/predict" \
 
 - **Project Repository**: [GitHub URL]
 - **Interactive API Docs**: http://localhost:8000/docs
-- **Model Performance**: MAPE 0.86%, R² 0.9995
+- **Model Performance**: MAPE 4.30%, R² 0.9914
 - **Technology**: Python, XGBoost, FastAPI, Docker
 
 ---
@@ -293,7 +293,7 @@ The detailed technical documentation is in Portuguese, but:
 ### v2.0 (March 2026)
 - ✅ ML Pipeline documentation (ML_PIPELINE.md)
 - ✅ Data Dictionary (DATA_DICTIONARY.md)
-- ✅ Updated MODEL_CARD.md (v2.0, Pipeline v5)
+- ✅ Updated MODEL_CARD.md (v2.0, Pipeline v6)
 - ✅ Updated ARCHITECTURE.md with new ML components
 - ✅ DVC pipeline documentation
 
@@ -317,7 +317,7 @@ The detailed technical documentation is in Portuguese, but:
 ## ⭐ Key Highlights
 
 ```
-✅ World-class model performance (MAPE 0.86%)
+✅ Strong model performance (MAPE 4.30%, 32% improvement over best baseline)
 ✅ Production-ready API (FastAPI)
 ✅ Comprehensive documentation (500+ pages)
 ✅ 11 development notebooks

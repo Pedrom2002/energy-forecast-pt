@@ -70,6 +70,14 @@ class PersistenceBaseline:
         """
         return np.concatenate([[y_train[-1]], y_train[-(n_steps - 1) :]]) if n_steps > 1 else np.array([y_train[-1]])
 
+    def predict_evaluation(self, y_train: np.ndarray, y_test: np.ndarray) -> np.ndarray:
+        """One-step-ahead evaluation: predict y[t] = y[t-1] using actuals.
+
+        This is the proper baseline for comparison with ML models that use
+        lag features (which also have access to actual previous values).
+        """
+        return np.concatenate([[y_train[-1]], y_test[:-1]])
+
 
 class SeasonalNaiveBaseline:
     """Seasonal naive: predict the value from the same hour *k* periods ago.
@@ -102,6 +110,13 @@ class SeasonalNaiveBaseline:
         tiled = np.tile(season, repeats)
         return tiled[:n_steps]
 
+    def predict_evaluation(self, y_train: np.ndarray, y_test: np.ndarray) -> np.ndarray:
+        """One-step-ahead evaluation: predict y[t] = y[t-seasonality] using actuals."""
+        full = np.concatenate([y_train, y_test])
+        n_train = len(y_train)
+        indices = np.arange(n_train, n_train + len(y_test)) - self.seasonality
+        return full[indices]
+
 
 class MovingAverageBaseline:
     """Moving average baseline: predict the mean of the last *window* values.
@@ -129,6 +144,15 @@ class MovingAverageBaseline:
             raise RuntimeError("Model not fitted. Call fit() first.")
         ma = float(np.mean(self._history[-self.window :]))
         return np.full(n_steps, ma)
+
+    def predict_evaluation(self, y_train: np.ndarray, y_test: np.ndarray) -> np.ndarray:
+        """One-step-ahead evaluation: predict y[t] = mean(y[t-window:t]) using actuals."""
+        full = np.concatenate([y_train, y_test])
+        n_train = len(y_train)
+        cumsum = np.concatenate([[0], np.cumsum(full)])
+        ends = np.arange(n_train, n_train + len(y_test))
+        starts = np.maximum(ends - self.window, 0)
+        return (cumsum[ends] - cumsum[starts]) / (ends - starts)
 
 
 class WeeklySeasonalBaseline:
@@ -158,6 +182,13 @@ class WeeklySeasonalBaseline:
         repeats = (n_steps // self.period) + 1
         tiled = np.tile(season, repeats)
         return tiled[:n_steps]
+
+    def predict_evaluation(self, y_train: np.ndarray, y_test: np.ndarray) -> np.ndarray:
+        """One-step-ahead evaluation: predict y[t] = y[t-period] using actuals."""
+        full = np.concatenate([y_train, y_test])
+        n_train = len(y_train)
+        indices = np.arange(n_train, n_train + len(y_test)) - self.period
+        return full[indices]
 
 
 # ---------------------------------------------------------------------------
@@ -217,32 +248,30 @@ def _evaluate_baselines_global(
     y_test: np.ndarray,
     seasonality: int,
 ) -> dict[str, dict[str, float]]:
-    """Evaluate baselines on the full series (no region split)."""
-    n = len(y_test)
+    """Evaluate baselines on the full series (no region split).
+
+    Uses one-step-ahead evaluation: each prediction uses actual prior
+    values, matching how ML models use lag features.
+    """
     baselines: dict[str, tuple[str, np.ndarray]] = {}
 
-    persistence = PersistenceBaseline()
-    persistence.fit(y_train)
-    baselines["persistence_lag1"] = ("Persistence (lag-1)", persistence.predict(n))
+    p = PersistenceBaseline()
+    baselines["persistence_lag1"] = ("Persistence (lag-1)", p.predict_evaluation(y_train, y_test))
 
-    seasonal_daily = SeasonalNaiveBaseline(seasonality=seasonality)
-    seasonal_daily.fit(y_train)
+    sd = SeasonalNaiveBaseline(seasonality=seasonality)
     baselines["seasonal_naive_daily"] = (
         f"Seasonal Naive ({seasonality}h)",
-        seasonal_daily.predict(n),
+        sd.predict_evaluation(y_train, y_test),
     )
 
-    weekly = WeeklySeasonalBaseline(period=168)
-    weekly.fit(y_train)
-    baselines["seasonal_naive_weekly"] = ("Seasonal Naive (weekly)", weekly.predict(n))
+    sw = WeeklySeasonalBaseline(period=168)
+    baselines["seasonal_naive_weekly"] = ("Seasonal Naive (weekly)", sw.predict_evaluation(y_train, y_test))
 
     ma24 = MovingAverageBaseline(window=24)
-    ma24.fit(y_train)
-    baselines["moving_average_24h"] = ("Moving Average (24h)", ma24.predict(n))
+    baselines["moving_average_24h"] = ("Moving Average (24h)", ma24.predict_evaluation(y_train, y_test))
 
     ma168 = MovingAverageBaseline(window=168)
-    ma168.fit(y_train)
-    baselines["moving_average_168h"] = ("Moving Average (168h)", ma168.predict(n))
+    baselines["moving_average_168h"] = ("Moving Average (168h)", ma168.predict_evaluation(y_train, y_test))
 
     return _compute_baseline_metrics(baselines, y_test)
 
@@ -295,30 +324,25 @@ def _evaluate_baselines_per_region(
 
         all_actuals.append(y_te)
 
-        # Persistence
+        # Persistence (one-step-ahead: y[t] = y[t-1])
         p = PersistenceBaseline()
-        p.fit(y_tr)
-        all_preds["persistence_lag1"].append(p.predict(n))
+        all_preds["persistence_lag1"].append(p.predict_evaluation(y_tr, y_te))
 
-        # Seasonal naive (daily)
+        # Seasonal naive daily (one-step-ahead: y[t] = y[t-seasonality])
         sd = SeasonalNaiveBaseline(seasonality=seasonality)
-        sd.fit(y_tr)
-        all_preds["seasonal_naive_daily"].append(sd.predict(n))
+        all_preds["seasonal_naive_daily"].append(sd.predict_evaluation(y_tr, y_te))
 
-        # Seasonal naive (weekly)
+        # Seasonal naive weekly (one-step-ahead: y[t] = y[t-168])
         sw = WeeklySeasonalBaseline(period=168)
-        sw.fit(y_tr)
-        all_preds["seasonal_naive_weekly"].append(sw.predict(n))
+        all_preds["seasonal_naive_weekly"].append(sw.predict_evaluation(y_tr, y_te))
 
-        # Moving average 24h
+        # Moving average 24h (one-step-ahead: y[t] = mean(y[t-24:t]))
         m24 = MovingAverageBaseline(window=24)
-        m24.fit(y_tr)
-        all_preds["moving_average_24h"].append(m24.predict(n))
+        all_preds["moving_average_24h"].append(m24.predict_evaluation(y_tr, y_te))
 
-        # Moving average 168h
+        # Moving average 168h (one-step-ahead: y[t] = mean(y[t-168:t]))
         m168 = MovingAverageBaseline(window=168)
-        m168.fit(y_tr)
-        all_preds["moving_average_168h"].append(m168.predict(n))
+        all_preds["moving_average_168h"].append(m168.predict_evaluation(y_tr, y_te))
 
     # Concatenate and compute aggregate metrics
     y_test_concat = np.concatenate(all_actuals)

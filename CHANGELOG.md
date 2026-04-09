@@ -119,7 +119,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - XGBoost ensemble model for hourly energy consumption forecasting across 5 Portuguese regions.
 - FastAPI REST API with endpoints: `/predict`, `/predict/batch`, `/predict/sequential`, `/predict/explain`, `/model/info`, `/health`, `/regions`, `/limitations`.
 - Feature engineering pipeline: temporal, weather, lag, rolling-window, interaction, and advanced derived features (heat index, wind chill, dew point).
-- Three model variants: with lags (MAPE 0.86%), no lags (MAPE ~4.5%), and advanced features.
+- Two model variants: no_lags LightGBM (MAPE 4.30%) and with_lags CatBoost (MAPE 4.41%).
 - Rate limiting middleware with Redis backend and in-memory fallback circuit breaker.
 - Security headers middleware and CORS support.
 - API key authentication via `X-API-Key` header.

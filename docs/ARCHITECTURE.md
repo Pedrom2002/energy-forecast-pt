@@ -23,8 +23,8 @@ graph TB
     subgraph "API Layer"
         G --> H[FastAPI Server<br/>Uvicorn]
         H --> I{Model Selection}
-        I -->|With History| J[Model WITH Lags<br/>MAPE 0.86%]
-        I -->|No History| K[Model WITHOUT Lags<br/>MAPE ~3-8%]
+        I -->|With History| J[Model WITH Lags<br/>CatBoost MAPE 4.41%]
+        I -->|No History| K[Model WITHOUT Lags<br/>LightGBM MAPE 4.30% ✅]
     end
 
     subgraph "Client Layer"
@@ -65,7 +65,7 @@ sequenceDiagram
     FE->>FE: Create lag features (1-48h)
     FE->>FE: Create rolling windows
     FE->>FE: Create interactions
-    FE->>Train: Processed features (68+)
+    FE->>Train: Processed features (39-52)
 
     Train->>Train: TimeSeriesSplit (70/15/15)
     Train->>Train: Train XGBoost/LightGBM/CatBoost
@@ -99,7 +99,7 @@ sequenceDiagram
     FE->>FE: Check for historical data
 
     alt Has 48h history
-        FE->>Model: Features WITH lags (68+)
+        FE->>Model: Features WITH lags (39-52)
         Model->>Model: XGBoost prediction
     else No history
         FE->>Model: Features WITHOUT lags (~35)
@@ -251,7 +251,7 @@ sequenceDiagram
 
 ### Feature Space
 
-**Model WITH Lags (68+ features):**
+**Model WITH Lags (39-52 features):**
 - 6 temporal features
 - 6 meteorological features
 - 7 lag features
@@ -368,7 +368,7 @@ graph LR
 
 ### 5. Reproducibility & Tracking
 
-**New in Pipeline v5:**
+**New in Pipeline v6:**
 
 | Component | File | Purpose |
 |---|---|---|
@@ -393,7 +393,7 @@ graph LR
 
 ## Future Improvements
 
-### Completed in v5
+### Completed in v5/v6
 - [x] Architecture documentation
 - [x] Structured logging
 - [x] File-based experiment tracking

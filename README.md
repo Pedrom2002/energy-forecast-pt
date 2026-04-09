@@ -13,14 +13,13 @@ Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter t
 
 ## Key Results
 
-| Variant | MAE (MW) | RMSE (MW) | MAPE | R² | Features |
-|---------|----------|-----------|------|-----|----------|
-| **with_lags** | 57.53 | 82.80 | 4.49% | 0.9909 | 39 |
-| **no_lags** | 55.74 | 81.00 | 4.33% | 0.9913 | 27 |
-| **advanced** | 57.66 | 82.93 | 4.49% | 0.9908 | 42 |
+| Variant | MAE (MW) | RMSE (MW) | MAPE | R² | Features | Best Model |
+|---------|----------|-----------|------|-----|----------|------------|
+| **no_lags** | **55.27** | **80.15** | **4.30%** | **0.9914** | 39 | LightGBM |
+| **with_lags** | 56.62 | 81.63 | 4.41% | 0.9911 | 52 | CatBoost |
 
-- **90.7% RMSE improvement** over best baseline (Moving Average 168h)
-- **MASE < 0.07** across all variants (vs seasonal naive 24h)
+- **32% RMSE improvement** over best baseline (Seasonal Weekly 117.87)
+- **MASE < 0.07** across all variants (vs seasonal naive)
 - **90% conformal prediction intervals** with distribution-free coverage guarantee
 - **5 regions**: Alentejo, Algarve, Centro, Lisboa, Norte
 - **175,205 samples** across 4 years (2021-2024), hourly granularity
@@ -180,7 +179,7 @@ The API auto-loads models from `data/models/checkpoints/` and selects the best a
 }
 ```
 
-## ML Pipeline (v5)
+## ML Pipeline (v6)
 
 The training pipeline (`scripts/retrain.py`) executes 12 steps per model variant:
 
@@ -213,7 +212,7 @@ energy-forecast-pt/
 │   │   ├── schemas.py                # Pydantic request/response models
 │   │   └── store.py                  # ModelStore, hot-reload, checksums
 │   ├── features/
-│   │   └── feature_engineering.py    # 71 features (temporal, lags, rolling, weather, holidays)
+│   │   └── feature_engineering.py    # Feature engineering (temporal, lags, rolling, weather, holidays)
 │   ├── models/
 │   │   ├── baselines.py             # 5 baseline models (persistence, seasonal, MA)
 │   │   ├── evaluation.py            # Metrics, CV, CoverageTracker
@@ -228,7 +227,7 @@ energy-forecast-pt/
 │       └── reproducibility.py       # Global seeds, environment snapshots, data hashing
 │
 ├── scripts/
-│   ├── retrain.py                   # Production training pipeline (v5)
+│   ├── retrain.py                   # Production training pipeline (v6)
 │   └── generate_notebooks.py        # Generate analysis notebooks
 │
 ├── notebooks/                        # Analysis-only (no model training/saving)
@@ -452,5 +451,5 @@ Expected behaviour — auto-regressive feedback accumulates error. For horizons 
 
 **Author**: Pedro Marques
 **Version**: 2.0.0
-**Pipeline**: v5
+**Pipeline**: v6
 **Last Updated**: March 2026
