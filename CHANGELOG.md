@@ -9,6 +9,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+#### Data Sources
+- **Migrated from synthetic to real data.** The training dataset is now assembled from official public sources instead of the previous synthetic series:
+  - **National hourly consumption** from e-Redes Open Data (`consumo-total-nacional`, 15-min aggregated to hourly), January 2023 – April 2026, including the real historical Iberian blackout of 28 April 2025.
+  - **Regional CP4 dataset** from e-Redes Open Data (`consumos_horario_codigo_postal`, November 2022 – September 2023) used to compute static per-(hour-of-week, region) shares for disaggregating the national series into 5 NUTS-II regions (Norte, Centro, Lisboa, Alentejo, Algarve).
+  - **Weather** from Open-Meteo Historical API (`archive-api.open-meteo.com/v1/archive`) pulled per region centroid: temperature, humidity, dew point, pressure, cloud cover, wind, precipitation, solar radiation.
+- Final processed dataset: 142,860 rows (5 regions × 28,572 hourly timestamps), period 2023-01-01 to 2026-04-06, coverage 99.88%.
+- **Caveat**: the national series is fully dynamic and real, but regional disaggregation uses static shares (computed from 11 months of real CP4 data) — they capture hour-of-week regional structure but not inter-annual variation in regional proportions.
+- Documentation updated across README, MODEL_CARD, DATA_DICTIONARY, EXECUTIVE_SUMMARY, and ML_PIPELINE to reflect the new provenance. Model metrics will be refreshed separately after the real-data retraining completes.
+
 ### Added
 
 #### Frontend

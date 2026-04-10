@@ -19,7 +19,8 @@ Test Set Metrics:
   - MASE: 0.0601       6% of seasonal naive error
 
 Features: 39 selected features (from 50 candidates)
-Training Data: 175,205 samples across 5 regions (2021-2024)
+Training Data: 142,860 samples of REAL hourly data across 5 regions (2023-01 to 2026-04)
+Data Sources: e-Redes Open Data (national + regional consumption) + Open-Meteo (weather)
 Data Split: 70% train / 15% validation / 15% test (temporal split)
 ```
 
