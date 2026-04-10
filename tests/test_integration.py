@@ -92,7 +92,7 @@ class TestFeatureToModelPipeline:
         X_train, X_val = X[:split], X[split:]
         y_train, y_val = y[:split], y[split:]
 
-        model = create_model("random_forest", {"n_estimators": 20, "max_depth": 10})
+        model = create_model("xgboost", {"n_estimators": 20, "max_depth": 10})
         fit_model(model, X_train, y_train)
         y_pred = model.predict(X_val)
 
@@ -116,7 +116,7 @@ class TestFeatureToModelPipeline:
         y = df["consumption_mw"].values
 
         split = int(len(X) * 0.8)
-        model = create_model("random_forest", {"n_estimators": 20, "max_depth": 10})
+        model = create_model("xgboost", {"n_estimators": 20, "max_depth": 10})
         fit_model(model, X[:split], y[:split])
         y_pred = model.predict(X[split:])
 
@@ -153,12 +153,12 @@ class TestFeatureToModelPipeline:
             y[:split],
             X[split:],
             y[split:],
-            model_keys=["random_forest"],
-            params_override={"random_forest": {"n_estimators": 10}},
+            model_keys=["xgboost"],
+            params_override={"xgboost": {"n_estimators": 10}},
         )
 
-        assert best_key == "random_forest"
-        assert results["random_forest"]["rmse"] > 0
+        assert best_key == "xgboost"
+        assert results["xgboost"]["rmse"] > 0
 
     def test_evaluator_with_pipeline_output(self, multi_region_data):
         """ModelEvaluator works with real pipeline predictions."""

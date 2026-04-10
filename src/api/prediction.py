@@ -552,7 +552,7 @@ def _explain_prediction(
 
     Attempts per-prediction SHAP values when the ``shap`` package is
     installed; falls back to the model's global ``feature_importances_``
-    attribute (available for XGBoost, LightGBM, CatBoost, and Random Forest).
+    attribute (available for XGBoost, LightGBM, and CatBoost).
     If neither source is available, returns uniform importances.
 
     SHAP failures are logged at WARNING level (not silently swallowed) so that

@@ -93,21 +93,12 @@ DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
         "random_seed": 42,
         "verbose": 0,
     },
-    "random_forest": {
-        "n_estimators": 300,
-        "max_depth": 30,
-        "min_samples_split": 5,
-        "min_samples_leaf": 2,
-        "n_jobs": 2,
-        "random_state": 42,
-    },
 }
 
 DISPLAY_NAMES: dict[str, str] = {
     "xgboost": "XGBoost",
     "lightgbm": "LightGBM",
     "catboost": "CatBoost",
-    "random_forest": "Random Forest",
 }
 
 
@@ -120,8 +111,7 @@ def create_model(model_key: str, params: dict[str, Any] | None = None) -> Any:
     """Create a model instance by key.
 
     Args:
-        model_key: One of ``'xgboost'``, ``'lightgbm'``, ``'catboost'``,
-            ``'random_forest'``.
+        model_key: One of ``'xgboost'``, ``'lightgbm'``, ``'catboost'``.
         params: Override default hyperparameters.  If ``None``, uses
             :data:`DEFAULT_PARAMS`.
 
@@ -333,14 +323,6 @@ def get_search_space(trial: Any, model_key: str) -> dict[str, Any]:
             "random_strength": trial.suggest_float("random_strength", 0, 2.0),
             "border_count": trial.suggest_int("border_count", 32, 255),
         }
-    elif model_key == "random_forest":
-        return {
-            "n_estimators": trial.suggest_int("n_estimators", 100, 800, step=50),
-            "max_depth": trial.suggest_int("max_depth", 8, 50),
-            "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
-            "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 10),
-            "max_features": trial.suggest_float("max_features", 0.3, 1.0),
-        }
     else:
         raise ValueError(f"No search space defined for: {model_key}")
 
@@ -378,6 +360,4 @@ def _infer_model_key(model: Any) -> str:
         return "lightgbm"
     elif "catboost" in name:
         return "catboost"
-    elif "forest" in name:
-        return "random_forest"
     return "unknown"

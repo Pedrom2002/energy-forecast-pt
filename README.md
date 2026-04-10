@@ -48,24 +48,40 @@ cp .env.example .env
 
 ### 2. Train Models
 
+**End-to-end refresh + retrain (recommended)** — downloads fresh data from
+e-Redes + Open-Meteo, rebuilds the dataset, validates, and retrains:
+
+```bash
+./scripts/refresh_and_retrain.sh                  # full pipeline
+./scripts/refresh_and_retrain.sh --skip-download  # use existing raw data
+./scripts/refresh_and_retrain.sh --multistep      # also train 1h/6h/12h/24h horizons
+```
+
+Manual steps if you only want to retrain on existing data:
+
 ```bash
 # Full pipeline (baselines, 5-fold CV, feature selection, conformal calibration)
 python scripts/retrain.py
 
-# Fast iteration (skip Optuna tuning)
-python scripts/retrain.py --skip-optuna
-
-# Skip advanced variant
+# Fast iteration (skip Optuna tuning, recommended for development)
 python scripts/retrain.py --skip-optuna --skip-advanced
 
 # Also train horizon-specific models (1h, 6h, 12h, 24h)
 python scripts/retrain.py --skip-optuna --multistep
 ```
 
+The data ingestion pipeline lives in `scripts/data_pipeline/` — see its
+[README](scripts/data_pipeline/README.md) for details on the v7 honest
+regional approach.
+
+A monthly automated retrain is configured via
+[`.github/workflows/retrain-monthly.yml`](.github/workflows/retrain-monthly.yml)
+which runs on the 1st of each month and opens a PR with the refreshed model
+if metrics did not regress.
+
 This produces:
-- `data/models/checkpoints/best_model.pkl` (with lags)
-- `data/models/checkpoints/best_model_no_lags.pkl` (no lags)
-- `data/models/checkpoints/best_model_advanced.pkl` (advanced features)
+- `data/models/checkpoints/best_model.pkl` (with lags, primary)
+- `data/models/checkpoints/best_model_no_lags.pkl` (no lags, fallback)
 - Metadata, feature names, and experiment logs in `data/models/` and `experiments/`
 
 ### 3. Run Analysis Notebooks (optional)
