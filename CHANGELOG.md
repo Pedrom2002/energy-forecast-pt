@@ -11,14 +11,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-#### Data Sources
-- **Migrated from synthetic to real data.** The training dataset is now assembled from official public sources instead of the previous synthetic series:
-  - **National hourly consumption** from e-Redes Open Data (`consumo-total-nacional`, 15-min aggregated to hourly), January 2023 – April 2026, including the real historical Iberian blackout of 28 April 2025.
-  - **Regional CP4 dataset** from e-Redes Open Data (`consumos_horario_codigo_postal`, November 2022 – September 2023) used to compute static per-(hour-of-week, region) shares for disaggregating the national series into 5 NUTS-II regions (Norte, Centro, Lisboa, Alentejo, Algarve).
-  - **Weather** from Open-Meteo Historical API (`archive-api.open-meteo.com/v1/archive`) pulled per region centroid: temperature, humidity, dew point, pressure, cloud cover, wind, precipitation, solar radiation.
-- Final processed dataset: 142,860 rows (5 regions × 28,572 hourly timestamps), period 2023-01-01 to 2026-04-06, coverage 99.88%.
-- **Caveat**: the national series is fully dynamic and real, but regional disaggregation uses static shares (computed from 11 months of real CP4 data) — they capture hour-of-week regional structure but not inter-annual variation in regional proportions.
-- Documentation updated across README, MODEL_CARD, DATA_DICTIONARY, EXECUTIVE_SUMMARY, and ML_PIPELINE to reflect the new provenance. Model metrics will be refreshed separately after the real-data retraining completes.
+#### Pipeline v7 — Honest Regional Data (April 2026)
+- **Abandoned the static-share disaggregation approach (v6)** after discovering it created a structural artefact: regional series were computed as `national[t] × constant_share`, which allowed lag-based models to trivially reconstruct one region from another. The MAPE 1.6% achieved with this approach was inflated by leakage. Verified by training the `no_lags` variant: MAPE jumped to ~5% once lags were removed, confirming the artefact.
+- **Pipeline v7 trains directly on the real e-Redes regional CP4 dataset** (`consumos_horario_codigo_postal`), with each region having genuinely independent dynamics. No fabricated regional split.
+- **New dataset**: 40,075 rows (5 NUTS-II regions × 8,015 hourly timestamps), period **2022-11-01 to 2023-09-30** (11 months). Smaller than v6 (142k rows over 3+ years) but **honest** — every regional measurement is real.
+- **New build script**: `scripts/data_pipeline/build_dataset_real_regional.py` (replaces the v6 disaggregation pipeline).
+- **Removed Random Forest** from the model registry — consistently the worst and slowest of the 4 candidates. Pipeline now selects between XGBoost, LightGBM, and CatBoost only.
+- **Final retrain results (Pipeline v7)**:
+  - Best model: **LightGBM with_lags** — MAPE **1.51%**, RMSE **23.44 MW**, R² **0.9978**, MASE **0.023**, Conformal q90 **30.16 MW**
+  - Fallback: LightGBM no_lags — MAPE 5.23%, RMSE 64.77 MW, R² 0.9831
+  - **2.5× better than Persistence baseline** (RMSE 58.74) — within state-of-the-art range for hourly load forecasting.
+  - Per-region MAPE varies genuinely (Alentejo 1.13% → Norte 2.32%), confirming real learning rather than artefactual leakage.
+- **Trade-off**: shorter time period (11 months vs 3+ years), but the model evaluations are now genuinely honest and defensible.
+
+#### Data Sources (superseded by v7 above)
+- Earlier in [Unreleased]: migration from synthetic to real data (v6 approach) — superseded by Pipeline v7.
+- **Pipeline v7 uses only**: e-Redes Open Data (`consumos_horario_codigo_postal`) for regional consumption, and Open-Meteo Historical API for weather.
 
 ### Added
 

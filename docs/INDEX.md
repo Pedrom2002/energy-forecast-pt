@@ -26,17 +26,18 @@ Complete technical documentation for the Energy Forecast PT project.
 ### Project Metrics
 
 ```
-Model Performance (2 variants, pipeline v6):
-  - Best: LightGBM no_lags — MAPE 4.30%, R² 0.9914, RMSE 80.15 MW
-  - With lags: CatBoost — MAPE 4.41%, R² 0.9911, RMSE 81.63 MW
-  - 90% conformal prediction intervals (q90 = 133.75 MW)
-  - 32% RMSE improvement over best baseline
+Model Performance (2 variants, pipeline v7 — honest regional data):
+  - Best: LightGBM with_lags — MAPE 1.51%, R² 0.9978, RMSE 23.44 MW
+  - Fallback: LightGBM no_lags — MAPE 5.23%, R² 0.9831, RMSE 64.77 MW
+  - 90% conformal prediction intervals (q90 = 30.16 MW with_lags, 101.63 no_lags)
+  - 60% RMSE improvement over best baseline (Persistence 58.74 MW) — 2.5x better
 
 Stack:
   - ML: LightGBM + CatBoost + XGBoost, Python 3.11+
   - API: FastAPI + Uvicorn
   - Frontend: React 19 + TypeScript + Tailwind CSS v4
-  - Features: 39 selected (no_lags) / 52 (with_lags)
+  - Features: 52 selected (with_lags) / 45 (no_lags)
+  - Data: 40,075 rows, real regional CP4 (2022-11 to 2023-09, 11 months)
   - Tests: 654 backend + 81 frontend
   - Deployment: Docker, AWS/Azure/GCP ready
 ```
@@ -243,7 +244,7 @@ curl -X POST "http://localhost:8000/predict" \
 
 - **Project Repository**: [GitHub URL]
 - **Interactive API Docs**: http://localhost:8000/docs
-- **Model Performance**: MAPE 4.30%, R² 0.9914
+- **Model Performance**: MAPE 1.51%, R² 0.9978 (Pipeline v7)
 - **Technology**: Python, XGBoost, FastAPI, Docker
 
 ---
@@ -290,6 +291,12 @@ The detailed technical documentation is in Portuguese, but:
 
 ## 📝 Changelog
 
+### v2.1 (April 2026)
+- ✅ Pipeline v7 — honest regional data (e-Redes CP4 direct, no disaggregation)
+- ✅ Dropped static-share disaggregation artefact (see CHANGELOG)
+- ✅ Updated all metrics: MAPE 1.51% (with_lags), 5.23% (no_lags)
+- ✅ Updated MODEL_CARD.md (v3.1, Pipeline v7) with per-region metrics
+
 ### v2.0 (March 2026)
 - ✅ ML Pipeline documentation (ML_PIPELINE.md)
 - ✅ Data Dictionary (DATA_DICTIONARY.md)
@@ -306,8 +313,8 @@ The detailed technical documentation is in Portuguese, but:
 
 ---
 
-**Last Updated**: March 2026
-**Version**: 2.0
+**Last Updated**: April 2026
+**Version**: 2.1
 **Author**: Pedro Marques
 **Project**: Energy Forecast PT
 **Language**: 🇬🇧 English (this index) | 🇵🇹 Portuguese (technical docs)
@@ -317,13 +324,13 @@ The detailed technical documentation is in Portuguese, but:
 ## ⭐ Key Highlights
 
 ```
-✅ Strong model performance (MAPE 4.30%, 32% improvement over best baseline)
+✅ Strong model performance (MAPE 1.51%, 60% RMSE improvement over best baseline)
 ✅ Production-ready API (FastAPI)
-✅ Comprehensive documentation (500+ pages)
-✅ 11 development notebooks
+✅ Comprehensive documentation
+✅ 5 development notebooks (01-05)
 ✅ Docker & CI/CD ready
 ✅ Multi-cloud deployment (AWS/Azure/GCP)
-✅ 68+ engineered features
+✅ 52 engineered features (with_lags) / 45 (no_lags)
 ✅ Complete testing suite
 ```
 

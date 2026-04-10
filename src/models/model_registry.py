@@ -60,7 +60,6 @@ _CONSTRUCTORS: dict[str, tuple[str, str]] = {
     "xgboost": ("xgboost", "XGBRegressor"),
     "lightgbm": ("lightgbm", "LGBMRegressor"),
     "catboost": ("catboost", "CatBoostRegressor"),
-    "random_forest": ("sklearn.ensemble", "RandomForestRegressor"),
 }
 
 DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
