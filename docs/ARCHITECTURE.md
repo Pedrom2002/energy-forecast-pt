@@ -23,8 +23,8 @@ graph TB
     subgraph "API Layer"
         G --> H[FastAPI Server<br/>Uvicorn]
         H --> I{Model Selection}
-        I -->|With History| J[Model WITH Lags<br/>CatBoost MAPE 4.41%]
-        I -->|No History| K[Model WITHOUT Lags<br/>LightGBM MAPE 4.30% ✅]
+        I -->|With History 48h+| J[Model WITH Lags<br/>LightGBM MAPE 1.51% ✅]
+        I -->|No History| K[Model WITHOUT Lags<br/>LightGBM MAPE 5.23%]
     end
 
     subgraph "Client Layer"
@@ -65,7 +65,7 @@ sequenceDiagram
     FE->>FE: Create lag features (1-48h)
     FE->>FE: Create rolling windows
     FE->>FE: Create interactions
-    FE->>Train: Processed features (39-52)
+    FE->>Train: Processed features (45-52)
 
     Train->>Train: TimeSeriesSplit (70/15/15)
     Train->>Train: Train XGBoost/LightGBM/CatBoost
@@ -99,11 +99,11 @@ sequenceDiagram
     FE->>FE: Check for historical data
 
     alt Has 48h history
-        FE->>Model: Features WITH lags (39-52)
-        Model->>Model: XGBoost prediction
+        FE->>Model: Features WITH lags (52)
+        Model->>Model: LightGBM prediction (MAPE 1.51%)
     else No history
-        FE->>Model: Features WITHOUT lags (~35)
-        Model->>Model: Fallback model prediction
+        FE->>Model: Features WITHOUT lags (45)
+        Model->>Model: Fallback model prediction (MAPE 5.23%)
     end
 
     Model->>Response: Prediction + confidence interval
@@ -251,19 +251,19 @@ sequenceDiagram
 
 ### Feature Space
 
-**Model WITH Lags (39-52 features):**
-- 6 temporal features
+**Model WITH Lags (52 features, primary):**
+- Temporal features (raw + cyclical)
 - 6 meteorological features
-- 7 lag features
-- 10 rolling window features
-- 15+ interaction features
-- 24+ derived features
+- 7 lag features (1, 2, 3, 6, 12, 24, 48h)
+- 20 rolling window features
+- Holiday features (PT holidays)
+- Interaction features
 
-**Model WITHOUT Lags (~35 features):**
-- 6 temporal features
-- 6 meteorological features
-- 15+ interaction features
-- 8+ derived features
+**Model WITHOUT Lags (45 features, fallback):**
+- Temporal features (raw + cyclical)
+- Meteorological features (+ derived)
+- Holiday features
+- Interaction features (no autoregressive inputs)
 
 ## 🚀 Deployment Architecture
 
@@ -368,7 +368,7 @@ graph LR
 
 ### 5. Reproducibility & Tracking
 
-**New in Pipeline v6:**
+**Established in Pipeline v6, retained in v7:**
 
 | Component | File | Purpose |
 |---|---|---|
@@ -392,6 +392,11 @@ graph LR
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
 ## Future Improvements
+
+### Completed in v7
+- [x] Migration to honest regional dataset (e-Redes CP4 direct)
+- [x] Removal of static-share disaggregation artefact
+- [x] Retraining with real regional dynamics (MAPE 1.51% with_lags, 5.23% no_lags)
 
 ### Completed in v5/v6
 - [x] Architecture documentation
@@ -420,5 +425,5 @@ graph LR
 
 ---
 
-**Last Updated**: March 2026
-**Version**: 2.0
+**Last Updated**: April 2026
+**Version**: 2.1 (Pipeline v7)

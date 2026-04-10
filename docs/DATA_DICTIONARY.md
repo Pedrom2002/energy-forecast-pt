@@ -10,8 +10,8 @@ This document describes all data sources, schemas, and transformations used in t
 
 | Column | Type | Unit | Range | Description |
 |---|---|---|---|---|
-| `timestamp` | datetime64 | - | 2023-01-01 to 2026-04-06 | Observation timestamp (hourly, UTC) |
-| `region` | string | - | {Alentejo, Algarve, Centro, Lisboa, Norte} | Portuguese grid region |
+| `timestamp` | datetime64 | - | 2022-11-01 to 2023-09-30 | Observation timestamp (hourly, UTC) |
+| `region` | string | - | {Alentejo, Algarve, Centro, Lisboa, Norte} | Portuguese NUTS-II region |
 | `consumption_mw` | float64 | MW | > 0 | Hourly energy consumption (target variable) |
 | `temperature` | float64 | °C | [-50, 60] | Air temperature at 2m height |
 | `humidity` | float64 | % | [0, 100] | Relative humidity |
@@ -24,42 +24,48 @@ This document describes all data sources, schemas, and transformations used in t
 
 | Property | Value |
 |---|---|
-| **Total rows** | 142,860 |
-| **Date range** | 2023-01-01 to 2026-04-06 (3+ years) |
+| **Total rows (raw)** | 40,075 |
+| **Total rows (after feature engineering)** | 39,835 |
+| **Date range** | 2022-11-01 to 2023-09-30 (11 months) |
 | **Granularity** | Hourly |
 | **Regions** | 5 (Alentejo, Algarve, Centro, Lisboa, Norte) |
-| **Rows per region** | 28,572 |
-| **Coverage** | 99.88% (near-complete hourly series) |
-| **Notable events** | Includes real historical Iberian blackout of 28 April 2025 |
+| **Rows per region** | 8,015 |
+| **Coverage** | Near-complete hourly series |
+| **Source** | Real regional CP4 dataset (no disaggregation) |
 
 ### Data Provenance
 
-The dataset is assembled from **real, official public sources** — no synthetic generation:
+The dataset is assembled from **real, official public sources** — no synthetic
+generation and **no disaggregation**:
 
-1. **e-Redes Open Data** (https://e-redes.opendatasoft.com/) — two datasets:
-   - `consumo-total-nacional` — national hourly consumption (15-min aggregated to hourly),
-     January 2023 through April 2026. Near real-time, fully dynamic.
-   - `consumos_horario_codigo_postal` — hourly consumption by 4-digit postal code,
-     November 2022 – September 2023 (11 months). Used to compute static regional shares.
+1. **e-Redes Open Data** (https://e-redes.opendatasoft.com/) —
+   - `consumos_horario_codigo_postal` — hourly consumption by 4-digit postal
+     code, November 2022 – September 2023 (11 months). CP4 values are mapped
+     to 5 NUTS-II regions and **summed** per region per hour to produce
+     genuinely regional time series. Each region therefore has independent
+     dynamics.
 2. **Open-Meteo Historical API** (https://archive-api.open-meteo.com/v1/archive) —
    hourly weather per region centroid (temperature, humidity, dew point, pressure,
    cloud cover, wind, precipitation, solar radiation).
 
-**Pipeline**: national hourly consumption → disaggregated into 5 NUTS-II regions
-by applying static shares per `(hour-of-week, region)` computed from the 11-month
-CP4 dataset (CP4 → NUTS-II mapping) → joined with Open-Meteo weather per region.
+**Pipeline (v7)**: CP4 dataset → CP4 → NUTS-II mapping → hourly sum per region
+→ joined with Open-Meteo weather per region centroid → feature engineering →
+temporal 70/15/15 split.
 
-**Caveat — static regional shares**: the regional disaggregation captures the
-hour-of-week regional structure but does not reflect inter-annual variation in
-regional proportions. The underlying national series is fully dynamic and real.
+**Why not disaggregated national data?** Pipeline v6 used the national
+consumption series (`consumo-total-nacional`) disaggregated into 5 regions via
+static shares. That approach introduced a structural artefact where
+`regional[t] ≈ national[t] × constant_share`, allowing the model to trivially
+exploit lag features. Pipeline v7 uses the raw regional CP4 measurements
+directly — the dataset is shorter (11 months) but honest.
 
 ### Temporal Split (no shuffling)
 
-| Split | Fraction | Period |
-|---|---|---|
-| **Train** | 70% | 2023-01 to 2025-04 (approx.) |
-| **Validation** | 15% | 2025-04 to 2025-10 (approx.) |
-| **Test** | 15% | 2025-10 to 2026-04 (approx.) |
+| Split | Fraction | Rows | Period |
+|---|---|---|---|
+| **Train** | 70% | ~28,000 | 2022-11-01 to 2023-06-22 |
+| **Validation** | 15% | ~6,000 | 2023-06-22 to 2023-08-11 |
+| **Test** | 15% | ~6,000 | 2023-08-11 to 2023-09-30 |
 
 ## Regions
 
@@ -89,10 +95,10 @@ Derived from coefficient of variation of training residuals:
 
 ### Feature Count by Variant
 
-| Variant | Total Features | Lag Features | Rolling Features |
+| Variant | Total Features (selected) | Lag Features | Rolling Features |
 |---|---|---|---|
-| **with_lags** | 71 | 7 | 20 |
-| **no_lags** | 54 | 0 | 0 |
+| **with_lags** (primary) | 52 | 7 | 20 |
+| **no_lags** (fallback) | 45 | 0 | 0 |
 | **advanced** | 50-90 | 7 | 20+ |
 
 ### Weather Validation Bounds
@@ -132,8 +138,8 @@ data/models/
 │   ├── ensemble_stacking.pkl       # stacking meta-learner
 │   └── best_model_horizon_{1,6,12,24}h.pkl
 ├── features/
-│   ├── feature_names.txt           # 52 features (with_lags)
-│   ├── feature_names_no_lags.txt   # 39 features (best model)
+│   ├── feature_names.txt           # 52 features (with_lags, best model)
+│   ├── feature_names_no_lags.txt   # 45 features (no_lags fallback)
 │   └── advanced_feature_names.txt  # advanced set
 ├── metadata/
 │   ├── training_metadata.json      # with_lags metrics + config
@@ -152,24 +158,24 @@ data/models/
 {
   "best_model": "LightGBM",
   "best_model_key": "lightgbm",
-  "model_file": "best_model_no_lags.pkl",
-  "n_features": 39,
-  "training_date": "2026-04-09 17:43:34 UTC",
-  "pipeline_version": "v6",
+  "model_file": "best_model.pkl",
+  "n_features": 52,
+  "training_date": "2026-04-10 14:34:54 UTC",
+  "pipeline_version": "v7",
   "random_seed": 42,
-  "data_hash": "sha256:abc123...",
-  "n_train": 122643,
-  "n_val": 26281,
-  "n_test": 26281,
+  "data_hash": "sha256:7133fbc1...",
+  "n_train": 27884,
+  "n_val": 5975,
+  "n_test": 5976,
   "test_metrics": {
-    "mae": 57.30,
-    "rmse": 82.27,
-    "mape": 4.48,
-    "r2": 0.991,
-    "nrmse": 0.065,
-    "mase": 0.42
+    "mae": 13.78,
+    "rmse": 23.44,
+    "mape": 1.51,
+    "r2": 0.9978,
+    "nrmse": 0.0263,
+    "mase": 0.023
   },
-  "conformal_q90": 116.0,
+  "conformal_q90": 30.16,
   "cv_scores": {
     "catboost": [80.1, 82.3, 83.5, 81.2, 84.1],
     "xgboost": [81.5, 83.0, 84.2, 82.8, 85.3]

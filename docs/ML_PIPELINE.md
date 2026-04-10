@@ -8,7 +8,7 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        ML PIPELINE (v6)                             │
+│                        ML PIPELINE (v7)                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  1. REPRODUCIBILITY SETUP                                           │
@@ -17,12 +17,12 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 │     └── Data hashing → SHA-256 of input DataFrame                   │
 │                                                                     │
 │  2. DATA LOADING & VALIDATION                                       │
-│     └── Parquet → pandas DataFrame (142,860 rows, real data)        │
-│        (e-Redes consumption + Open-Meteo weather, 2023-01→2026-04)  │
+│     └── Parquet → pandas DataFrame (40,075 rows, real regional data)│
+│        (e-Redes CP4 consumption + Open-Meteo, 2022-11→2023-09)      │
 │     └── Weather column validation (hard + soft bounds)               │
 │     └── Data hash verification for reproducibility                   │
 │                                                                     │
-│  3. FEATURE ENGINEERING (39-52 features after selection)              │
+│  3. FEATURE ENGINEERING (45-52 features after selection)              │
 │     ├── Temporal (13): hour, dow, month + cyclical sin/cos           │
 │     ├── Lag (7): consumption at t-{1,2,3,6,12,24,48}h               │
 │     ├── Rolling (20): mean/std/min/max over {3,6,12,24,48}h         │

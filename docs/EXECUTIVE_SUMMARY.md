@@ -10,21 +10,29 @@
 
 ### Model Performance
 ```
-Best Model: LightGBM (no_lags variant)
+Best Model: LightGBM (with_lags variant) — Pipeline v7 (honest)
 Test Set Metrics:
-  - MAPE: 4.30%        Strong for regional hourly forecasting
-  - R²: 0.9914         Explains 99.14% of variance
-  - MAE: 55.27 MW      Average error ±55.27 MW
-  - RMSE: 80.15 MW     Root mean squared error
-  - MASE: 0.0601       6% of seasonal naive error
+  - MAPE: 1.51%        Excellent for regional hourly forecasting
+  - R²: 0.9978         Explains 99.78% of variance
+  - MAE: 13.78 MW      Average error ±13.78 MW
+  - RMSE: 23.44 MW     Root mean squared error
+  - MASE: 0.023        ~2% of seasonal naive error
+  - Conformal q90: 30.16 MW (distribution-free ≥90% coverage)
 
-Features: 39 selected features (from 50 candidates)
-Training Data: 142,860 samples of REAL hourly data across 5 regions (2023-01 to 2026-04)
-Data Sources: e-Redes Open Data (national + regional consumption) + Open-Meteo (weather)
-Data Split: 70% train / 15% validation / 15% test (temporal split)
+Features: 52 selected features (with_lags, recommended) / 45 (no_lags fallback)
+Training Data: 40,075 samples (39,835 after FE) of REAL regional hourly
+  data across 5 NUTS-II regions (2022-11-01 to 2023-09-30, 11 months)
+Data Sources: e-Redes CP4 Open Data (consumos_horario_codigo_postal) +
+  Open-Meteo Historical API
+Data Split: 70% train / 15% validation / 15% test (temporal split, no shuffle)
+Baseline Improvement: 60% RMSE reduction vs Persistence (23.44 vs 58.74) — 2.5x better
 ```
 
-**Interpretation**: For average consumption of ~1327 MW, the model has an average error of ±55.27 MW (4.30% MAPE). This is competitive for regional hourly energy forecasting (sub-5% MAPE at regional level is considered strong).
+**Interpretation**: Pipeline v7 uses raw regional CP4 measurements — each of
+the 5 regions has independent dynamics, so the lag features capture genuine
+autoregressive signal rather than exploiting a disaggregation artefact. On the
+honest test set, the with_lags model reaches MAPE 1.51% and is 2.5× better
+than the strongest baseline (persistence).
 
 ### API Performance
 ```
@@ -54,7 +62,7 @@ Endpoints: 7 (health, predict, batch, info, etc.)
 ```
 Raw Data (Weather + Consumption)
     ↓
-Feature Engineering (39 features)
+Feature Engineering (52 features)
     ↓
 Model Training (XGBoost + Optuna optimization)
     ↓
@@ -134,21 +142,21 @@ Cloud Deployment (AWS/Azure/GCP)
 
 ### Model Selection
 
-**Comparison (no_lags variant, 5-fold CV)**:
+**Comparison (with_lags variant, 5-fold CV on real regional data)**:
 ```
 Model          | Mean CV RMSE | Test MAPE | Test R²
 ---------------|-------------|-----------|--------
-LightGBM       | 81.34       | 4.30%     | 0.9914  ✅
-CatBoost       | 84.00       | —         | —
-XGBoost        | 85.44       | —         | —
-Random Forest  | 89.47       | —         | —
+LightGBM       | 30.24       | 1.51%     | 0.9978  ✅
+XGBoost        | 30.62       | —         | —
+CatBoost       | 39.18       | —         | —
 ```
 
-**Why LightGBM (no_lags)?**
-- ✅ Best performance across all metrics (MAPE 4.30%, RMSE 80.15)
-- ✅ No dependency on recent consumption data — works for any forecast horizon
+**Why LightGBM (with_lags)?**
+- ✅ Best performance across all metrics (MAPE 1.51%, RMSE 23.44)
+- ✅ Lag features provide genuine autoregressive signal on honest regional data
 - ✅ Fastest training and inference
-- ✅ Most interpretable features (weather, temporal, geographic)
+- ✅ Distributed feature importance (top-1 only 6.5%, top-10 cumulative 44.8%)
+  confirms no leakage exploitation
 - ✅ Compact model size
 
 ### Optimization with Optuna
@@ -186,16 +194,16 @@ Improvement:
 
 2. **Time Series Cross-Validation**
    - 5 folds
-   - LightGBM (no_lags) mean CV RMSE: 81.34 ± 2.25 (stable)
+   - LightGBM (with_lags) per-fold RMSE: [38.59, 27.73, 38.24, 24.63, 22.03]
 
 3. **Per-Region Evaluation**
-   - All 5 regions evaluated independently
-   - MAPE range: 4.24% (Centro) to 4.34% (Algarve)
-   - R² range: 0.9549 (Algarve) to 0.9564 (Centro)
+   - All 5 regions evaluated independently on real regional CP4 data
+   - MAPE range: 1.13% (Alentejo/Centro) to 2.32% (Norte)
+   - R² range: 0.9757 (Alentejo) to 0.9912 (Algarve)
 
 4. **Baseline Comparison (one-step-ahead)**
-   - Model RMSE 80.15 vs Seasonal Weekly 117.87 (32% improvement)
-   - MASE 0.0601 (model error is 6% of seasonal naive error)
+   - Model RMSE 23.44 vs Persistence 58.74 (60% improvement, 2.5× better)
+   - MASE 0.023 (model error is ~2% of seasonal naive error)
 
 ---
 
@@ -355,9 +363,9 @@ curl http://localhost:8000/health
 
 ### Benefits
 
-✅ **High Accuracy**: MAPE 4.30% (strong for regional hourly forecasting)
+✅ **High Accuracy**: MAPE 1.51% (with_lags) on honest regional CP4 data
 ✅ **Fast**: < 50ms predictions (real-time)
-✅ **Reliable**: 93.1% confidence interval coverage
+✅ **Reliable**: ≥ 90% conformal coverage guarantee (q90 = 30.16 MW)
 ✅ **Scalable**: 200+ req/s, cloud-ready
 ✅ **Complete**: Full ML pipeline with documentation
 
@@ -516,7 +524,7 @@ This project demonstrates expertise in:
 
 ### Machine Learning
 ✅ End-to-end ML pipeline
-✅ Feature engineering (39 features)
+✅ Feature engineering (52 features)
 ✅ Model selection and comparison
 ✅ Hyperparameter optimization (Bayesian)
 ✅ Time series forecasting
@@ -565,7 +573,7 @@ This project demonstrates expertise in:
 ## ⭐ Quick Stats
 
 ```
-📊 Model Performance:      MAPE 4.30%, R² 0.9914
+📊 Model Performance:      MAPE 1.51%, R² 0.9978 (with_lags, v7 honest)
 ⚡ API Latency:            < 50ms (p99)
 🚀 Throughput:             200+ req/s
 💾 Model Size:             65MB

@@ -15,14 +15,14 @@ Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter t
 
 | Variant | MAE (MW) | RMSE (MW) | MAPE | R² | Features | Best Model |
 |---------|----------|-----------|------|-----|----------|------------|
-| **no_lags** | **55.27** | **80.15** | **4.30%** | **0.9914** | 39 | LightGBM |
-| **with_lags** | 56.62 | 81.63 | 4.41% | 0.9911 | 52 | CatBoost |
+| **with_lags** | **13.78** | **23.44** | **1.51%** | **0.9978** | 52 | LightGBM |
+| no_lags | 44.98 | 64.77 | 5.23% | 0.9831 | 45 | LightGBM |
 
-- **32% RMSE improvement** over best baseline (Seasonal Weekly 117.87)
-- **MASE < 0.07** across all variants (vs seasonal naive)
-- **90% conformal prediction intervals** with distribution-free coverage guarantee
+- **60% RMSE reduction** over best baseline (Persistence 58.74) — 2.5x better
+- **MASE 0.023** (with_lags) — model error ~2% of seasonal naive error
+- **90% conformal prediction intervals** with distribution-free coverage guarantee (q90 = 30.16 MW)
 - **5 regions**: Alentejo, Algarve, Centro, Lisboa, Norte
-- **142,860 samples** of real hourly data (2023-01-01 to 2026-04-06), sourced from e-Redes Open Data + Open-Meteo
+- **40,075 samples** (39,835 after feature engineering) of REAL regional hourly data (2022-11-01 to 2023-09-30), sourced from e-Redes `consumos_horario_codigo_postal` (CP4) + Open-Meteo
 
 ## Prerequisites
 
@@ -179,7 +179,7 @@ The API auto-loads models from `data/models/checkpoints/` and selects the best a
 }
 ```
 
-## ML Pipeline (v6)
+## ML Pipeline (v7)
 
 The training pipeline (`scripts/retrain.py`) executes 12 steps per model variant:
 
@@ -227,7 +227,7 @@ energy-forecast-pt/
 │       └── reproducibility.py       # Global seeds, environment snapshots, data hashing
 │
 ├── scripts/
-│   ├── retrain.py                   # Production training pipeline (v6)
+│   ├── retrain.py                   # Production training pipeline (v7)
 │   └── generate_notebooks.py        # Generate analysis notebooks
 │
 ├── notebooks/                        # Analysis-only (no model training/saving)
@@ -239,7 +239,7 @@ energy-forecast-pt/
 │
 ├── data/
 │   ├── processed/
-│   │   └── processed_data.parquet   # 142,860 rows, hourly, 5 regions (real data, 2023-01 to 2026-04)
+│   │   └── processed_data.parquet   # 40,075 rows, hourly, 5 regions (real regional CP4 data, 2022-11 to 2023-09)
 │   └── models/
 │       ├── checkpoints/             # .pkl model files
 │       ├── features/                # feature name lists
@@ -450,6 +450,6 @@ Expected behaviour — auto-regressive feedback accumulates error. For horizons 
 ---
 
 **Author**: Pedro Marques
-**Version**: 2.0.0
-**Pipeline**: v6
-**Last Updated**: March 2026
+**Version**: 2.1.0
+**Pipeline**: v7
+**Last Updated**: April 2026
