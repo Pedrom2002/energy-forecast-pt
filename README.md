@@ -22,7 +22,7 @@ Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter t
 - **MASE < 0.07** across all variants (vs seasonal naive)
 - **90% conformal prediction intervals** with distribution-free coverage guarantee
 - **5 regions**: Alentejo, Algarve, Centro, Lisboa, Norte
-- **175,205 samples** across 4 years (2021-2024), hourly granularity
+- **142,860 samples** of real hourly data (2023-01-01 to 2026-04-06), sourced from e-Redes Open Data + Open-Meteo
 
 ## Prerequisites
 
@@ -239,7 +239,7 @@ energy-forecast-pt/
 │
 ├── data/
 │   ├── processed/
-│   │   └── processed_data.parquet   # 175,205 rows, hourly, 5 regions
+│   │   └── processed_data.parquet   # 142,860 rows, hourly, 5 regions (real data, 2023-01 to 2026-04)
 │   └── models/
 │       ├── checkpoints/             # .pkl model files
 │       ├── features/                # feature name lists

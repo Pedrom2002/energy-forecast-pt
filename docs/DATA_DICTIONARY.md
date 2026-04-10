@@ -10,7 +10,7 @@ This document describes all data sources, schemas, and transformations used in t
 
 | Column | Type | Unit | Range | Description |
 |---|---|---|---|---|
-| `timestamp` | datetime64 | - | 2021-01-01 to 2024-12-31 | Observation timestamp (hourly, UTC) |
+| `timestamp` | datetime64 | - | 2023-01-01 to 2026-04-06 | Observation timestamp (hourly, UTC) |
 | `region` | string | - | {Alentejo, Algarve, Centro, Lisboa, Norte} | Portuguese grid region |
 | `consumption_mw` | float64 | MW | > 0 | Hourly energy consumption (target variable) |
 | `temperature` | float64 | °C | [-50, 60] | Air temperature at 2m height |
@@ -24,26 +24,42 @@ This document describes all data sources, schemas, and transformations used in t
 
 | Property | Value |
 |---|---|
-| **Total rows** | 175,205 |
-| **Date range** | 2021-01-01 to 2024-12-31 (4 years) |
+| **Total rows** | 142,860 |
+| **Date range** | 2023-01-01 to 2026-04-06 (3+ years) |
 | **Granularity** | Hourly |
 | **Regions** | 5 (Alentejo, Algarve, Centro, Lisboa, Norte) |
-| **Rows per region** | ~35,041 |
-| **Missing values** | None (pre-cleaned) |
+| **Rows per region** | 28,572 |
+| **Coverage** | 99.88% (near-complete hourly series) |
+| **Notable events** | Includes real historical Iberian blackout of 28 April 2025 |
 
 ### Data Provenance
 
-The dataset is synthetic but physically motivated, modelled on:
-1. **REN Data Hub** (datahub.ren.pt) — Regional load curve patterns
-2. **Open-Meteo API** (open-meteo.com) — Historical weather data for Portuguese regions
+The dataset is assembled from **real, official public sources** — no synthetic generation:
+
+1. **e-Redes Open Data** (https://e-redes.opendatasoft.com/) — two datasets:
+   - `consumo-total-nacional` — national hourly consumption (15-min aggregated to hourly),
+     January 2023 through April 2026. Near real-time, fully dynamic.
+   - `consumos_horario_codigo_postal` — hourly consumption by 4-digit postal code,
+     November 2022 – September 2023 (11 months). Used to compute static regional shares.
+2. **Open-Meteo Historical API** (https://archive-api.open-meteo.com/v1/archive) —
+   hourly weather per region centroid (temperature, humidity, dew point, pressure,
+   cloud cover, wind, precipitation, solar radiation).
+
+**Pipeline**: national hourly consumption → disaggregated into 5 NUTS-II regions
+by applying static shares per `(hour-of-week, region)` computed from the 11-month
+CP4 dataset (CP4 → NUTS-II mapping) → joined with Open-Meteo weather per region.
+
+**Caveat — static regional shares**: the regional disaggregation captures the
+hour-of-week regional structure but does not reflect inter-annual variation in
+regional proportions. The underlying national series is fully dynamic and real.
 
 ### Temporal Split (no shuffling)
 
-| Split | Fraction | Rows | Period |
-|---|---|---|---|
-| **Train** | 70% | 122,643 | 2021-01 to 2023-10 |
-| **Validation** | 15% | 26,281 | 2023-10 to 2024-05 |
-| **Test** | 15% | 26,281 | 2024-05 to 2024-12 |
+| Split | Fraction | Period |
+|---|---|---|
+| **Train** | 70% | 2023-01 to 2025-04 (approx.) |
+| **Validation** | 15% | 2025-04 to 2025-10 (approx.) |
+| **Test** | 15% | 2025-10 to 2026-04 (approx.) |
 
 ## Regions
 

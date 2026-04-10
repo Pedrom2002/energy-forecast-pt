@@ -17,7 +17,8 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 │     └── Data hashing → SHA-256 of input DataFrame                   │
 │                                                                     │
 │  2. DATA LOADING & VALIDATION                                       │
-│     └── Parquet → pandas DataFrame (175,205 rows)                   │
+│     └── Parquet → pandas DataFrame (142,860 rows, real data)        │
+│        (e-Redes consumption + Open-Meteo weather, 2023-01→2026-04)  │
 │     └── Weather column validation (hard + soft bounds)               │
 │     └── Data hash verification for reproducibility                   │
 │                                                                     │
