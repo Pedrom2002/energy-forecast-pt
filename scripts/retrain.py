@@ -11,7 +11,7 @@ Fully reproducible training pipeline with:
 - File-based experiment tracking for full auditability
 - Data hashing for version verification
 
-Trains all 4 models (XGBoost, LightGBM, CatBoost, Random Forest),
+Trains all 3 models (XGBoost, LightGBM, CatBoost),
 selects the best by time-series cross-validated RMSE, evaluates on a
 held-out test set, computes conformal prediction quantiles, and saves
 with generic filenames.

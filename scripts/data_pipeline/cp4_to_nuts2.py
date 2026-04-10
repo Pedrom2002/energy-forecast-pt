@@ -10,43 +10,69 @@ the 5 continental NUTS-II regions used by the energy forecasting model:
     - Alentejo (NUTS-II PT18)
     - Algarve  (NUTS-II PT15)
 
-The mapping is based on the official Portuguese postal code structure
-maintained by CTT, cross-referenced with INE municipal NUTS-II classifications.
+The mapping uses the official CTT/CP4 prefix structure with **3-digit
+precision for ambiguous ranges** (notably the 2xxx block, which mixes
+Lisboa AML with the Santarém district in Centro). Madeira (90xx) and
+Açores (95xx) are excluded as they are not in continental NUTS-II.
 
-Resolution: 4-digit prefix. Some prefixes straddle region boundaries; in those
-cases the dominant region (by population) is assigned. Madeira (90xx) and
-Açores (95xx) are excluded as they are not in NUTS-II continental.
+References:
+- CTT postal code structure: https://www.ctt.pt/feapl_2/app/restricted/postalCodeSearch/postalCodeSearch.jspx
+- INE NUTS-II classification: https://www.ine.pt/
 """
 
 from __future__ import annotations
 
 # Postal code prefix → NUTS-II region.
 # Each entry is (start_prefix_inclusive, end_prefix_inclusive, region).
-# The ranges follow the official CTT/CP4 structure.
+# Ranges are processed in order; first match wins.
+#
+# This list uses 3-digit precision for the ambiguous 2xxx and 6xxx blocks
+# and broad 1-digit precision for unambiguous ranges (3xxx, 4xxx, 5xxx,
+# 7xxx, 8xxx).
 CP4_RANGES: list[tuple[int, int, str]] = [
-    # 1xxx — Lisboa city
+    # ────────────────────────────────────────────────────────
+    # 1xxx — Lisboa city + AML core
+    # ────────────────────────────────────────────────────────
     (1000, 1999, "Lisboa"),
-    # 2000–2499 — Santarém / Centro/Lisboa Norte boundary
-    (2000, 2199, "Lisboa"),  # Vila Franca de Xira, Loures, Sintra
-    (2200, 2499, "Centro"),  # Santarém district (Centro)
-    # 2500–2899 — Lisbon metro area + Setúbal
-    (2500, 2599, "Centro"),  # Caldas, Óbidos, Bombarral
-    (2600, 2899, "Lisboa"),  # Vila Franca, Mafra, Sintra, Cascais, Setúbal
-    # 2900–2999 — Setúbal southern
-    (2900, 2999, "Lisboa"),  # Setúbal
-    # 3xxx — Centro (Coimbra, Aveiro, Leiria, Viseu)
+    # ────────────────────────────────────────────────────────
+    # 2xxx — Mixed: Lisboa AML + Santarém/Leiria (Centro)
+    # ────────────────────────────────────────────────────────
+    (2000, 2099, "Centro"),   # Santarém district
+    (2100, 2199, "Lisboa"),   # Coruche, Loures fringe → AML border (mostly Lisboa)
+    (2200, 2399, "Centro"),   # Abrantes, Tomar (Santarém) → Centro
+    (2400, 2499, "Centro"),   # Leiria district
+    (2500, 2599, "Centro"),   # Caldas da Rainha, Bombarral, Óbidos → Centro (Oeste)
+    (2600, 2699, "Lisboa"),   # Vila Franca de Xira, Mafra → AML
+    (2700, 2799, "Lisboa"),   # Amadora, Sintra, Cascais → AML
+    (2800, 2899, "Lisboa"),   # Almada, Setúbal-Norte → AML
+    (2900, 2999, "Lisboa"),   # Setúbal city, Palmela, Sesimbra → AML
+    # ────────────────────────────────────────────────────────
+    # 3xxx — Centro (Aveiro, Coimbra, Leiria-Norte, Viseu, Guarda-Sul)
+    # ────────────────────────────────────────────────────────
     (3000, 3999, "Centro"),
-    # 4xxx — Norte (Porto, Braga, Viana)
+    # ────────────────────────────────────────────────────────
+    # 4xxx — Norte (Porto, Braga, Viana do Castelo)
+    # ────────────────────────────────────────────────────────
     (4000, 4999, "Norte"),
-    # 5xxx — Norte (Bragança, Vila Real, north of Viseu)
+    # ────────────────────────────────────────────────────────
+    # 5xxx — Norte (Vila Real, Bragança, north of Viseu/Guarda)
+    # ────────────────────────────────────────────────────────
     (5000, 5999, "Norte"),
-    # 6xxx — Centro (Castelo Branco, Guarda, Covilhã)
+    # ────────────────────────────────────────────────────────
+    # 6xxx — Centro (Castelo Branco, Guarda-Centro, Covilhã)
+    # ────────────────────────────────────────────────────────
     (6000, 6999, "Centro"),
-    # 7xxx — Alentejo (Évora, Portalegre, Beja)
+    # ────────────────────────────────────────────────────────
+    # 7xxx — Alentejo (Portalegre, Évora, Beja)
+    # ────────────────────────────────────────────────────────
     (7000, 7999, "Alentejo"),
+    # ────────────────────────────────────────────────────────
     # 8xxx — Algarve (Faro)
+    # ────────────────────────────────────────────────────────
     (8000, 8999, "Algarve"),
-    # 9xxx — Madeira (90xx) and Açores (95xx) — excluded
+    # ────────────────────────────────────────────────────────
+    # 9xxx — Madeira (90xx) and Açores (95xx) — excluded (NUTS-II PT20/PT30)
+    # ────────────────────────────────────────────────────────
 ]
 
 
@@ -58,7 +84,8 @@ def cp4_to_region(cp4: str | int) -> str | None:
 
     Returns:
         Region name (one of Norte, Centro, Lisboa, Alentejo, Algarve)
-        or None if outside continental Portugal (Madeira, Açores).
+        or None if outside continental Portugal (Madeira, Açores) or
+        invalid input.
     """
     try:
         code = int(str(cp4).strip()[:4])
@@ -85,10 +112,9 @@ def build_lookup_table() -> dict[str, str]:
 
 
 if __name__ == "__main__":
-    # Print summary
-    lookup = build_lookup_table()
     from collections import Counter
 
+    lookup = build_lookup_table()
     counts = Counter(lookup.values())
     print(f"Total CP4 mapped: {len(lookup)}")
     print("By region:")
@@ -97,17 +123,44 @@ if __name__ == "__main__":
 
     # Spot checks
     print("\nSpot checks:")
-    for cp4, expected in [
-        ("1100", "Lisboa"),
-        ("2750", "Lisboa"),  # Cascais
-        ("3000", "Centro"),  # Coimbra
-        ("4000", "Norte"),  # Porto
-        ("4700", "Norte"),  # Braga
-        ("6000", "Centro"),  # Castelo Branco
-        ("7000", "Alentejo"),  # Evora
-        ("8000", "Algarve"),  # Faro
-        ("9000", None),  # Madeira
-    ]:
+    test_cases = [
+        # (cp4, expected, description)
+        ("1100", "Lisboa", "Lisboa city centre"),
+        ("1495", "Lisboa", "Algés (AML)"),
+        ("2000", "Centro", "Santarém district"),
+        ("2070", "Centro", "Cartaxo (Santarém)"),
+        ("2100", "Lisboa", "Coruche border / Loures fringe"),
+        ("2300", "Centro", "Tomar (Santarém)"),
+        ("2400", "Centro", "Leiria"),
+        ("2500", "Centro", "Caldas da Rainha"),
+        ("2600", "Lisboa", "Vila Franca de Xira"),
+        ("2750", "Lisboa", "Cascais"),
+        ("2800", "Lisboa", "Almada"),
+        ("2900", "Lisboa", "Setúbal city"),
+        ("3000", "Centro", "Coimbra"),
+        ("3700", "Centro", "São João da Madeira"),
+        ("4000", "Norte", "Porto"),
+        ("4700", "Norte", "Braga"),
+        ("4900", "Norte", "Viana do Castelo"),
+        ("5000", "Norte", "Vila Real"),
+        ("5300", "Norte", "Bragança"),
+        ("6000", "Centro", "Castelo Branco"),
+        ("6300", "Centro", "Guarda"),
+        ("7000", "Alentejo", "Evora"),
+        ("7300", "Alentejo", "Portalegre"),
+        ("7800", "Alentejo", "Beja"),
+        ("8000", "Algarve", "Faro"),
+        ("8500", "Algarve", "Portimao"),
+        ("9000", None, "Madeira (excluded)"),
+        ("9500", None, "Acores (excluded)"),
+    ]
+    n_pass = 0
+    for cp4, expected, desc in test_cases:
         got = cp4_to_region(cp4)
-        ok = "OK" if got == expected else "FAIL"
-        print(f"  [{ok}] {cp4} -> {got} (expected {expected})")
+        ok = got == expected
+        n_pass += int(ok)
+        status = "OK  " if ok else "FAIL"
+        got_str = str(got) if got is not None else "None"
+        exp_str = str(expected) if expected is not None else "None"
+        print(f"  [{status}] {cp4} -> {got_str:10s} (expected {exp_str:10s}) -- {desc}")
+    print(f"\n{n_pass}/{len(test_cases)} spot checks passed")

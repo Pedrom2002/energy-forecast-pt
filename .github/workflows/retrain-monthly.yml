@@ -1,0 +1,140 @@
+name: Monthly Model Retrain
+
+# Refreshes raw data from public sources and retrains the model on a schedule.
+# Runs on the 1st of each month at 03:00 UTC, and on manual dispatch.
+#
+# The job:
+#   1. Downloads fresh e-Redes regional CP4 data + Open-Meteo weather
+#   2. Rebuilds processed_data.parquet
+#   3. Validates the dataset
+#   4. Retrains the model (with_lags + no_lags variants)
+#   5. Compares new metrics against the previous run
+#   6. Opens a PR with the new model + metadata if metrics improved
+#
+# Manual trigger: actions tab → "Monthly Model Retrain" → Run workflow.
+
+on:
+  schedule:
+    # 03:00 UTC on the 1st of each month
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+    inputs:
+      skip_download:
+        description: "Skip data download (use existing raw)"
+        required: false
+        default: "false"
+      multistep:
+        description: "Also train horizon-specific models"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need full history for diff
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Snapshot previous metrics (for comparison)
+        id: prev
+        run: |
+          if [ -f data/models/metadata/training_metadata.json ]; then
+            python -c "
+          import json
+          m = json.load(open('data/models/metadata/training_metadata.json'))
+          print(f\"prev_mape={m['test_metrics']['mape']:.4f}\")
+          print(f\"prev_rmse={m['test_metrics']['rmse']:.4f}\")
+          print(f\"prev_r2={m['test_metrics']['r2']:.4f}\")
+          " >> "$GITHUB_OUTPUT"
+          else
+            echo "prev_mape=999" >> "$GITHUB_OUTPUT"
+            echo "prev_rmse=999" >> "$GITHUB_OUTPUT"
+            echo "prev_r2=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refresh data and retrain
+        env:
+          SKIP: ${{ github.event.inputs.skip_download == 'true' && '--skip-download' || '' }}
+          MULTI: ${{ github.event.inputs.multistep == 'true' && '--multistep' || '' }}
+        run: |
+          chmod +x scripts/refresh_and_retrain.sh
+          ./scripts/refresh_and_retrain.sh ${SKIP} ${MULTI}
+
+      - name: Read new metrics
+        id: new
+        run: |
+          python -c "
+          import json
+          m = json.load(open('data/models/metadata/training_metadata.json'))
+          tm = m['test_metrics']
+          print(f\"new_mape={tm['mape']:.4f}\")
+          print(f\"new_rmse={tm['rmse']:.4f}\")
+          print(f\"new_r2={tm['r2']:.4f}\")
+          print(f\"period_start={m['n_train']}\")
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Compare metrics
+        id: compare
+        run: |
+          PREV_RMSE=${{ steps.prev.outputs.prev_rmse }}
+          NEW_RMSE=${{ steps.new.outputs.new_rmse }}
+          IMPROVED=$(python -c "print('true' if ${NEW_RMSE} <= ${PREV_RMSE} * 1.05 else 'false')")
+          echo "improved=${IMPROVED}" >> "$GITHUB_OUTPUT"
+          echo "Previous RMSE: ${PREV_RMSE}"
+          echo "New RMSE:      ${NEW_RMSE}"
+          echo "Acceptable (within 5% of previous): ${IMPROVED}"
+
+      - name: Stop if metrics regressed significantly
+        if: steps.compare.outputs.improved == 'false'
+        run: |
+          echo "::warning::Metrics regressed by more than 5% — not opening PR"
+          exit 1
+
+      - name: Create branch and PR with refreshed model
+        if: steps.compare.outputs.improved == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DATE=$(date '+%Y-%m-%d')
+          BRANCH="auto/retrain-${DATE}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add data/models/ data/processed/processed_data.parquet
+          git commit -m "Auto-retrain ${DATE}: MAPE ${{ steps.new.outputs.new_mape }}%, RMSE ${{ steps.new.outputs.new_rmse }}"
+          git push origin "${BRANCH}"
+          gh pr create \
+            --title "Auto-retrain ${DATE}" \
+            --body "Automated monthly retrain on refreshed data.
+
+          ## Metrics
+
+          | Metric | Previous | New |
+          |--------|----------|-----|
+          | MAPE   | ${{ steps.prev.outputs.prev_mape }}% | **${{ steps.new.outputs.new_mape }}%** |
+          | RMSE   | ${{ steps.prev.outputs.prev_rmse }}  | **${{ steps.new.outputs.new_rmse }}**  |
+          | R2     | ${{ steps.prev.outputs.prev_r2 }}    | **${{ steps.new.outputs.new_r2 }}**    |
+
+          Triggered by: ${{ github.event_name }}
+          Run: [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+            --base master \
+            --head "${BRANCH}"

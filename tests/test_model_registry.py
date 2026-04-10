@@ -20,7 +20,7 @@ from src.models.model_registry import (
 class TestCreateModel:
     """Test model creation by key."""
 
-    @pytest.mark.parametrize("key", ["xgboost", "lightgbm", "catboost", "random_forest"])
+    @pytest.mark.parametrize("key", ["xgboost", "lightgbm", "catboost"])
     def test_create_all_model_types(self, key):
         model = create_model(key)
         assert model is not None
@@ -53,7 +53,7 @@ class TestFitModel:
         y = X[:, 0] * 2 + rng.randn(100) * 0.1
         return X[:80], y[:80], X[80:], y[80:]
 
-    @pytest.mark.parametrize("key", ["xgboost", "lightgbm", "catboost", "random_forest"])
+    @pytest.mark.parametrize("key", ["xgboost", "lightgbm", "catboost"])
     def test_fit_all_types_with_eval(self, key, dummy_data):
         X_train, y_train, X_val, y_val = dummy_data
         model = create_model(key, {"n_estimators": 10})
@@ -63,7 +63,7 @@ class TestFitModel:
 
     def test_fit_without_eval(self, dummy_data):
         X_train, y_train, _, _ = dummy_data
-        model = create_model("random_forest", {"n_estimators": 10})
+        model = create_model("xgboost", {"n_estimators": 10})
         fitted = fit_model(model, X_train, y_train)
         preds = fitted.predict(X_train[:5])
         assert len(preds) == 5
@@ -90,12 +90,11 @@ class TestTrainAndSelectBest:
                 "xgboost": {"n_estimators": 10},
                 "lightgbm": {"n_estimators": 10},
                 "catboost": {"iterations": 10},
-                "random_forest": {"n_estimators": 10},
             },
         )
-        assert best_key in ("xgboost", "lightgbm", "catboost", "random_forest")
+        assert best_key in ("xgboost", "lightgbm", "catboost")
         assert hasattr(best_model, "predict")
-        assert len(all_results) == 4
+        assert len(all_results) == 3
         for key, metrics in all_results.items():
             assert "rmse" in metrics
             assert "mae" in metrics
@@ -109,13 +108,13 @@ class TestTrainAndSelectBest:
             y_train,
             X_val,
             y_val,
-            model_keys=["xgboost", "random_forest"],
+            model_keys=["xgboost", "lightgbm"],
             params_override={
                 "xgboost": {"n_estimators": 10},
-                "random_forest": {"n_estimators": 10},
+                "lightgbm": {"n_estimators": 10},
             },
         )
-        assert best_key in ("xgboost", "random_forest")
+        assert best_key in ("xgboost", "lightgbm")
         assert len(results) == 2
 
 
@@ -127,7 +126,7 @@ class TestSearchSpace:
 
         study = optuna.create_study(direction="minimize")
 
-        for key in ("xgboost", "lightgbm", "catboost", "random_forest"):
+        for key in ("xgboost", "lightgbm", "catboost"):
             trial = study.ask()
             params = get_search_space(trial, key)
             assert isinstance(params, dict)
@@ -146,12 +145,12 @@ class TestDisplayNames:
     """Test registry constants."""
 
     def test_all_keys_have_display_names(self):
-        for key in ("xgboost", "lightgbm", "catboost", "random_forest"):
+        for key in ("xgboost", "lightgbm", "catboost"):
             assert key in DISPLAY_NAMES
             assert isinstance(DISPLAY_NAMES[key], str)
 
     def test_all_keys_have_default_params(self):
-        for key in ("xgboost", "lightgbm", "catboost", "random_forest"):
+        for key in ("xgboost", "lightgbm", "catboost"):
             assert key in DEFAULT_PARAMS
             assert isinstance(DEFAULT_PARAMS[key], dict)
 
@@ -167,9 +166,9 @@ class TestInferModelKey:
         model = create_model("catboost", {"iterations": 5})
         assert _infer_model_key(model) == "catboost"
 
-    def test_infer_random_forest(self):
-        model = create_model("random_forest", {"n_estimators": 5})
-        assert _infer_model_key(model) == "random_forest"
+    def test_infer_lightgbm(self):
+        model = create_model("lightgbm", {"n_estimators": 5})
+        assert _infer_model_key(model) == "lightgbm"
 
 
 class TestModelPersistence:
@@ -179,7 +178,7 @@ class TestModelPersistence:
     don't silently break model loading.
     """
 
-    @pytest.mark.parametrize("key", ["random_forest", "xgboost"])
+    @pytest.mark.parametrize("key", ["lightgbm", "xgboost"])
     def test_model_roundtrip_predictions_match(self, tmp_path, key):
         """Train → dump → load → predict: outputs must be identical."""
         rng = np.random.RandomState(0)
@@ -200,7 +199,7 @@ class TestModelPersistence:
 
     def test_model_file_is_nonzero(self, tmp_path):
         """Serialised file must have non-zero size (guard against empty dump)."""
-        model = create_model("random_forest", {"n_estimators": 5})
+        model = create_model("xgboost", {"n_estimators": 5})
         X, y = np.random.rand(30, 3), np.random.rand(30)
         model.fit(X, y)
         path = tmp_path / "model.pkl"
