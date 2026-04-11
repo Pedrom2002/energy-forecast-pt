@@ -27,7 +27,7 @@ pytest-timeout>=2.3.0,<3.0
 pytest-benchmark>=4.0.0,<5.0
 
 # Mutation testing
-mutmut>=2.4.0,<3.0
+mutmut>=2.4.0,<4.0
 
 # Property-based testing
 hypothesis>=6.98.0,<7.0
