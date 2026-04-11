@@ -61,7 +61,7 @@ TARGET = "consumption_mw"
 # Optuna tuning configuration
 OPTUNA_N_TRIALS = int(OPTUNA_DEFAULTS.get("n_trials", 50))
 OPTUNA_CV_FOLDS = int(OPTUNA_DEFAULTS.get("n_cv_folds", 5))
-OPTUNA_TIMEOUT = int(OPTUNA_DEFAULTS.get("timeout_seconds", 3600))
+OPTUNA_TIMEOUT = None  # No hard timeout — let Optuna run all trials to completion
 
 # Feature selection — relaxed for tree-based models.
 # Tree models handle correlated features natively (splitting on different
@@ -273,7 +273,7 @@ def optuna_tune(
     y_train: np.ndarray,
     n_trials: int = OPTUNA_N_TRIALS,
     n_cv_folds: int = OPTUNA_CV_FOLDS,
-    timeout: int = OPTUNA_TIMEOUT,
+    timeout: int | None = OPTUNA_TIMEOUT,
     cv_mode: str = "expanding",
 ) -> dict:
     """Run Optuna hyperparameter optimisation for the given model.
@@ -317,10 +317,20 @@ def optuna_tune(
     sampler = optuna.samplers.TPESampler(seed=RANDOM_STATE)
     study = optuna.create_study(direction="minimize", sampler=sampler)
 
+    timeout_str = "no timeout" if timeout is None else f"timeout={timeout}s"
     print(
-        f"\nOptuna tuning: {n_trials} trials, {len(splits)}-fold {cv_mode} CV, timeout={timeout}s"
+        f"\nOptuna tuning: {n_trials} trials, {len(splits)}-fold {cv_mode} CV, {timeout_str}"
     )
-    study.optimize(objective, n_trials=n_trials, timeout=timeout)
+
+    # Progress callback so we can see trial-by-trial progress in the log
+    def _progress_callback(study, trial):
+        print(
+            f"  Trial {trial.number + 1}/{n_trials} finished — "
+            f"value={trial.value:.4f}, best={study.best_value:.4f}",
+            flush=True,
+        )
+
+    study.optimize(objective, n_trials=n_trials, timeout=timeout, callbacks=[_progress_callback])
 
     best = study.best_trial
     print(f"  Best CV RMSE: {best.value:.4f} (trial {best.number})")
@@ -650,7 +660,7 @@ def _train_variant(
         "model_file": model_filename,
         "n_features": len(selected_feature_cols),
         "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "pipeline_version": "v6",
+        "pipeline_version": "v8",
         "random_seed": RANDOM_STATE,
         "data_hash": data_hash,
         "n_train": len(train),
@@ -704,7 +714,7 @@ def _train_variant(
             hyperparams=best_params or {},
             feature_names=selected_feature_cols,
             data_hash=data_hash,
-            tags={"variant": variant_name, "pipeline_version": "v6", "cv_mode": cv_mode},
+            tags={"variant": variant_name, "pipeline_version": "v8", "cv_mode": cv_mode},
             reproducibility_info=repro_info,
         )
 
@@ -872,7 +882,7 @@ def train_per_region_models(
     combined_meta_path = meta_dir / "training_metadata_per_region.json"
     combined_meta = {
         "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "pipeline_version": "v6",
+        "pipeline_version": "v8",
         "variant": variant,
         "cv_mode": cv_mode,
         "random_seed": RANDOM_STATE,
@@ -970,7 +980,7 @@ def train_multistep_models(run_optuna: bool = False) -> dict[str, dict[str, floa
             f"{h}h": {k: round(float(v), 4) for k, v in m.items()} for h, m in zip(horizons, all_metrics.values())
         },
         "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
-        "pipeline_version": "v6",
+        "pipeline_version": "v8",
         "random_seed": RANDOM_STATE,
     }
     meta_path = meta_dir / "metadata_multistep.json"

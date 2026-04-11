@@ -3,7 +3,7 @@
   "best_model_key": "xgboost",
   "model_file": "best_model_no_lags.pkl",
   "n_features": 56,
-  "training_date": "2026-04-11 18:38:34 UTC",
+  "training_date": "2026-04-11 21:44:44 UTC",
   "pipeline_version": "v8",
   "random_seed": 42,
   "data_hash": "441ffc5b56a982338bedca861061e0bca18016b9b026e59897f362be960de167",
@@ -11,14 +11,14 @@
   "n_val": 6011,
   "n_test": 6012,
   "test_metrics": {
-    "mae": 37.2554,
-    "rmse": 54.1842,
-    "mape": 4.7745,
-    "r2": 0.9882,
-    "nrmse": 0.0609,
+    "mae": 37.224,
+    "rmse": 53.5241,
+    "mape": 4.7669,
+    "r2": 0.9885,
+    "nrmse": 0.0602,
     "mase": 0.0481
   },
-  "conformal_q90": 103.39,
+  "conformal_q90": 101.89,
   "cv_scores": {
     "xgboost": [
       49.4932,
@@ -44,44 +44,44 @@
   },
   "feature_importance_top10": [
     {
-      "feature": "region_Alentejo",
-      "importance": 0.2545459270477295
+      "feature": "region_Algarve",
+      "importance": 0.2942574620246887
     },
     {
-      "feature": "region_Algarve",
-      "importance": 0.23586468398571014
+      "feature": "region_Alentejo",
+      "importance": 0.2313789278268814
     },
     {
       "feature": "latitude",
-      "importance": 0.15672463178634644
+      "importance": 0.161936417222023
     },
     {
       "feature": "longitude",
-      "importance": 0.140647292137146
+      "importance": 0.11928196251392365
     },
     {
       "feature": "is_night",
-      "importance": 0.09133351594209671
+      "importance": 0.06869277358055115
     },
     {
       "feature": "days_in_holiday_window",
-      "importance": 0.03880879655480385
+      "importance": 0.0639021247625351
     },
     {
       "feature": "hour",
-      "importance": 0.017074210569262505
-    },
-    {
-      "feature": "is_business_hour",
-      "importance": 0.010011584497988224
+      "importance": 0.016813592985272408
     },
     {
       "feature": "is_evening",
-      "importance": 0.007602480705827475
+      "importance": 0.004724189639091492
+    },
+    {
+      "feature": "temp_hour",
+      "importance": 0.004502933472394943
     },
     {
       "feature": "day_of_week",
-      "importance": 0.005159957334399223
+      "importance": 0.0036640013568103313
     }
   ],
   "features": [
@@ -631,39 +631,39 @@
   },
   "per_region_metrics": {
     "Alentejo": {
-      "mae": 14.7161,
-      "rmse": 18.1358,
-      "mape": 4.1643,
-      "r2": 0.7492,
-      "nrmse": 0.0507
+      "mae": 15.5262,
+      "rmse": 19.0024,
+      "mape": 4.457,
+      "r2": 0.7247,
+      "nrmse": 0.0531
     },
     "Algarve": {
-      "mae": 21.7686,
-      "rmse": 26.6871,
-      "mape": 7.7556,
-      "r2": 0.8218,
-      "nrmse": 0.0912
+      "mae": 22.7581,
+      "rmse": 29.2034,
+      "mape": 7.5935,
+      "r2": 0.7867,
+      "nrmse": 0.0998
     },
     "Centro": {
-      "mae": 42.4034,
-      "rmse": 58.2624,
-      "mape": 3.2436,
-      "r2": 0.9272,
-      "nrmse": 0.0446
-    },
-    "Lisboa": {
-      "mae": 40.9466,
-      "rmse": 50.6602,
-      "mape": 3.5977,
-      "r2": 0.9427,
+      "mae": 40.8759,
+      "rmse": 56.489,
+      "mape": 3.1105,
+      "r2": 0.9315,
       "nrmse": 0.0432
     },
+    "Lisboa": {
+      "mae": 41.4465,
+      "rmse": 51.5883,
+      "mape": 3.625,
+      "r2": 0.9406,
+      "nrmse": 0.044
+    },
     "Norte": {
-      "mae": 66.4742,
-      "rmse": 87.6446,
-      "mape": 5.1092,
-      "r2": 0.8975,
-      "nrmse": 0.0666
+      "mae": 65.5436,
+      "rmse": 85.2152,
+      "mape": 5.0463,
+      "r2": 0.9031,
+      "nrmse": 0.0647
     }
   },
   "reproducibility": {
@@ -672,27 +672,11 @@
     "platform": "Windows-11-10.0.26200-SP0",
     "numpy_version": "2.3.3",
     "sklearn_version": "1.7.2",
-    "timestamp_utc": "2026-04-11T17:56:37.467929+00:00",
-    "git_commit": null,
+    "timestamp_utc": "2026-04-11T21:42:21.894617+00:00",
+    "git_commit": "fabdd8ac552dd9c25eaac84e683f3ee887f52b7a",
     "hostname": "Pedro"
   },
   "cv_mode": "walk-forward",
-  "optuna": {
-    "n_trials": 30,
-    "cv_folds": 5,
-    "best_cv_rmse": 41.4375,
-    "best_params": {
-      "n_estimators": 1400,
-      "max_depth": 8,
-      "learning_rate": 0.032188872120825024,
-      "subsample": 0.8154292057330472,
-      "colsample_bytree": 0.6870855294988752,
-      "min_child_weight": 4,
-      "reg_alpha": 0.6157951883839035,
-      "reg_lambda": 1.1614088660604218e-06,
-      "gamma": 3.00120582375693
-    }
-  },
   "optuna_enabled": true,
-  "notes": "Pipeline v8: Optuna 30 trials + walk-forward CV. with_lags model file from previous v7 run (best_model.pkl) preserved; Optuna with_lags model was lost during disk corruption event but its metrics were logged: MAPE 1.4360%, RMSE 22.9032, MAE 13.4997, R2 0.9979, MASE 0.0223 (XGBoost, walk-forward CV, 78 features after selection)."
+  "notes": "Pipeline v8: Optuna 30 trials + walk-forward CV. Best XGBoost params via TPE sampler."
 }
