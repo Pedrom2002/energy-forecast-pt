@@ -695,9 +695,9 @@ def train_multistep_models(run_optuna: bool = False) -> dict[str, dict[str, floa
     feature_cols = get_feature_columns(df_features, exclude_cols=feature_exclude)
 
     for h in horizons:
-        print(f"\n{'─' * 40}")
+        print(f"\n{'-' * 40}")
         print(f"HORIZON: {h}h ahead")
-        print("─" * 40)
+        print("-" * 40)
 
         # Create shifted target per region
         target_col = f"target_{h}h"
