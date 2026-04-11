@@ -48,7 +48,7 @@ generation and **no disaggregation**:
    hourly weather per region centroid (temperature, humidity, dew point, pressure,
    cloud cover, wind, precipitation, solar radiation).
 
-**Pipeline (v7)**: CP4 dataset → CP4 → NUTS-II mapping → hourly sum per region
+**Pipeline (v8)**: CP4 dataset → CP4 → NUTS-II mapping → hourly sum per region
 → joined with Open-Meteo weather per region centroid → feature engineering →
 temporal 70/15/15 split.
 
@@ -56,7 +56,7 @@ temporal 70/15/15 split.
 consumption series (`consumo-total-nacional`) disaggregated into 5 regions via
 static shares. That approach introduced a structural artefact where
 `regional[t] ≈ national[t] × constant_share`, allowing the model to trivially
-exploit lag features. Pipeline v7 uses the raw regional CP4 measurements
+exploit lag features. Pipeline v8 uses the raw regional CP4 measurements
 directly — the dataset is shorter (11 months) but honest.
 
 ### Temporal Split (no shuffling)
@@ -138,8 +138,8 @@ data/models/
 │   ├── ensemble_stacking.pkl       # stacking meta-learner
 │   └── best_model_horizon_{1,6,12,24}h.pkl
 ├── features/
-│   ├── feature_names.txt           # 52 features (with_lags, best model)
-│   ├── feature_names_no_lags.txt   # 45 features (no_lags fallback)
+│   ├── feature_names.txt           # 78 features (with_lags, best model)
+│   ├── feature_names_no_lags.txt   # 56 features (no_lags fallback)
 │   └── advanced_feature_names.txt  # advanced set
 ├── metadata/
 │   ├── training_metadata.json      # with_lags metrics + config
@@ -168,11 +168,11 @@ data/models/
   "n_val": 5975,
   "n_test": 5976,
   "test_metrics": {
-    "mae": 13.78,
-    "rmse": 23.44,
+    "mae": 13.50,
+    "rmse": 22.90,
     "mape": 1.51,
-    "r2": 0.9978,
-    "nrmse": 0.0263,
+    "r2": 0.9979,
+    "nrmse": 0.0257,
     "mase": 0.023
   },
   "conformal_q90": 30.16,

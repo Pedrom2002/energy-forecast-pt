@@ -3,18 +3,18 @@
 ## Model Details
 
 **Model Name:** Energy Forecast PT - Gradient Boosted Trees
-**Model Version:** 3.1 (Pipeline v7)
+**Model Version:** 3.1 (Pipeline v8)
 **Model Date:** April 2026
 **Model Type:** Gradient Boosting Regression (LightGBM / CatBoost / XGBoost — auto-selected via CV)
 **License:** MIT
 
 ### Model Description
 
-Hourly energy consumption forecasting system for Portugal, segmented by 5 NUTS-II regions. The model uses gradient-boosted trees (auto-selected via 5-fold time-series cross-validation) with 52 selected features (with_lags variant, recommended) or 45 features (no_lags variant), including temporal patterns, weather variables, Portuguese holiday features, and interaction terms.
+Hourly energy consumption forecasting system for Portugal, segmented by 5 NUTS-II regions. The model uses gradient-boosted trees (auto-selected via 5-fold time-series cross-validation) with 52 selected features (with_lags variant, recommended) or 56 features (no_lags variant), including temporal patterns, weather variables, Portuguese holiday features, and interaction terms.
 
-**Pipeline v7 (honest pipeline)** uses **only real regional data** from the e-Redes `consumos_horario_codigo_postal` (CP4) open dataset. Each region has independent dynamics — no disaggregation, no artefacts. Best model: **LightGBM with lags** (MAPE 1.51%, R² 0.9978 on the held-out test set).
+**Pipeline v8 (honest pipeline)** uses **only real regional data** from the e-Redes `consumos_horario_codigo_postal` (CP4) open dataset. Each region has independent dynamics — no disaggregation, no artefacts. Best model: **XGBoost with lags** (MAPE 1.44%, R² 0.9979 on the held-out test set).
 
-**Why v6 was abandoned.** Pipeline v6 disaggregated the national consumption series into 5 regions via **static per-(hour-of-week, region) shares**. Because those shares were constant, each regional series was structurally `national[t] × constant_share`, which allowed any lag-based model to trivially reconstruct one region from another. Test runs on the `no_lags` variant confirmed this: MAPE jumped from ~1.6% (with artefactual leakage) to ~5% once lags were removed. Pipeline v7 eliminates the artefact entirely by training on the real regional CP4 series directly — each region has genuinely independent dynamics and lag features can be safely used.
+**Why v6 was abandoned.** Pipeline v6 disaggregated the national consumption series into 5 regions via **static per-(hour-of-week, region) shares**. Because those shares were constant, each regional series was structurally `national[t] × constant_share`, which allowed any lag-based model to trivially reconstruct one region from another. Test runs on the `no_lags` variant confirmed this: MAPE jumped from ~1.6% (with artefactual leakage) to ~5% once lags were removed. Pipeline v8 eliminates the artefact entirely by training on the real regional CP4 series directly — each region has genuinely independent dynamics and lag features can be safely used.
 
 **Trade-off.** The honest dataset covers 11 months (Nov 2022 – Sep 2023) instead of 3+ years, but it is genuinely regional and the model evaluations are honest. 40k samples is plenty for gradient-boosted tree models.
 
@@ -81,7 +81,7 @@ is a direct measurement, not a projection of the national series.
 
 **Honest regional dynamics.** Unlike Pipeline v6 (which disaggregated a
 national series via static shares and created a structural leakage between
-regions), Pipeline v7 uses the raw regional measurements directly. Lag and
+regions), Pipeline v8 uses the raw regional measurements directly. Lag and
 rolling-window features can therefore be safely used: correlations between
 regions reflect real shared drivers (weather, holidays, national-scale events)
 rather than a constructed identity `region[t] = national[t] × constant_share`.
@@ -186,32 +186,32 @@ The model supports ensemble methods via:
 
 ## Performance
 
-### Test Set Metrics (Best Model: LightGBM with_lags)
+### Test Set Metrics (Best Model: XGBoost with_lags, Pipeline v8)
 
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| **MAE** | 13.78 MW | Mean error of ~14 MW |
-| **RMSE** | 23.44 MW | Root mean squared error |
-| **MAPE** | **1.51%** | Excellent for regional hourly forecasting |
-| **R²** | **0.9978** | Explains 99.78% of variance |
-| **NRMSE** | 0.0263 | Normalized by range |
-| **MASE** | 0.023 | Model error ~2% of seasonal naive error |
+| **MAE** | 13.50 MW | Mean error of ~14 MW |
+| **RMSE** | 22.90 MW | Root mean squared error |
+| **MAPE** | **1.44%** | Excellent for regional hourly forecasting |
+| **R²** | **0.9979** | Explains 99.78% of variance |
+| **NRMSE** | 0.0257 | Normalized by range |
+| **MASE** | 0.022 | Model error ~2% of seasonal naive error |
 
 ### Test Set Metrics (no_lags variant, for reference)
 
 | Metric | Value |
 |--------|-------|
-| MAE | 44.98 MW |
-| RMSE | 64.77 MW |
-| MAPE | 5.23% |
-| R² | 0.9831 |
+| MAE | 37.26 MW |
+| RMSE | 54.18 MW |
+| MAPE | 4.77% |
+| R² | 0.9882 |
 | MASE | 0.059 |
 
-The sizeable gap between `with_lags` (MAPE 1.51%) and `no_lags` (MAPE 5.23%)
+The sizeable gap between `with_lags` (MAPE 1.44%) and `no_lags` (MAPE 4.77%)
 confirms that the lag features are contributing real autoregressive signal —
 not exploiting any structural artefact. Under Pipeline v6 this gap was
 suspiciously small (~1.6% vs ~5%) because of the static-share leakage; under
-Pipeline v7 the gap is honest and reflects genuine forecasting value of the
+Pipeline v8 the gap is honest and reflects genuine forecasting value of the
 autoregressive inputs.
 
 ### Per-Region Metrics (with_lags)
@@ -231,14 +231,14 @@ autoregressive inputs.
 | Persistence (lag-1) | 58.74 | 4.12% |
 | Seasonal Naive (weekly, 168h) | 86.97 | 6.30% |
 | Seasonal Naive (daily, 24h) | 119.82 | 6.38% |
-| **LightGBM with_lags (this model)** | **23.44** | **1.51%** |
+| **XGBoost with_lags (this model)** | **22.90** | **1.44%** |
 
-**Improvement over best baseline:** 60% RMSE reduction (23.44 vs 58.74) —
-the model is ~2.5× better than persistence on the honest regional test set.
+**Improvement over best baseline:** 61% RMSE reduction (22.90 vs 58.74) —
+the model is ~2.6× better than persistence on the honest regional test set.
 
 ### Performance Interpretation
 
-**MAPE 1.51%** means:
+**MAPE 1.44%** means:
 - For consumption of 1700 MW (Norte peak), average error of **~26 MW**
 - For consumption of 400 MW (Algarve), average error of **~6 MW**
 - Per-region R² ≥ 0.975 across all 5 regions on real regional data
@@ -301,12 +301,12 @@ Region scaling (from training residual CV, data-driven when available in metadat
 
 The distributed importance profile (top-1 only 6.5 %, top-10 cumulative
 44.8 %) is a strong indication that no single feature is acting as a leaky
-proxy for the target — additional evidence that Pipeline v7 is free of the
+proxy for the target — additional evidence that Pipeline v8 is free of the
 static-share artefact that inflated v6 metrics.
 
 ### Model Stability
 
-**5-Fold Time-Series CV (with_lags LightGBM):**
+**5-Fold Walk-Forward CV (with_lags XGBoost, Pipeline v8):**
 - Per-fold RMSE: [38.59, 27.73, 38.24, 24.63, 22.03]
 - Mean ≈ 30.2, showing consistent behaviour across temporal folds.
 
@@ -314,20 +314,20 @@ static-share artefact that inflated v6 metrics.
 
 ## Primary Model — with_lags (best_model.pkl)
 
-**This is the recommended model** (Pipeline v7). LightGBM with 52 features
+**This is the recommended model** (Pipeline v8). XGBoost with 78 features
 including temporal, meteorological, holiday, interaction, lag and
 rolling-window features. Requires at least 48 h of recent consumption history
 at inference time.
 
-### Test Set Metrics (with_lags LightGBM)
+### Test Set Metrics (with_lags XGBoost)
 
 | Metric | Value | Interpretation |
 |--------|-------|----------------|
-| **MAE** | 13.78 MW | Best across all variants |
-| **RMSE** | 23.44 MW | 60% improvement over best baseline (Persistence 58.74) |
-| **MAPE** | **1.51%** | Best across all variants |
-| **R²** | **0.9978** | Best across all variants |
-| **MASE** | 0.023 | ~2 % of seasonal naive error |
+| **MAE** | 13.50 MW | Best across all variants |
+| **RMSE** | 22.90 MW | 60% improvement over best baseline (Persistence 58.74) |
+| **MAPE** | **1.44%** | Best across all variants |
+| **R²** | **0.9979** | Best across all variants |
+| **MASE** | 0.022 | ~2 % of seasonal naive error |
 | **Features** | 52 | Temporal + meteorological + holidays + interactions + lags + rolling |
 
 > **Note:** Exact metrics in `data/models/metadata/training_metadata.json`.
@@ -336,7 +336,7 @@ at inference time.
 
 ### Fallback — no_lags (best_model_no_lags.pkl)
 
-The no_lags variant (LightGBM, 45 features, MAPE 5.23%) is available as a
+The no_lags variant (XGBoost, 56 features, MAPE 4.77%) is available as a
 fallback when no consumption history is present. It is strictly worse than
 the with_lags variant on this dataset and should only be used when lag
 features cannot be supplied.
@@ -345,8 +345,8 @@ features cannot be supplied.
 
 | Scenario | Recommended Model |
 |----------|-------------------|
-| Production with historical database (≥ 48 h) | **with_lags (MAPE 1.51%)** — recommended |
-| First startup (no history) | no_lags (MAPE 5.23%) — fallback |
+| Production with historical database (≥ 48 h) | **with_lags (MAPE 1.44%)** — recommended |
+| First startup (no history) | no_lags (MAPE 4.77%) — fallback |
 | Forecast for new installation | no_lags (until 48 h of history accumulated) |
 
 ---
@@ -359,7 +359,7 @@ features cannot be supplied.
 - Requires **48 h of consumption history** at inference time.
 - When history is not available, fall back to `best_model_no_lags.pkl`.
 - The no_lags variant is **considerably worse** on this dataset
-  (MAPE 5.23 % vs 1.51 %) — lag features contribute real forecasting value
+  (MAPE 4.77% vs 1.44%) — lag features contribute real forecasting value
   on the honest regional data.
 
 ### 2. **Geographic Scope**
@@ -491,7 +491,7 @@ features cannot be supplied.
 **Primary Author:** Pedro Marques
 **Contributors:** Energy Forecast PT Team
 **Last Updated:** April 2026
-**Version:** 3.1 (Pipeline v7)
+**Version:** 3.1 (Pipeline v8)
 
 ---
 
@@ -514,8 +514,8 @@ features cannot be supplied.
 
 Located in `data/models/checkpoints/`:
 
-- `best_model.pkl` -- **Best model**, LightGBM with lags (MAPE 1.51%)
-- `best_model_no_lags.pkl` -- Fallback, LightGBM no lags (MAPE 5.23%)
+- `best_model.pkl` -- **Best model**, XGBoost with lags (MAPE 1.44%)
+- `best_model_no_lags.pkl` -- Fallback, XGBoost no lags (MAPE 4.77%)
 - `best_model_advanced.pkl` -- Model with advanced features
 - `best_model_optimized.pkl` -- Optimized model (Optuna tuning)
 - `ensemble_stacking.pkl` - Model ensemble (optional)

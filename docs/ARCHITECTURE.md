@@ -23,8 +23,8 @@ graph TB
     subgraph "API Layer"
         G --> H[FastAPI Server<br/>Uvicorn]
         H --> I{Model Selection}
-        I -->|With History 48h+| J[Model WITH Lags<br/>LightGBM MAPE 1.51% ✅]
-        I -->|No History| K[Model WITHOUT Lags<br/>LightGBM MAPE 5.23%]
+        I -->|With History 48h+| J[Model WITH Lags<br/>LightGBM MAPE 1.44% ✅]
+        I -->|No History| K[Model WITHOUT Lags<br/>LightGBM MAPE 4.77%]
     end
 
     subgraph "Client Layer"
@@ -100,10 +100,10 @@ sequenceDiagram
 
     alt Has 48h history
         FE->>Model: Features WITH lags (52)
-        Model->>Model: LightGBM prediction (MAPE 1.51%)
+        Model->>Model: LightGBM prediction (MAPE 1.44%)
     else No history
         FE->>Model: Features WITHOUT lags (45)
-        Model->>Model: Fallback model prediction (MAPE 5.23%)
+        Model->>Model: Fallback model prediction (MAPE 4.77%)
     end
 
     Model->>Response: Prediction + confidence interval
@@ -396,7 +396,7 @@ graph LR
 ### Completed in v7
 - [x] Migration to honest regional dataset (e-Redes CP4 direct)
 - [x] Removal of static-share disaggregation artefact
-- [x] Retraining with real regional dynamics (MAPE 1.51% with_lags, 5.23% no_lags)
+- [x] Retraining with real regional dynamics (MAPE 1.44% with_lags, 4.77% no_lags)
 
 ### Completed in v5/v6
 - [x] Architecture documentation
@@ -426,4 +426,4 @@ graph LR
 ---
 
 **Last Updated**: April 2026
-**Version**: 2.1 (Pipeline v7)
+**Version**: 2.1 (Pipeline v8)

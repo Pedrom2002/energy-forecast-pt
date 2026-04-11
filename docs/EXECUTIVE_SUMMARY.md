@@ -10,29 +10,31 @@
 
 ### Model Performance
 ```
-Best Model: LightGBM (with_lags variant) — Pipeline v7 (honest)
+Best Model: XGBoost (with_lags variant) — Pipeline v8 (Optuna + walk-forward)
 Test Set Metrics:
-  - MAPE: 1.51%        Excellent for regional hourly forecasting
-  - R²: 0.9978         Explains 99.78% of variance
-  - MAE: 13.78 MW      Average error ±13.78 MW
-  - RMSE: 23.44 MW     Root mean squared error
-  - MASE: 0.023        ~2% of seasonal naive error
-  - Conformal q90: 30.16 MW (distribution-free ≥90% coverage)
+  - MAPE: 1.44%        Excellent for regional hourly forecasting
+  - R²: 0.9979         Explains 99.79% of variance
+  - MAE: 13.50 MW      Average error ±13.50 MW
+  - RMSE: 22.90 MW     Root mean squared error
+  - MASE: 0.022        ~2% of seasonal naive error
+  - Conformal q90: ~24 MW (split conformal: calibration on held-out val half)
 
-Features: 52 selected features (with_lags, recommended) / 45 (no_lags fallback)
+Features: 78 selected features (with_lags, recommended) / 56 (no_lags fallback)
 Training Data: 40,075 samples (39,835 after FE) of REAL regional hourly
   data across 5 NUTS-II regions (2022-11-01 to 2023-09-30, 11 months)
 Data Sources: e-Redes CP4 Open Data (consumos_horario_codigo_postal) +
   Open-Meteo Historical API
 Data Split: 70% train / 15% validation / 15% test (temporal split, no shuffle)
-Baseline Improvement: 60% RMSE reduction vs Persistence (23.44 vs 58.74) — 2.5x better
+CV Mode: walk-forward (5 sliding-window folds, 60% window size)
+Tuning: Optuna 30 trials × 5-fold walk-forward CV with TPE sampler
+Baseline Improvement: 61% RMSE reduction vs Persistence (22.90 vs 58.74) — 2.6x better
 ```
 
-**Interpretation**: Pipeline v7 uses raw regional CP4 measurements — each of
-the 5 regions has independent dynamics, so the lag features capture genuine
-autoregressive signal rather than exploiting a disaggregation artefact. On the
-honest test set, the with_lags model reaches MAPE 1.51% and is 2.5× better
-than the strongest baseline (persistence).
+**Interpretation**: Pipeline v8 builds on the v7 honest dataset (real regional
+CP4 measurements, no static-share artefact) and adds Optuna hyperparameter
+tuning + walk-forward cross-validation for production-realistic evaluation.
+The with_lags model reaches MAPE 1.44% and is 2.6× better than the strongest
+baseline (persistence).
 
 ### API Performance
 ```
@@ -62,7 +64,7 @@ Endpoints: 7 (health, predict, batch, info, etc.)
 ```
 Raw Data (Weather + Consumption)
     ↓
-Feature Engineering (52 features)
+Feature Engineering (78 features)
     ↓
 Model Training (XGBoost + Optuna optimization)
     ↓
@@ -142,21 +144,21 @@ Cloud Deployment (AWS/Azure/GCP)
 
 ### Model Selection
 
-**Comparison (with_lags variant, 5-fold CV on real regional data)**:
+**Comparison (with_lags variant, 5-fold walk-forward CV on real regional data)**:
 ```
-Model          | Mean CV RMSE | Test MAPE | Test R²
----------------|-------------|-----------|--------
-LightGBM       | 30.24       | 1.51%     | 0.9978  ✅
-XGBoost        | 30.62       | —         | —
-CatBoost       | 39.18       | —         | —
+Model          | Mean CV RMSE | Std    | Test MAPE | Test R²
+---------------|-------------|--------|-----------|--------
+XGBoost        | 23.21       | 2.48   | 1.44%     | 0.9979  ✅
+LightGBM       | 23.39       | 2.15   | —         | —
+CatBoost       | 26.03       | 4.03   | —         | —
 ```
 
-**Why LightGBM (with_lags)?**
-- ✅ Best performance across all metrics (MAPE 1.51%, RMSE 23.44)
+**Why XGBoost (with_lags) — Pipeline v8?**
+- ✅ Best CV mean RMSE under walk-forward validation
+- ✅ Optuna-tuned (30 trials) on the same walk-forward folds
 - ✅ Lag features provide genuine autoregressive signal on honest regional data
-- ✅ Fastest training and inference
-- ✅ Distributed feature importance (top-1 only 6.5%, top-10 cumulative 44.8%)
-  confirms no leakage exploitation
+- ✅ Distributed feature importance (consumption_mw_lag_1 ~45%,
+  lag_24 ~15%, rolling_mean_3 ~11%) — no single-feature leakage
 - ✅ Compact model size
 
 ### Optimization with Optuna
@@ -192,9 +194,10 @@ Improvement:
    - Prevents data leakage
    - Simulates production (predict future)
 
-2. **Time Series Cross-Validation**
-   - 5 folds
-   - LightGBM (with_lags) per-fold RMSE: [38.59, 27.73, 38.24, 24.63, 22.03]
+2. **Walk-Forward Cross-Validation**
+   - 5 folds, sliding-window (60% size)
+   - XGBoost (with_lags) per-fold RMSE: [21.65, 23.11, 26.34, 19.92, 21.10]
+   - Mean ± std: 23.21 ± 2.48
 
 3. **Per-Region Evaluation**
    - All 5 regions evaluated independently on real regional CP4 data
@@ -202,8 +205,8 @@ Improvement:
    - R² range: 0.9757 (Alentejo) to 0.9912 (Algarve)
 
 4. **Baseline Comparison (one-step-ahead)**
-   - Model RMSE 23.44 vs Persistence 58.74 (60% improvement, 2.5× better)
-   - MASE 0.023 (model error is ~2% of seasonal naive error)
+   - Model RMSE 22.90 vs Persistence 58.74 (60% improvement, 2.6× better)
+   - MASE 0.022 (model error is ~2% of seasonal naive error)
 
 ---
 
@@ -363,9 +366,9 @@ curl http://localhost:8000/health
 
 ### Benefits
 
-✅ **High Accuracy**: MAPE 1.51% (with_lags) on honest regional CP4 data
+✅ **High Accuracy**: MAPE 1.44% (with_lags) on honest regional CP4 data
 ✅ **Fast**: < 50ms predictions (real-time)
-✅ **Reliable**: ≥ 90% conformal coverage guarantee (q90 = 30.16 MW)
+✅ **Reliable**: ≥ 90% conformal coverage guarantee (split conformal calibration)
 ✅ **Scalable**: 200+ req/s, cloud-ready
 ✅ **Complete**: Full ML pipeline with documentation
 
@@ -524,7 +527,7 @@ This project demonstrates expertise in:
 
 ### Machine Learning
 ✅ End-to-end ML pipeline
-✅ Feature engineering (52 features)
+✅ Feature engineering (78 features)
 ✅ Model selection and comparison
 ✅ Hyperparameter optimization (Bayesian)
 ✅ Time series forecasting
@@ -573,7 +576,7 @@ This project demonstrates expertise in:
 ## ⭐ Quick Stats
 
 ```
-📊 Model Performance:      MAPE 1.51%, R² 0.9978 (with_lags, v7 honest)
+📊 Model Performance:      MAPE 1.44%, R² 0.9979 (with_lags, v8 honest)
 ⚡ API Latency:            < 50ms (p99)
 🚀 Throughput:             200+ req/s
 💾 Model Size:             65MB

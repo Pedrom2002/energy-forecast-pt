@@ -387,7 +387,8 @@ def _train_variant(
     set_global_seed(RANDOM_STATE)
     repro_info = get_reproducibility_info(RANDOM_STATE)
     print(f"  Seed: {RANDOM_STATE}")
-    print(f"  Git commit: {repro_info.get('git_commit', 'N/A')[:12]}...")
+    git_commit = repro_info.get("git_commit") or "N/A"
+    print(f"  Git commit: {git_commit[:12]}...")
 
     # Step 2: Load data
     if df_override is not None:
