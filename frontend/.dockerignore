@@ -1,0 +1,32 @@
+# .dockerignore for the frontend build context.
+# Keep the context tiny so `npm ci` layer cache is effective.
+
+node_modules/
+dist/
+build/
+coverage/
+
+# VCS / CI
+.git/
+.gitignore
+.github/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Test / lint caches
+.vitest-cache/
+.eslintcache
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+README.md

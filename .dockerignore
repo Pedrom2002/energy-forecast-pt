@@ -1,5 +1,19 @@
-# Python
+# -----------------------------------------------------------------------------
+# .dockerignore for the Energy Forecast PT backend build context.
+# Anything listed here is NOT shipped to the Docker daemon, which speeds up
+# builds and keeps secrets / heavy artefacts out of the image layers.
+# -----------------------------------------------------------------------------
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+.gitlab-ci.yml
+
+# Python bytecode, caches and local virtualenvs
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 *.so
@@ -7,55 +21,89 @@ __pycache__/
 venv/
 env/
 ENV/
+.venv/
 .venv
+pip-wheel-metadata/
+
+# Test / lint / type-check caches
+.pytest_cache/
+**/.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.benchmarks/
+coverage.xml
+*.cover
 
 # Jupyter
 .ipynb_checkpoints/
 notebooks/
 
-# Git
-.git/
-.gitignore
-.gitattributes
-
-# IDE
+# IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
+# OS cruft
 .DS_Store
 Thumbs.db
 
-# Documentation
+# Docs and dev metadata (not needed in image)
 *.md
 docs/
+CHANGELOG.md
+LICENSE
 
-# CI/CD
-.github/
-.gitlab-ci.yml
+# Node / frontend (built separately by frontend/Dockerfile)
+frontend/node_modules/
+frontend/dist/
+node_modules/
 
-# Test files
+# Data: raw datasets and experiment artefacts are huge and should be
+# mounted as volumes, not baked into the image.
+data/raw/
+data/interim/
+data/processed/
+data/external/
+experiments/
+outputs/
+catboost_info/
+mlruns/
+
+# DVC internals (the remote is configured at runtime if needed)
+.dvc/cache/
+.dvc/tmp/
+
+# Test suite and tooling configs not needed at runtime
 tests/
-*.pytest_cache/
-.coverage
-htmlcov/
+mutmut_config.py
+run_fix.sh
+run_notebooks.sh
+run_notebooks.py
+.pre-commit-config.yaml
 
-# Build artifacts
+# Build artefacts
 build/
 dist/
 *.egg-info/
 
-# Large files (models can be mounted as volumes)
-# data/models/*.pkl
-
-# Logs
+# Logs and tmp
 *.log
 logs/
-
-# Temporary files
 tmp/
 temp/
 *.tmp
+
+# Secrets — never copy these into an image
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/

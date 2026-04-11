@@ -205,12 +205,27 @@ class SequentialForecastResponse(BaseModel):
 
 
 class FeatureContribution(BaseModel):
-    """Importance and value of a single feature for a given prediction."""
+    """Importance and value of a single feature for a given prediction.
+
+    ``importance`` is the unsigned magnitude (0–1 normalised) used for ranking
+    and backward-compatible display.  ``contribution`` (when present) carries
+    the *signed* per-prediction effect from SHAP — positive values push the
+    prediction up, negative values push it down.  ``contribution`` is ``None``
+    for the global ``feature_importances_`` fallback path.
+    """
 
     feature: str = Field(..., description="Feature name")
     importance: float = Field(..., description="Global feature importance (0–1 normalised)")
     value: float = Field(..., description="Feature value for this prediction")
     rank: int = Field(..., description="Rank by importance (1 = most important)")
+    contribution: float | None = Field(
+        default=None,
+        description=(
+            "Signed per-prediction contribution (SHAP value). "
+            "Positive = increases prediction, negative = decreases. "
+            "None when only global feature_importances_ is available."
+        ),
+    )
 
 
 class ExplanationResponse(BaseModel):

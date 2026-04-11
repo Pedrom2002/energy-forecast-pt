@@ -326,3 +326,270 @@ class TestScaledRMSE:
         result = _scaled_rmse(base, "Centro", hour=7)
         # Centro=1.0, transition=1.0
         assert abs(result - base) < 0.01
+
+
+# ===========================================================================
+# SHAP-based per-prediction explanation tests
+# ===========================================================================
+
+
+class TestShapExplainPrediction:
+    """Cover the SHAP TreeExplainer path of /predict/explain.
+
+    These tests exercise :func:`src.api.prediction._explain_prediction` directly
+    with a mocked ``ModelStore`` so they run without trained models loaded
+    on disk.  The integration tests in ``test_full_integration.py`` cover the
+    real-model path when models are present.
+    """
+
+    @staticmethod
+    def _make_store(feature_names, importances, predict_value=1500.0):
+        """Build a fake ``ModelStore`` whose no_lags model returns *predict_value*."""
+        from unittest.mock import MagicMock
+
+        import numpy as np
+        import pandas as pd
+
+        from src.api.store import ModelStore
+
+        store = ModelStore()
+        store.feature_engineer = MagicMock()
+        store.model_advanced = None
+        store.model_with_lags = None
+        store.model_no_lags = MagicMock()
+        store.feature_names_no_lags = list(feature_names)
+        store.model_name_no_lags = "FakeLGBM (no lags)"
+        store.rmse_no_lags = 50.0
+        store.conformal_q90_no_lags = None
+
+        df = pd.DataFrame({name: [float(i + 1)] for i, name in enumerate(feature_names)})
+        store.feature_engineer.create_features_no_lags.return_value = df
+        store.model_no_lags.predict.return_value = np.array([predict_value])
+        store.model_no_lags.feature_importances_ = np.array(importances)
+        return store
+
+    def test_shap_returns_per_prediction_signed_contributions(self):
+        """SHAP path returns *signed* per-prediction contributions, not global importances."""
+        from unittest.mock import MagicMock, patch
+
+        import numpy as np
+
+        from src.api.prediction import _TREE_EXPLAINER_CACHE, _explain_prediction
+        from src.api.schemas import EnergyData
+
+        feature_names = ["lag_1", "hour", "temperature", "humidity"]
+        store = self._make_store(feature_names, [0.4, 0.3, 0.2, 0.1])
+
+        # SHAP values include positive AND negative contributions to verify
+        # that sign is preserved in the response.
+        per_prediction_shap = np.array([[120.5, -45.0, 30.0, -5.0]])
+
+        mock_shap = MagicMock()
+        mock_explainer = MagicMock()
+        mock_explainer.shap_values.return_value = per_prediction_shap
+        mock_shap.TreeExplainer.return_value = mock_explainer
+
+        _TREE_EXPLAINER_CACHE.clear()
+        data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
+        with patch.dict("sys.modules", {"shap": mock_shap}):
+            result = _explain_prediction(data, store, top_n=4)
+
+        assert result.explanation_method == "shap"
+        assert len(result.top_features) == 4
+        # The TreeExplainer should have been built once.
+        assert mock_shap.TreeExplainer.called
+        # Top feature should be lag_1 (highest |shap|).
+        assert result.top_features[0].feature == "lag_1"
+        # Sign must be preserved.
+        feat_by_name = {f.feature: f for f in result.top_features}
+        assert feat_by_name["lag_1"].contribution == 120.5  # positive
+        assert feat_by_name["hour"].contribution == -45.0  # negative
+        assert feat_by_name["humidity"].contribution == -5.0  # negative
+
+    def test_shap_top_k_ranked_by_absolute_contribution(self):
+        """Ranking uses |contribution| so a strong negative feature beats a weak positive."""
+        from unittest.mock import MagicMock, patch
+
+        import numpy as np
+
+        from src.api.prediction import _TREE_EXPLAINER_CACHE, _explain_prediction
+        from src.api.schemas import EnergyData
+
+        feature_names = ["a", "b", "c"]
+        store = self._make_store(feature_names, [0.33, 0.33, 0.34])
+
+        # b has the largest magnitude but is *negative*; it must rank #1.
+        mock_shap = MagicMock()
+        mock_explainer = MagicMock()
+        mock_explainer.shap_values.return_value = np.array([[10.0, -200.0, 50.0]])
+        mock_shap.TreeExplainer.return_value = mock_explainer
+
+        _TREE_EXPLAINER_CACHE.clear()
+        data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
+        with patch.dict("sys.modules", {"shap": mock_shap}):
+            result = _explain_prediction(data, store, top_n=2)
+
+        assert result.explanation_method == "shap"
+        assert [f.feature for f in result.top_features] == ["b", "c"]
+        assert result.top_features[0].contribution == -200.0
+        assert result.top_features[0].rank == 1
+        assert result.top_features[1].rank == 2
+
+    def test_shap_response_format_unchanged(self):
+        """The ExplanationResponse keys must remain stable for the frontend.
+
+        Specifically: ``prediction``, ``top_features``, ``explanation_method``,
+        ``total_features`` at the top level; and ``feature``, ``importance``,
+        ``value``, ``rank`` on each contribution.  ``contribution`` is a new
+        *additive* field — None for the legacy fallback path.
+        """
+        from unittest.mock import MagicMock, patch
+
+        import numpy as np
+
+        from src.api.prediction import _TREE_EXPLAINER_CACHE, _explain_prediction
+        from src.api.schemas import EnergyData
+
+        feature_names = ["lag_1", "hour", "temperature"]
+        store = self._make_store(feature_names, [0.5, 0.3, 0.2])
+
+        mock_shap = MagicMock()
+        mock_explainer = MagicMock()
+        mock_explainer.shap_values.return_value = np.array([[80.0, -20.0, 5.0]])
+        mock_shap.TreeExplainer.return_value = mock_explainer
+
+        _TREE_EXPLAINER_CACHE.clear()
+        data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
+        with patch.dict("sys.modules", {"shap": mock_shap}):
+            result = _explain_prediction(data, store, top_n=3)
+
+        body = result.model_dump()
+        assert set(body.keys()) >= {"prediction", "top_features", "explanation_method", "total_features"}
+        assert body["total_features"] == 3
+        assert isinstance(body["top_features"], list)
+        for feat in body["top_features"]:
+            assert set(feat.keys()) >= {"feature", "importance", "value", "rank"}
+            assert isinstance(feat["rank"], int)
+            assert feat["importance"] >= 0  # importance is unsigned magnitude
+        # Importances normalised to sum to 1 (or very close).
+        assert abs(sum(f["importance"] for f in body["top_features"]) - 1.0) < 1e-6
+
+    def test_shap_treeexplainer_is_cached_across_calls(self):
+        """The TreeExplainer must be built once per model and reused."""
+        from unittest.mock import MagicMock, patch
+
+        import numpy as np
+
+        from src.api.prediction import _TREE_EXPLAINER_CACHE, _explain_prediction
+        from src.api.schemas import EnergyData
+
+        feature_names = ["lag_1", "hour"]
+        store = self._make_store(feature_names, [0.6, 0.4])
+
+        mock_shap = MagicMock()
+        mock_explainer = MagicMock()
+        mock_explainer.shap_values.return_value = np.array([[10.0, 5.0]])
+        mock_shap.TreeExplainer.return_value = mock_explainer
+
+        _TREE_EXPLAINER_CACHE.clear()
+        data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
+        with patch.dict("sys.modules", {"shap": mock_shap}):
+            _explain_prediction(data, store, top_n=2)
+            _explain_prediction(data, store, top_n=2)
+            _explain_prediction(data, store, top_n=2)
+
+        # TreeExplainer was constructed exactly once across three calls.
+        assert mock_shap.TreeExplainer.call_count == 1
+        # But shap_values was called for each prediction.
+        assert mock_explainer.shap_values.call_count == 3
+
+    def test_falls_back_to_feature_importances_when_shap_missing(self):
+        """When the shap import fails, fall back to model.feature_importances_."""
+        import sys
+        from unittest.mock import patch
+
+        from src.api.prediction import _TREE_EXPLAINER_CACHE, _explain_prediction
+        from src.api.schemas import EnergyData
+
+        feature_names = ["lag_1", "hour", "temperature"]
+        store = self._make_store(feature_names, [0.5, 0.3, 0.2])
+
+        _TREE_EXPLAINER_CACHE.clear()
+
+        original_import = __builtins__["__import__"] if isinstance(__builtins__, dict) else __builtins__.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "shap" or name.startswith("shap."):
+                raise ImportError("shap unavailable for this test")
+            return original_import(name, *args, **kwargs)
+
+        # Also remove any cached shap module so the import is re-attempted.
+        with patch.dict(sys.modules, {k: v for k, v in sys.modules.items() if not k.startswith("shap")}, clear=True):
+            with patch("builtins.__import__", side_effect=fake_import):
+                data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
+                result = _explain_prediction(data, store, top_n=3)
+
+        assert result.explanation_method == "feature_importance"
+        # The signed `contribution` field is None on the fallback path.
+        for feat in result.top_features:
+            assert feat.contribution is None
+        # lag_1 (importance 0.5) should rank first.
+        assert result.top_features[0].feature == "lag_1"
+
+    def test_shap_failure_falls_back_with_warning_log(self, caplog):
+        """When TreeExplainer.shap_values raises, fall back and log a WARNING."""
+        import logging
+        from unittest.mock import MagicMock, patch
+
+        from src.api.prediction import _TREE_EXPLAINER_CACHE, _explain_prediction
+        from src.api.schemas import EnergyData
+
+        feature_names = ["lag_1", "hour"]
+        store = self._make_store(feature_names, [0.7, 0.3])
+
+        mock_shap = MagicMock()
+        mock_explainer = MagicMock()
+        mock_explainer.shap_values.side_effect = RuntimeError("SHAP exploded")
+        mock_shap.TreeExplainer.return_value = mock_explainer
+
+        _TREE_EXPLAINER_CACHE.clear()
+        data = EnergyData(timestamp="2025-06-15T14:00:00", region="Lisboa")
+        with caplog.at_level(logging.WARNING, logger="src.api.prediction"):
+            with patch.dict("sys.modules", {"shap": mock_shap}):
+                result = _explain_prediction(data, store, top_n=2)
+
+        assert result.explanation_method == "feature_importance"
+        assert any("SHAP explanation failed" in rec.message for rec in caplog.records)
+        # And the fallback signed field is None.
+        assert all(f.contribution is None for f in result.top_features)
+
+
+@pytest.mark.skipif(not _models_loaded(), reason="No trained models loaded")
+class TestShapExplainOnRealModel:
+    """End-to-end SHAP explain test against the real loaded LightGBM model."""
+
+    def test_shap_explain_includes_typical_drivers(self, valid_prediction_payload):
+        """The top features should include known strong drivers (lag/hour/temperature)."""
+        resp = client.post("/predict/explain?top_n=15", json=valid_prediction_payload)
+        assert resp.status_code == 200, f"explain failed: {resp.text}"
+        body = resp.json()
+        assert body["explanation_method"] in ("shap", "feature_importance")
+
+        names = [f["feature"].lower() for f in body["top_features"]]
+        # At least one classic driver should appear in the top 15 features.
+        drivers = ("lag", "hour", "temperature", "rolling")
+        assert any(any(d in n for d in drivers) for n in names), f"None of {drivers} found in top features: {names}"
+
+    def test_shap_explain_per_prediction_performance(self, valid_prediction_payload):
+        """Warm SHAP explanations should be fast (< 500 ms wall clock incl. HTTP overhead)."""
+        import time
+
+        # Warm up the explainer cache.
+        client.post("/predict/explain", json=valid_prediction_payload)
+
+        t0 = time.perf_counter()
+        resp = client.post("/predict/explain", json=valid_prediction_payload)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        assert resp.status_code == 200
+        # Generous bound — TreeExplainer.shap_values is < 50 ms; the rest is HTTP/serialisation.
+        assert elapsed_ms < 500, f"warm explain took {elapsed_ms:.0f} ms (expected < 500)"

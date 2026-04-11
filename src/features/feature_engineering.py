@@ -183,6 +183,115 @@ def get_portuguese_holidays(year: int) -> set[pd.Timestamp]:
     return holidays
 
 
+# Minimum length (in days) of a consecutive non-working block to qualify as an
+# "extended weekend".  A bridge-day block must include at least the bridge,
+# the adjacent holiday, and both Sat+Sun (>= 4 days).
+EXTENDED_WEEKEND_MIN_DAYS: int = 4
+
+# Weekday codes (Python convention: Monday=0 .. Sunday=6)
+_MONDAY: int = 0
+_THURSDAY: int = 3
+_FRIDAY: int = 4
+_TUESDAY: int = 1
+_SATURDAY: int = 5
+_SUNDAY: int = 6
+
+
+def _compute_bridge_day_lookup(
+    holidays: set[pd.Timestamp],
+    years: list[int],
+) -> dict[pd.Timestamp, tuple[int, int, int]]:
+    """Build a per-date lookup of bridge-day / extended-weekend features.
+
+    A **bridge day** is a working weekday squeezed between the weekend and a
+    holiday, so that most workers take it off:
+
+    * a Monday whose following Tuesday is a holiday, or
+    * a Friday whose preceding Thursday is a holiday.
+
+    The lookup covers every calendar day of the requested years plus a small
+    margin, so callers can simply index into it by date.  Dates that fall
+    outside the lookup (e.g. because the DataFrame spans extra years) default
+    to ``(0, 0, 0)`` which means "working day, no extended weekend, zero
+    consecutive non-working days".
+
+    Args:
+        holidays: Set of holiday timestamps (must cover *years* plus a buffer
+            of one day on each side for correct adjacency detection).
+        years: List of calendar years present in the data.
+
+    Returns:
+        Dictionary mapping ``pd.Timestamp`` (normalised to midnight) to a
+        tuple ``(is_bridge_day, is_extended_weekend, days_in_holiday_window)``.
+    """
+    if not years:
+        return {}
+
+    # Scan a range wide enough to safely detect adjacency at the boundaries.
+    start = pd.Timestamp(min(years) - 1, 12, 1)
+    end = pd.Timestamp(max(years) + 1, 1, 31)
+    all_dates = pd.date_range(start=start, end=end, freq="D")
+
+    holiday_set = set(holidays)
+
+    # Step 1: identify bridge days.  A bridge day is a working weekday (not
+    # itself a weekend or holiday) adjacent to a holiday that creates a long
+    # non-working block.
+    bridge_days: set[pd.Timestamp] = set()
+    for d in all_dates:
+        if d in holiday_set:
+            continue
+        dow = d.weekday()
+        if dow >= _SATURDAY:
+            continue
+        # Monday bridge: Tuesday (d + 1) is a holiday.
+        if dow == _MONDAY:
+            nxt = d + pd.Timedelta(days=1)
+            if nxt in holiday_set and nxt.weekday() == _TUESDAY:
+                bridge_days.add(d)
+        # Friday bridge: Thursday (d - 1) is a holiday.
+        elif dow == _FRIDAY:
+            prv = d - pd.Timedelta(days=1)
+            if prv in holiday_set and prv.weekday() == _THURSDAY:
+                bridge_days.add(d)
+
+    # Step 2: expanded non-working day set = weekends + holidays + bridge days.
+    def _is_non_working(d: pd.Timestamp) -> bool:
+        return d.weekday() >= _SATURDAY or d in holiday_set or d in bridge_days
+
+    non_working: set[pd.Timestamp] = {d for d in all_dates if _is_non_working(d)}
+
+    # Step 3: label consecutive runs of non-working days so we know the length
+    # of each "holiday window" and whether it contains a bridge day.
+    lookup: dict[pd.Timestamp, tuple[int, int, int]] = {}
+    i = 0
+    n = len(all_dates)
+    while i < n:
+        d = all_dates[i]
+        if d not in non_working:
+            lookup[d] = (0, 0, 0)
+            i += 1
+            continue
+        # Walk to the end of the consecutive non-working run.
+        j = i
+        run: list[pd.Timestamp] = []
+        while j < n and all_dates[j] in non_working:
+            run.append(all_dates[j])
+            j += 1
+        run_len = len(run)
+        run_has_bridge = any(r in bridge_days for r in run)
+        is_ext_weekend = int(run_len >= EXTENDED_WEEKEND_MIN_DAYS and run_has_bridge)
+        for r in run:
+            lookup[r] = (
+                int(r in bridge_days),
+                is_ext_weekend,
+                run_len,
+            )
+        i = j
+
+    return lookup
+
+
 def _validate_output_features(df: pd.DataFrame) -> pd.DataFrame:
     """Check output features for infinite values and out-of-range values.
 
@@ -644,23 +753,41 @@ class FeatureEngineer:
         Handles both timezone-aware and timezone-naive timestamps by converting
         to UTC-normalized tz-naive dates before comparing with holiday dates.
 
+        In addition to the base holiday flags, this method also produces
+        **bridge-day** features that capture the energy-consumption effect of
+        long weekends:
+
+        * ``is_bridge_day``: a Monday whose Tuesday is a holiday, or a Friday
+          whose Thursday is a holiday -- the "bridge" workers take off.
+        * ``is_extended_weekend``: flag for every day inside a 4+ day run of
+          consecutive non-working days (weekend + holiday + bridge).
+        * ``days_in_holiday_window``: length of the consecutive non-working
+          block containing this day (0 for regular working days).
+
         Args:
             df: DataFrame with a ``timestamp`` column.
 
         Returns:
             DataFrame augmented with holiday feature columns including
             ``is_holiday``, ``is_holiday_eve``, ``is_holiday_after``,
-            ``days_to_nearest_holiday``, ``days_to_holiday``, and
-            ``days_from_holiday``.
+            ``days_to_nearest_holiday``, ``days_to_holiday``,
+            ``days_from_holiday``, ``is_bridge_day``, ``is_extended_weekend``,
+            and ``days_in_holiday_window``.
         """
         df = df.copy()
         ts = df["timestamp"]
 
-        # Build holiday set for all years in the data.
+        # Build holiday set for all years in the data PLUS a one-year buffer
+        # on each side so that bridge-day adjacency detection at year
+        # boundaries (e.g. a Jan 1 holiday) works correctly even for single
+        # row inputs used at inference time.
         ts_naive = ts.dt.tz_localize(None) if ts.dt.tz is not None else ts
-        years = ts_naive.dt.year.unique()
+        years_in_data = sorted(int(y) for y in ts_naive.dt.year.unique())
+        if not years_in_data:
+            years_in_data = [pd.Timestamp.utcnow().year]
+        years_expanded = sorted({y + delta for y in years_in_data for delta in (-1, 0, 1)})
         all_holidays: set[pd.Timestamp] = set()
-        for year in years:
+        for year in years_expanded:
             all_holidays.update(get_portuguese_holidays(year))
 
         dates = ts_naive.dt.normalize()
@@ -690,6 +817,33 @@ class FeatureEngineer:
             df["days_to_nearest_holiday"] = HOLIDAY_PROXIMITY_CAP
             df["days_to_holiday"] = HOLIDAY_PROXIMITY_CAP
             df["days_from_holiday"] = HOLIDAY_PROXIMITY_CAP
+
+        # Bridge-day / extended-weekend features.  Built from a per-date
+        # lookup so the results are identical regardless of how many hourly
+        # rows share the same date (works for single-row inference too).
+        bridge_lookup = _compute_bridge_day_lookup(all_holidays, years_expanded)
+        unique_dates = dates.drop_duplicates()
+        bridge_records = [
+            (d, *bridge_lookup.get(d, (0, 0, 0))) for d in unique_dates
+        ]
+        bridge_df = pd.DataFrame(
+            bridge_records,
+            columns=[
+                "_bridge_date",
+                "is_bridge_day",
+                "is_extended_weekend",
+                "days_in_holiday_window",
+            ],
+        )
+        dates_series = dates.rename("_bridge_date").reset_index(drop=True)
+        merged = dates_series.to_frame().merge(bridge_df, on="_bridge_date", how="left")
+        df["is_bridge_day"] = merged["is_bridge_day"].fillna(0).astype(int).to_numpy()
+        df["is_extended_weekend"] = (
+            merged["is_extended_weekend"].fillna(0).astype(int).to_numpy()
+        )
+        df["days_in_holiday_window"] = (
+            merged["days_in_holiday_window"].fillna(0).astype(int).to_numpy()
+        )
 
         return df
 
