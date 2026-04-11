@@ -39,6 +39,7 @@ def preload_app_state():
     test runs.  It is safe to call even when model files are absent; in that
     case ``store.total_models == 0`` and tests that require models still skip.
     """
+    from src.api.anomaly import AnomalyDetector
     from src.api.main import app
     from src.api.store import _load_models
     from src.models.evaluation import CoverageTracker
@@ -50,6 +51,7 @@ def preload_app_state():
         nominal_coverage=0.90,
         alert_threshold=0.80,
     )
+    app.state.anomaly_detector = AnomalyDetector(window_size=168, z_threshold=3.0)
 
 
 def _find_rate_limiter():

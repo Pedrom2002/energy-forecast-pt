@@ -21,11 +21,17 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.security import APIKeyHeader
+from starlette.middleware.base import BaseHTTPMiddleware
 
+from src.api.anomaly import AnomalyDetector
+from src.api.metrics import PROMETHEUS_AVAILABLE as _PROM_CLIENT_AVAILABLE
+from src.api.metrics import metrics as prom_metrics
 from src.api.middleware import (
     BodySizeLimitMiddleware,
     RateLimitMiddleware,
@@ -154,6 +160,13 @@ async def lifespan(app: FastAPI):  # pragma: no cover — exercised at real star
         nominal_coverage=0.90,
         alert_threshold=float(os.environ.get("COVERAGE_ALERT_THRESHOLD", "0.80")),
     )
+    # Per-region anomaly detector (168-observation = 1 week hourly window).
+    app.state.anomaly_detector = AnomalyDetector(
+        window_size=int(os.environ.get("ANOMALY_WINDOW_SIZE", "168")),
+        z_threshold=float(os.environ.get("ANOMALY_Z_THRESHOLD", "3.0")),
+    )
+    # Seed the model age gauge from training metadata once at startup.
+    _refresh_model_age_gauge(app.state.models)
     yield
     logger.info("Shutting down Energy Forecast PT API")
 
@@ -167,6 +180,76 @@ def get_model_store(request: Request) -> ModelStore:
         logger.warning("Model store accessed before initialisation — returning empty store")
         return ModelStore()
     return store
+
+
+def _refresh_model_age_gauge(store: ModelStore | None) -> None:
+    """Update the ``model_age_days`` Prometheus gauge from training metadata.
+
+    Tries each model variant in capability order; uses the first
+    ``training_date`` field encountered.  Silently no-ops when no model
+    metadata is available.
+    """
+    if store is None:
+        return
+    for meta in (store.metadata_advanced, store.metadata_with_lags, store.metadata_no_lags):
+        if not meta:
+            continue
+        trained = meta.get("training_date") or meta.get("trained_at")
+        if trained:
+            prom_metrics.update_model_age_gauge(trained)
+            return
+
+
+class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
+    """Records Prometheus latency / counter metrics for ``/predict*`` routes.
+
+    The middleware brackets the downstream call in a monotonic-clock timer
+    and observes the elapsed seconds against the
+    ``energy_forecast_prediction_latency_seconds`` histogram, labeled with
+    the request path (one of ``/predict``, ``/predict/batch``,
+    ``/predict/sequential``, ``/predict/explain``).
+
+    The ``energy_forecast_predictions_total`` counter is incremented per
+    successful response (HTTP < 500).  Region / model_variant labels are
+    intentionally left empty here because the middleware does not parse the
+    request body — those labels are populated more accurately by the
+    prediction handler when it knows which variant was used.  See
+    :meth:`MetricsRegistry.observe_prediction` for details.
+
+    Errors are *not* recorded here — they go through
+    :func:`http_exception_handler` and :func:`generic_exception_handler` so
+    every error path (validation, auth, timeout, ...) is captured uniformly.
+    """
+
+    _PREDICT_PREFIXES = ("/predict",)
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        path = request.url.path
+        if not any(path.startswith(p) for p in self._PREDICT_PREFIXES):
+            return await call_next(request)
+
+        start = time.monotonic()
+        try:
+            response = await call_next(request)
+        except Exception:
+            elapsed = time.monotonic() - start
+            prom_metrics.prediction_latency.labels(endpoint=path).observe(elapsed)
+            prom_metrics.observe_error(endpoint=path, error_type="unhandled_exception")
+            raise
+
+        elapsed = time.monotonic() - start
+        prom_metrics.prediction_latency.labels(endpoint=path).observe(elapsed)
+        if response.status_code < 400:
+            # Region / model_variant left as "all" — the handler tags more
+            # specific values when it knows them.  Keeping a single label
+            # avoids label cardinality explosions in Prometheus.
+            prom_metrics.predictions_total.labels(
+                region="all",
+                model_variant="all",
+            ).inc()
+        elif response.status_code >= 500:
+            prom_metrics.observe_error(endpoint=path, error_type=f"http_{response.status_code}")
+        return response
 
 
 # ── App factory ───────────────────────────────────────────────────────────────
@@ -203,9 +286,61 @@ app.add_middleware(
 )
 
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES)
+app.add_middleware(PrometheusMetricsMiddleware)
 
 if _PROMETHEUS_AVAILABLE:  # pragma: no cover
     Instrumentator().instrument(app).expose(app, include_in_schema=False)
+
+
+# ── Exception handlers (Prometheus error counter) ─────────────────────────────
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Wrap FastAPI's default HTTPException handler so we can record errors.
+
+    Behaviour is identical to the framework default — same JSON shape, same
+    status code, same headers — but every 4xx/5xx response also increments
+    ``energy_forecast_errors_total{endpoint=...,error_type=http_<status>}``.
+    """
+    from fastapi.encoders import jsonable_encoder
+    from fastapi.responses import JSONResponse
+
+    prom_metrics.observe_error(
+        endpoint=request.url.path,
+        error_type=f"http_{exc.status_code}",
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=jsonable_encoder({"detail": exc.detail}),
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler that records and returns a 500.
+
+    Records ``energy_forecast_errors_total{error_type=<exception_class>}``
+    so unexpected internal errors are visible in dashboards even when they
+    do not correspond to a thrown ``HTTPException``.
+    """
+    from fastapi.responses import JSONResponse
+
+    prom_metrics.observe_error(
+        endpoint=request.url.path,
+        error_type=type(exc).__name__,
+    )
+    logger.exception("Unhandled exception in %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": {
+                "code": "INTERNAL_ERROR",
+                "message": "Internal server error.  See server logs for details.",
+            }
+        },
+    )
 
 
 # ── Shared OpenAPI response declarations ──────────────────────────────────────
@@ -953,6 +1088,197 @@ async def record_coverage_observation(
         "within_interval": ci_lower <= actual_mw <= ci_upper,
         "n_observations": tracker.n_observations,
     }
+
+
+# ── Anomaly detection + Prometheus endpoints ──────────────────────────────────
+
+
+@app.post(
+    "/model/record",
+    tags=["monitoring"],
+    responses={**_R_401, **_R_422, **_R_503},
+)
+async def record_observation(
+    request: Request,
+    actual_mw: float,
+    predicted_mw: float,
+    region: str,
+    timestamp: str | None = None,
+    ci_lower: float | None = None,
+    ci_upper: float | None = None,
+    _key: str | None = Depends(verify_api_key),
+):
+    """Record a ground-truth observation for anomaly + coverage tracking.
+
+    Updates two trackers in a single call:
+
+    1. The :class:`AnomalyDetector` (always updated when both
+       ``actual_mw`` and ``predicted_mw`` are provided).
+    2. The :class:`CoverageTracker` (only when ``ci_lower`` and ``ci_upper``
+       are also provided).
+
+    The Prometheus ``model_coverage`` and ``anomaly_rate`` gauges are
+    refreshed with the post-update values so dashboards reflect the latest
+    state without waiting for the next scrape window.
+
+    Args:
+        actual_mw: Actual measured consumption (MW, must be ≥ 0).
+        predicted_mw: Model point prediction at the same timestamp (MW).
+        region: Region the observation belongs to.  Must be one of the
+            five supported Portuguese regions.
+        timestamp: Optional ISO-8601 timestamp.  Defaults to "now" (UTC).
+        ci_lower: Optional CI lower bound (used for coverage tracking).
+        ci_upper: Optional CI upper bound (used for coverage tracking).
+    """
+    if actual_mw < 0:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_VALUE", "message": "actual_mw must be ≥ 0."},
+        )
+    if region not in VALID_REGIONS:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_REGION",
+                "message": f"region must be one of {sorted(VALID_REGIONS)}.",
+            },
+        )
+
+    parsed_ts: datetime | None = None
+    if timestamp is not None:
+        try:
+            parsed_ts = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "INVALID_TIMESTAMP",
+                    "message": "timestamp must be a valid ISO-8601 string.",
+                },
+            )
+
+    detector = getattr(request.app.state, "anomaly_detector", None)
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    if detector is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "DETECTOR_UNAVAILABLE",
+                "message": "Anomaly detector not initialised.",
+            },
+        )
+
+    record = detector.record(predicted_mw, actual_mw, region, parsed_ts)
+
+    coverage_recorded = False
+    within_interval: bool | None = None
+    if ci_lower is not None and ci_upper is not None:
+        if ci_lower > ci_upper:
+            raise HTTPException(
+                status_code=422,
+                detail={"code": "INVALID_VALUE", "message": "ci_lower must be ≤ ci_upper."},
+            )
+        if tracker is not None:
+            tracker.record(actual_mw, ci_lower, ci_upper)
+            coverage_recorded = True
+            within_interval = ci_lower <= actual_mw <= ci_upper
+
+    # Refresh gauges so /metrics reflects the latest state immediately.
+    summary = detector.summary()
+    prom_metrics.update_anomaly_rate_gauge(summary.get("anomaly_rate"))
+    if tracker is not None:
+        cov_summary = tracker.summary()
+        prom_metrics.update_coverage_gauge(cov_summary.get("coverage"))
+
+    return {
+        "recorded": True,
+        "is_anomaly": record["is_anomaly"],
+        "residual": record["residual"],
+        "z_score": record["z_score"],
+        "anomaly_summary": summary,
+        "coverage_recorded": coverage_recorded,
+        "within_interval": within_interval,
+    }
+
+
+@app.get("/model/anomalies", tags=["monitoring"], responses={**_R_401, **_R_503})
+async def get_anomalies(
+    request: Request,
+    n: int = 100,
+    region: str | None = None,
+    _key: str | None = Depends(verify_api_key),
+):
+    """Return the most recent flagged anomalies.
+
+    Args:
+        n: Maximum number of records to return (default 100, max 1000).
+        region: Optional region filter.
+    """
+    if n < 1 or n > 1000:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INVALID_PARAM", "message": "n must be between 1 and 1000."},
+        )
+    if region is not None and region not in VALID_REGIONS:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_REGION",
+                "message": f"region must be one of {sorted(VALID_REGIONS)}.",
+            },
+        )
+
+    detector = getattr(request.app.state, "anomaly_detector", None)
+    if detector is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "DETECTOR_UNAVAILABLE",
+                "message": "Anomaly detector not initialised.",
+            },
+        )
+
+    anomalies = detector.get_recent_anomalies(n=n, region=region)
+    return {
+        "count": len(anomalies),
+        "anomalies": anomalies,
+        "summary": detector.summary(),
+    }
+
+
+@app.get("/metrics", tags=["monitoring"], include_in_schema=False)
+async def prometheus_metrics_endpoint(request: Request):
+    """Return all Prometheus metrics in the standard text-exposition format.
+
+    Refreshes the ``model_coverage`` and ``anomaly_rate`` gauges from the
+    live trackers immediately before rendering so a single scrape always
+    returns up-to-date values.
+
+    Returns 503 when ``prometheus_client`` is not installed in the runtime
+    environment so the absence of the dependency is visible to scrapers
+    rather than silently producing an empty response.
+    """
+    if not _PROM_CLIENT_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "PROMETHEUS_UNAVAILABLE",
+                "message": "prometheus_client is not installed in this environment.",
+            },
+        )
+
+    tracker = getattr(request.app.state, "coverage_tracker", None)
+    if tracker is not None:
+        prom_metrics.update_coverage_gauge(tracker.summary().get("coverage"))
+
+    detector = getattr(request.app.state, "anomaly_detector", None)
+    if detector is not None:
+        prom_metrics.update_anomaly_rate_gauge(detector.summary().get("anomaly_rate"))
+
+    _refresh_model_age_gauge(getattr(request.app.state, "models", None))
+
+    payload, content_type = prom_metrics.render()
+    return Response(content=payload, media_type=content_type)
 
 
 if __name__ == "__main__":  # pragma: no cover

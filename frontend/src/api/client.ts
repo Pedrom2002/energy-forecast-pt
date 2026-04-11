@@ -1,4 +1,17 @@
-const BASE_URL = '/api';
+/**
+ * Base URL for the FastAPI backend.
+ *
+ * Resolution order:
+ *   1. `VITE_API_URL` environment variable (e.g. `http://localhost:8000`)
+ *      — used for production builds or when hitting the backend directly
+ *      without the Vite dev proxy.
+ *   2. Default `/api` — during `vite dev`/`vite preview` this is rewritten
+ *      to `http://localhost:8000` by the proxy defined in `vite.config.ts`.
+ *
+ * See `frontend/.env.example` for documentation.
+ */
+export const BASE_URL: string =
+  (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {

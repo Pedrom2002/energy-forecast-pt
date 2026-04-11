@@ -148,24 +148,98 @@ def get_feature_columns(
 # ── Model selection ──────────────────────────────────────────────────────────
 
 
+def _walk_forward_splits(
+    n_samples: int,
+    n_splits: int,
+    window_frac: float = 0.6,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Generate walk-forward (sliding window) CV fold indices.
+
+    Each fold uses a fixed-size training window of ``window_frac * n_samples``
+    that slides forward in time. The test block is the immediately-following
+    chunk of size ``(n_samples - window_size) // n_splits``.
+
+    Args:
+        n_samples: Total number of training samples.
+        n_splits: Number of walk-forward folds to generate.
+        window_frac: Fraction of ``n_samples`` used as the sliding window size.
+
+    Returns:
+        List of (train_idx, val_idx) tuples, suitable as a drop-in replacement
+        for ``TimeSeriesSplit.split()`` output.
+    """
+    window_size = max(1, int(n_samples * window_frac))
+    remainder = n_samples - window_size
+    if remainder < n_splits:
+        # Not enough room for the requested number of folds — fall back to a
+        # single fold using the maximum possible test block.
+        n_splits = max(1, remainder)
+    test_size = max(1, remainder // n_splits)
+
+    splits: list[tuple[np.ndarray, np.ndarray]] = []
+    for fold in range(n_splits):
+        start = fold * test_size
+        train_end = start + window_size
+        test_end = train_end + test_size
+        if train_end >= n_samples:
+            break
+        if test_end > n_samples:
+            test_end = n_samples
+        train_idx = np.arange(start, train_end)
+        val_idx = np.arange(train_end, test_end)
+        if len(val_idx) == 0:
+            break
+        splits.append((train_idx, val_idx))
+    return splits
+
+
+def _make_cv_splits(
+    n_samples: int,
+    n_splits: int,
+    cv_mode: str = "expanding",
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Build CV fold indices according to ``cv_mode``.
+
+    - ``"expanding"``: classic ``TimeSeriesSplit`` (growing training set).
+    - ``"walk-forward"``: fixed-size sliding window walking forward in time.
+    """
+    if cv_mode == "walk-forward":
+        return _walk_forward_splits(n_samples, n_splits)
+    if cv_mode != "expanding":
+        raise ValueError(f"Unknown cv_mode: {cv_mode!r}. Use 'expanding' or 'walk-forward'.")
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    return list(tscv.split(np.arange(n_samples)))
+
+
 def cross_validate_model_selection(
     X_trainval: np.ndarray,
     y_trainval: np.ndarray,
     n_splits: int = 5,
+    cv_mode: str = "expanding",
 ) -> tuple[str, dict[str, list[float]]]:
     """Select the best model using time-series cross-validation.
 
     Trains all 4 model types across *n_splits* temporal folds and returns
     the model key with the lowest average validation RMSE.
+
+    Args:
+        X_trainval: Concatenated train+val feature matrix.
+        y_trainval: Concatenated train+val target vector.
+        n_splits: Number of CV folds.
+        cv_mode: Either ``"expanding"`` (default; ``TimeSeriesSplit``) or
+            ``"walk-forward"`` (fixed-size sliding window).
     """
     from src.models.model_registry import _CONSTRUCTORS
 
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    splits = _make_cv_splits(len(X_trainval), n_splits, cv_mode=cv_mode)
+    n_splits_actual = len(splits)
     model_keys = list(_CONSTRUCTORS.keys())
     cv_scores: dict[str, list[float]] = {k: [] for k in model_keys}
 
-    print(f"\nRunning {n_splits}-fold time-series CV for model selection...")
-    for fold, (train_idx, val_idx) in enumerate(tscv.split(X_trainval), 1):
+    print(
+        f"\nRunning {n_splits_actual}-fold {cv_mode} time-series CV for model selection..."
+    )
+    for fold, (train_idx, val_idx) in enumerate(splits, 1):
         X_tr, X_vl = X_trainval[train_idx], X_trainval[val_idx]
         y_tr, y_vl = y_trainval[train_idx], y_trainval[val_idx]
 
@@ -177,7 +251,7 @@ def cross_validate_model_selection(
             cv_scores[key].append(rmse)
 
         fold_summary = ", ".join(f"{DISPLAY_NAMES.get(k, k)}: {cv_scores[k][-1]:.2f}" for k in model_keys)
-        print(f"  Fold {fold}/{n_splits} — {fold_summary}")
+        print(f"  Fold {fold}/{n_splits_actual} — {fold_summary}")
 
     print("\n--- CV RESULTS (mean ± std RMSE) ---")
     for key in model_keys:
@@ -200,6 +274,7 @@ def optuna_tune(
     n_trials: int = OPTUNA_N_TRIALS,
     n_cv_folds: int = OPTUNA_CV_FOLDS,
     timeout: int = OPTUNA_TIMEOUT,
+    cv_mode: str = "expanding",
 ) -> dict:
     """Run Optuna hyperparameter optimisation for the given model.
 
@@ -221,13 +296,13 @@ def optuna_tune(
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-    tscv = TimeSeriesSplit(n_splits=n_cv_folds)
+    splits = _make_cv_splits(len(X_train), n_cv_folds, cv_mode=cv_mode)
 
     def objective(trial: optuna.Trial) -> float:
         params = get_search_space(trial, model_key)
         fold_scores = []
 
-        for train_idx, val_idx in tscv.split(X_train):
+        for train_idx, val_idx in splits:
             X_tr, X_vl = X_train[train_idx], X_train[val_idx]
             y_tr, y_vl = y_train[train_idx], y_train[val_idx]
 
@@ -242,7 +317,9 @@ def optuna_tune(
     sampler = optuna.samplers.TPESampler(seed=RANDOM_STATE)
     study = optuna.create_study(direction="minimize", sampler=sampler)
 
-    print(f"\nOptuna tuning: {n_trials} trials, {n_cv_folds}-fold CV, timeout={timeout}s")
+    print(
+        f"\nOptuna tuning: {n_trials} trials, {len(splits)}-fold {cv_mode} CV, timeout={timeout}s"
+    )
     study.optimize(objective, n_trials=n_trials, timeout=timeout)
 
     best = study.best_trial
@@ -282,6 +359,9 @@ def _train_variant(
     fe_kwargs: dict | None = None,
     run_optuna: bool = True,
     run_feature_selection: bool = True,
+    cv_mode: str = "expanding",
+    df_override: pd.DataFrame | None = None,
+    log_experiment: bool = True,
 ) -> dict[str, float]:
     """Shared training logic for with-lags and no-lags variants.
 
@@ -310,7 +390,11 @@ def _train_variant(
     print(f"  Git commit: {repro_info.get('git_commit', 'N/A')[:12]}...")
 
     # Step 2: Load data
-    df_raw = load_and_prepare_data()
+    if df_override is not None:
+        df_raw = df_override
+        print(f"  Using pre-loaded dataframe with {len(df_raw)} rows")
+    else:
+        df_raw = load_and_prepare_data()
     data_hash = hash_dataframe(df_raw)
 
     # Step 3: Feature engineering
@@ -375,7 +459,9 @@ def _train_variant(
     # Step 6: Model selection via time-series CV
     X_trainval = np.concatenate([X_train, X_val])
     y_trainval = np.concatenate([y_train, y_val])
-    best_key, cv_scores = cross_validate_model_selection(X_trainval, y_trainval, n_splits=5)
+    best_key, cv_scores = cross_validate_model_selection(
+        X_trainval, y_trainval, n_splits=5, cv_mode=cv_mode
+    )
 
     # Step 7: Optuna hyperparameter optimisation
     optuna_results = None
@@ -391,6 +477,7 @@ def _train_variant(
             n_trials=OPTUNA_N_TRIALS,
             n_cv_folds=OPTUNA_CV_FOLDS,
             timeout=OPTUNA_TIMEOUT,
+            cv_mode=cv_mode,
         )
         best_params = optuna_results["best_params"]
 
@@ -435,15 +522,32 @@ def _train_variant(
             print(f"  Feature selection skipped due to error: {e}")
             logger.warning("Feature selection failed", exc_info=True)
 
-    # Step 9: Intermediate model for conformal calibration & optimal iterations
-    print(f"\nTraining intermediate {DISPLAY_NAMES[best_key]} (train + val early stopping)...")
-    intermediate_model = create_model(best_key, best_params)
-    fit_model(intermediate_model, X_train, y_train, X_val, y_val, model_key=best_key)
+    # Step 9: Intermediate model for conformal calibration & optimal iterations.
+    #
+    # Split-conformal calibration: the validation set is split 50/50 into an
+    # "early-stopping val" half (used to drive early stopping during this
+    # intermediate fit) and a "calibration val" half that is held out from the
+    # model entirely. The held-out half is used to compute the conformal q90,
+    # which removes the mild leakage caused by reusing the early-stopping set
+    # for calibration.
+    n_val = len(X_val)
+    half = n_val // 2
+    X_val_es, X_val_cal = X_val[:half], X_val[half:]
+    y_val_es, y_val_cal = y_val[:half], y_val[half:]
+    print(
+        f"\nSplit-conformal: val split into early-stopping ({len(X_val_es)}) "
+        f"and calibration ({len(X_val_cal)}) halves"
+    )
 
-    # Conformal calibration on held-out validation set (not test set)
-    print("\nConformal prediction calibration (on validation set)...")
-    y_pred_val = intermediate_model.predict(X_val)
-    conformal_q90 = compute_conformal_q90(y_val, y_pred_val)
+    print(f"Training intermediate {DISPLAY_NAMES[best_key]} (train + early-stopping val half)...")
+    intermediate_model = create_model(best_key, best_params)
+    fit_model(intermediate_model, X_train, y_train, X_val_es, y_val_es, model_key=best_key)
+
+    # Conformal calibration on the held-out calibration half (untouched by
+    # early stopping) — proper split conformal.
+    print("\nConformal prediction calibration (held-out calibration half)...")
+    y_pred_cal = intermediate_model.predict(X_val_cal)
+    conformal_q90 = compute_conformal_q90(y_val_cal, y_pred_cal)
 
     # Determine optimal iteration count from early stopping
     best_iter = None
@@ -563,6 +667,7 @@ def _train_variant(
         },
         "per_region_metrics": per_region_metrics,
         "reproducibility": repro_info,
+        "cv_mode": cv_mode,
     }
 
     if optuna_results:
@@ -589,31 +694,32 @@ def _train_variant(
     print(f"Metadata saved to {meta_path}")
 
     # Step 12: Experiment tracking
-    print("\nLogging experiment...")
-    tracker = ExperimentTracker()
-    run_id = tracker.start_run(
-        experiment_name=f"retrain_{variant_name.replace(' ', '_')}",
-        model_key=best_key,
-        hyperparams=best_params or {},
-        feature_names=selected_feature_cols,
-        data_hash=data_hash,
-        tags={"variant": variant_name, "pipeline_version": "v6"},
-        reproducibility_info=repro_info,
-    )
+    if log_experiment:
+        print("\nLogging experiment...")
+        tracker = ExperimentTracker()
+        run_id = tracker.start_run(
+            experiment_name=f"retrain_{variant_name.replace(' ', '_')}",
+            model_key=best_key,
+            hyperparams=best_params or {},
+            feature_names=selected_feature_cols,
+            data_hash=data_hash,
+            tags={"variant": variant_name, "pipeline_version": "v6", "cv_mode": cv_mode},
+            reproducibility_info=repro_info,
+        )
 
-    tracker.log_metrics(run_id, test_metrics, prefix="test_")
-    tracker.log_cv_results(run_id, cv_scores, best_key)
-    tracker.log_baseline_comparison(run_id, baseline_results, test_metrics)
+        tracker.log_metrics(run_id, test_metrics, prefix="test_")
+        tracker.log_cv_results(run_id, cv_scores, best_key)
+        tracker.log_baseline_comparison(run_id, baseline_results, test_metrics)
 
-    if feature_selection_report:
-        tracker.log_feature_selection(run_id, feature_selection_report)
+        if feature_selection_report:
+            tracker.log_feature_selection(run_id, feature_selection_report)
 
-    tracker.log_artifact(run_id, "model_checkpoint", str(model_path))
-    tracker.log_artifact(run_id, "feature_names", str(fn_path))
-    tracker.log_artifact(run_id, "metadata", str(meta_path))
-    tracker.end_run(run_id, status="completed")
+        tracker.log_artifact(run_id, "model_checkpoint", str(model_path))
+        tracker.log_artifact(run_id, "feature_names", str(fn_path))
+        tracker.log_artifact(run_id, "metadata", str(meta_path))
+        tracker.end_run(run_id, status="completed")
 
-    print(f"  Experiment logged: {run_id}")
+        print(f"  Experiment logged: {run_id}")
 
     # Print improvement over baselines
     best_baseline_rmse = min(m["rmse"] for m in baseline_results.values())
@@ -623,7 +729,9 @@ def _train_variant(
     return test_metrics
 
 
-def train_model_with_lags(run_optuna: bool = True) -> dict[str, float]:
+def train_model_with_lags(
+    run_optuna: bool = True, cv_mode: str = "expanding"
+) -> dict[str, float]:
     """Train all models WITH lag features, select best via CV."""
     return _train_variant(
         df=None,
@@ -634,10 +742,13 @@ def train_model_with_lags(run_optuna: bool = True) -> dict[str, float]:
         feature_filename="feature_names.txt",
         metadata_filename="training_metadata.json",
         run_optuna=run_optuna,
+        cv_mode=cv_mode,
     )
 
 
-def train_model_no_lags(run_optuna: bool = True) -> dict[str, float]:
+def train_model_no_lags(
+    run_optuna: bool = True, cv_mode: str = "expanding"
+) -> dict[str, float]:
     """Train all models WITHOUT lag features, select best via CV."""
     return _train_variant(
         df=None,
@@ -648,10 +759,13 @@ def train_model_no_lags(run_optuna: bool = True) -> dict[str, float]:
         feature_filename="feature_names_no_lags.txt",
         metadata_filename="training_metadata_no_lags.json",
         run_optuna=run_optuna,
+        cv_mode=cv_mode,
     )
 
 
-def train_model_advanced(run_optuna: bool = True) -> dict[str, float]:
+def train_model_advanced(
+    run_optuna: bool = True, cv_mode: str = "expanding"
+) -> dict[str, float]:
     """Train all models WITH advanced features (weather-derived + trend), select best via CV."""
     return _train_variant(
         df=None,
@@ -662,7 +776,112 @@ def train_model_advanced(run_optuna: bool = True) -> dict[str, float]:
         feature_filename="advanced_feature_names.txt",
         metadata_filename="metadata_advanced.json",
         run_optuna=run_optuna,
+        cv_mode=cv_mode,
     )
+
+
+# ── Per-region training (Feature 3) ──────────────────────────────────────────
+
+
+REGIONS = ["Norte", "Centro", "Lisboa", "Alentejo", "Algarve"]
+
+
+def train_per_region_models(
+    run_optuna: bool,
+    variant: str = "with_lags",
+    cv_mode: str = "expanding",
+) -> dict[str, dict[str, float]]:
+    """Train one model per region instead of a single global model.
+
+    For each of the 5 continental Portuguese regions, this filters the dataset
+    to that region only, runs the standard training pipeline, and saves the
+    model to ``data/models/checkpoints/best_model_{region_lower}.pkl``. A
+    combined metadata file is written to
+    ``data/models/metadata/training_metadata_per_region.json``.
+
+    Args:
+        run_optuna: Whether to run Optuna tuning per region.
+        variant: Which feature-engineering variant to use ("with_lags",
+            "no_lags", or "advanced").
+        cv_mode: CV mode forwarded to model selection / Optuna.
+
+    Returns:
+        Dict mapping region name to its test metrics dict.
+    """
+    print(f"\n{'=' * 60}")
+    print(f"PER-REGION TRAINING — variant={variant}")
+    print("=" * 60)
+
+    df_all = load_and_prepare_data()
+    if "region" not in df_all.columns:
+        raise RuntimeError("Cannot train per-region models: 'region' column missing.")
+
+    available_regions = set(df_all["region"].unique())
+    target_regions = [r for r in REGIONS if r in available_regions]
+    if not target_regions:
+        raise RuntimeError(f"None of {REGIONS} found in dataset; got {available_regions}.")
+
+    if variant == "with_lags":
+        fe_func = lambda fe, df, **kw: fe.create_all_features(df)
+        feature_exclude = [TARGET, "timestamp", "region", "year"]
+    elif variant == "no_lags":
+        fe_func = lambda fe, df, **kw: fe.create_features_no_lags(df)
+        feature_exclude = [TARGET, "timestamp", "region"]
+    elif variant == "advanced":
+        fe_func = lambda fe, df, **kw: fe.create_all_features(df, use_advanced=True)
+        feature_exclude = [TARGET, "timestamp", "region", "year"]
+    else:
+        raise ValueError(f"Unknown variant: {variant!r}")
+
+    per_region_results: dict[str, dict[str, float]] = {}
+
+    for region in target_regions:
+        print(f"\n{'#' * 60}")
+        print(f"# REGION: {region}")
+        print("#" * 60)
+        df_region = (
+            df_all[df_all["region"] == region]
+            .sort_values("timestamp")
+            .reset_index(drop=True)
+            .copy()
+        )
+        print(f"  {region}: {len(df_region)} rows")
+
+        region_lower = region.lower()
+        test_metrics = _train_variant(
+            df=None,
+            fe_func=fe_func,
+            feature_exclude=feature_exclude,
+            variant_name=f"per_region_{region_lower}",
+            model_filename=f"best_model_{region_lower}.pkl",
+            feature_filename=f"feature_names_{region_lower}.txt",
+            metadata_filename=f"training_metadata_{region_lower}.json",
+            run_optuna=run_optuna,
+            cv_mode=cv_mode,
+            df_override=df_region,
+            log_experiment=False,
+        )
+        per_region_results[region] = {
+            k: round(float(v), 4) for k, v in test_metrics.items()
+        }
+
+    # Combined per-region metadata
+    meta_dir = MODEL_PATH / "metadata"
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    combined_meta_path = meta_dir / "training_metadata_per_region.json"
+    combined_meta = {
+        "training_date": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "pipeline_version": "v6",
+        "variant": variant,
+        "cv_mode": cv_mode,
+        "random_seed": RANDOM_STATE,
+        "regions": per_region_results,
+    }
+    with open(combined_meta_path, "w") as f:
+        json.dump(combined_meta, f, indent=2, default=str)
+    print(f"\nPer-region metadata saved to {combined_meta_path}")
+
+    return per_region_results
 
 
 def train_multistep_models(run_optuna: bool = False) -> dict[str, dict[str, float]]:
@@ -782,16 +1001,33 @@ if __name__ == "__main__":
         action="store_true",
         help="Also train horizon-specific models (1h, 6h, 12h, 24h)",
     )
+    parser.add_argument(
+        "--cv-mode",
+        choices=["expanding", "walk-forward"],
+        default="expanding",
+        help="Time-series CV mode for model selection / Optuna "
+        "(expanding=TimeSeriesSplit, walk-forward=fixed sliding window). "
+        "Default 'expanding' preserves backward compatibility.",
+    )
+    parser.add_argument(
+        "--per-region",
+        action="store_true",
+        help="Train one model per region (Norte, Centro, Lisboa, Alentejo, Algarve) "
+        "instead of (or in addition to) the global models.",
+    )
     args = parser.parse_args()
 
     use_optuna = not args.skip_optuna
+    cv_mode = args.cv_mode
 
     print("RETRAINING MODELS WITH MODEL REGISTRY (v5)")
     print("=" * 60)
     print(f"Random seed: {RANDOM_STATE}")
     print(f"Optuna: {'ON (' + str(OPTUNA_N_TRIALS) + ' trials)' if use_optuna else 'OFF (--skip-optuna)'}")
+    print(f"CV mode: {cv_mode}")
     print(f"Advanced variant: {'OFF (--skip-advanced)' if args.skip_advanced else 'ON'}")
     print(f"Multi-step: {'ON (--multistep)' if args.multistep else 'OFF'}")
+    print(f"Per-region: {'ON (--per-region)' if args.per_region else 'OFF'}")
     print(f"Feature selection: correlation_threshold={CORRELATION_THRESHOLD}")
     print("=" * 60)
 
@@ -799,16 +1035,23 @@ if __name__ == "__main__":
 
     all_results: dict[str, dict[str, float]] = {}
 
-    all_results["with_lags"] = train_model_with_lags(run_optuna=use_optuna)
-    all_results["no_lags"] = train_model_no_lags(run_optuna=use_optuna)
+    all_results["with_lags"] = train_model_with_lags(run_optuna=use_optuna, cv_mode=cv_mode)
+    all_results["no_lags"] = train_model_no_lags(run_optuna=use_optuna, cv_mode=cv_mode)
 
     if not args.skip_advanced:
-        all_results["advanced"] = train_model_advanced(run_optuna=use_optuna)
+        all_results["advanced"] = train_model_advanced(run_optuna=use_optuna, cv_mode=cv_mode)
 
     if args.multistep:
         multistep = train_multistep_models(run_optuna=use_optuna)
         for horizon, metrics in multistep.items():
             all_results[f"horizon_{horizon}"] = metrics
+
+    if args.per_region:
+        per_region_metrics = train_per_region_models(
+            run_optuna=use_optuna, variant="with_lags", cv_mode=cv_mode
+        )
+        for region, metrics in per_region_metrics.items():
+            all_results[f"region_{region.lower()}"] = metrics
 
     print("\n" + "=" * 60)
     print("SUMMARY")

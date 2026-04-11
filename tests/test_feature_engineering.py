@@ -107,6 +107,170 @@ class TestHolidayFeatures:
         assert (result["days_to_nearest_holiday"] >= 0).all()
 
 
+def _weather_row(timestamp, region="Lisboa"):
+    """Build a minimal weather+consumption dict for a single timestamp."""
+    return {
+        "timestamp": timestamp,
+        "region": region,
+        "consumption_mw": 1500.0,
+        "temperature": 15.0,
+        "humidity": 60.0,
+        "wind_speed": 10.0,
+        "precipitation": 0.0,
+        "cloud_cover": 50.0,
+        "pressure": 1013.0,
+    }
+
+
+class TestBridgeDayFeatures:
+    """Test bridge-day / extended-weekend features.
+
+    Reference dates (all Portuguese public holidays):
+    * 2018-05-01 (Dia do Trabalhador) falls on a Tuesday, so 2018-04-30
+      (Monday) is a Monday-bridge.  The extended weekend runs Sat 04-28 to
+      Tue 05-01 (4 days).
+    * 2025-05-01 (Dia do Trabalhador) falls on a Thursday, so 2025-05-02
+      (Friday) is a Friday-bridge.  The extended weekend runs Thu 05-01 to
+      Sun 05-04 (4 days).
+    """
+
+    def _build_df(self, dates, region="Lisboa"):
+        return pd.DataFrame([_weather_row(d, region=region) for d in dates])
+
+    def test_bridge_columns_created(self, feature_engineer):
+        df = self._build_df(pd.date_range("2018-04-27", "2018-05-03", freq="D"))
+        result = feature_engineer.create_holiday_features(df)
+        for col in ("is_bridge_day", "is_extended_weekend", "days_in_holiday_window"):
+            assert col in result.columns, f"Missing column: {col}"
+
+    def test_monday_bridge_before_tuesday_holiday(self, feature_engineer):
+        """Monday 2018-04-30 is a bridge before Tuesday 2018-05-01 (holiday)."""
+        df = self._build_df(pd.date_range("2018-04-27", "2018-05-03", freq="D"))
+        result = feature_engineer.create_holiday_features(df).set_index(
+            pd.DatetimeIndex(pd.to_datetime(df["timestamp"]))
+        )
+        assert result.loc["2018-04-30", "is_bridge_day"] == 1
+        # The Tuesday holiday itself is not the bridge day
+        assert result.loc["2018-05-01", "is_bridge_day"] == 0
+        assert result.loc["2018-05-01", "is_holiday"] == 1
+        # All four days Sat-Tue must be flagged as extended weekend
+        for day in ("2018-04-28", "2018-04-29", "2018-04-30", "2018-05-01"):
+            assert result.loc[day, "is_extended_weekend"] == 1
+            assert result.loc[day, "days_in_holiday_window"] == 4
+
+    def test_friday_bridge_after_thursday_holiday(self, feature_engineer):
+        """Friday 2025-05-02 is a bridge after Thursday 2025-05-01 (holiday)."""
+        df = self._build_df(pd.date_range("2025-04-29", "2025-05-05", freq="D"))
+        result = feature_engineer.create_holiday_features(df).set_index(
+            pd.DatetimeIndex(pd.to_datetime(df["timestamp"]))
+        )
+        assert result.loc["2025-05-02", "is_bridge_day"] == 1
+        assert result.loc["2025-05-01", "is_holiday"] == 1
+        assert result.loc["2025-05-01", "is_bridge_day"] == 0
+        for day in ("2025-05-01", "2025-05-02", "2025-05-03", "2025-05-04"):
+            assert result.loc[day, "is_extended_weekend"] == 1
+            assert result.loc[day, "days_in_holiday_window"] == 4
+
+    def test_extended_weekend_boundaries(self, feature_engineer):
+        """Days immediately outside the extended run must be flagged 0."""
+        df = self._build_df(pd.date_range("2018-04-26", "2018-05-03", freq="D"))
+        result = feature_engineer.create_holiday_features(df).set_index(
+            pd.DatetimeIndex(pd.to_datetime(df["timestamp"]))
+        )
+        # Thursday 2018-04-26 and Friday 2018-04-27 are regular workdays.
+        assert result.loc["2018-04-26", "is_extended_weekend"] == 0
+        assert result.loc["2018-04-26", "days_in_holiday_window"] == 0
+        assert result.loc["2018-04-27", "is_extended_weekend"] == 0
+        assert result.loc["2018-04-27", "days_in_holiday_window"] == 0
+        # Wednesday 2018-05-02 after the extended block is a regular workday.
+        assert result.loc["2018-05-02", "is_extended_weekend"] == 0
+        assert result.loc["2018-05-02", "days_in_holiday_window"] == 0
+
+    def test_normal_weekday_not_bridge(self, feature_engineer):
+        """A random mid-week day with no nearby holiday is not a bridge."""
+        df = self._build_df(pd.date_range("2024-07-08", "2024-07-12", freq="D"))
+        result = feature_engineer.create_holiday_features(df)
+        assert (result["is_bridge_day"] == 0).all()
+        assert (result["is_extended_weekend"] == 0).all()
+        assert (result["days_in_holiday_window"] == 0).all()
+
+    def test_regular_weekend_window_is_two(self, feature_engineer):
+        """A normal Sat/Sun (no holiday or bridge) has window=2, not extended."""
+        df = self._build_df(pd.date_range("2024-07-13", "2024-07-14", freq="D"))
+        result = feature_engineer.create_holiday_features(df)
+        assert (result["days_in_holiday_window"] == 2).all()
+        assert (result["is_extended_weekend"] == 0).all()
+        assert (result["is_bridge_day"] == 0).all()
+
+    def test_single_row_inference(self, feature_engineer):
+        """Single-row inference must still produce the bridge features."""
+        df = pd.DataFrame([_weather_row(pd.Timestamp("2018-04-30 12:00:00"))])
+        result = feature_engineer.create_holiday_features(df)
+        assert result["is_bridge_day"].iloc[0] == 1
+        assert result["is_extended_weekend"].iloc[0] == 1
+        assert result["days_in_holiday_window"].iloc[0] == 4
+
+    def test_hourly_broadcast(self, feature_engineer):
+        """Bridge features must be identical for every hour on the same date."""
+        dates = pd.date_range("2018-04-30 00:00:00", "2018-04-30 23:00:00", freq="h")
+        df = self._build_df(dates)
+        result = feature_engineer.create_holiday_features(df)
+        assert (result["is_bridge_day"] == 1).all()
+        assert (result["is_extended_weekend"] == 1).all()
+        assert (result["days_in_holiday_window"] == 4).all()
+
+    def test_multi_region(self, feature_engineer):
+        """Multi-region DataFrames broadcast the bridge features per row."""
+        regions = ["Alentejo", "Algarve", "Centro", "Lisboa", "Norte"]
+        rows = []
+        for region in regions:
+            for ts in pd.date_range("2018-04-28", "2018-05-01", freq="D"):
+                rows.append(_weather_row(ts, region=region))
+        df = pd.DataFrame(rows).sort_values("timestamp").reset_index(drop=True)
+        result = feature_engineer.create_holiday_features(df)
+        # Every row in every region must be flagged as extended weekend
+        # with window length 4.
+        assert (result["is_extended_weekend"] == 1).all()
+        assert (result["days_in_holiday_window"] == 4).all()
+        # Only the 5 Monday rows (one per region) should be bridge days.
+        monday_mask = pd.to_datetime(result["timestamp"]).dt.normalize() == pd.Timestamp(
+            "2018-04-30"
+        )
+        assert result.loc[monday_mask, "is_bridge_day"].sum() == len(regions)
+        assert result.loc[~monday_mask, "is_bridge_day"].sum() == 0
+
+    def test_saturday_sunday_handling_in_normal_week(self, feature_engineer):
+        """Plain Sat/Sun with surrounding workdays: window=2, not extended."""
+        df = self._build_df(pd.date_range("2024-07-11", "2024-07-16", freq="D"))
+        result = feature_engineer.create_holiday_features(df).set_index(
+            pd.DatetimeIndex(pd.to_datetime(df["timestamp"]))
+        )
+        # Thursday and Friday are regular workdays
+        assert result.loc["2024-07-11", "days_in_holiday_window"] == 0
+        assert result.loc["2024-07-12", "days_in_holiday_window"] == 0
+        # Saturday and Sunday form a 2-day non-working block
+        assert result.loc["2024-07-13", "days_in_holiday_window"] == 2
+        assert result.loc["2024-07-14", "days_in_holiday_window"] == 2
+        assert result.loc["2024-07-13", "is_extended_weekend"] == 0
+        assert result.loc["2024-07-14", "is_extended_weekend"] == 0
+        # Monday is back to a regular workday
+        assert result.loc["2024-07-15", "days_in_holiday_window"] == 0
+
+    def test_existing_holiday_features_preserved(self, feature_engineer):
+        """Bridge-day additions must not break existing holiday columns."""
+        df = self._build_df(pd.date_range("2018-04-27", "2018-05-03", freq="D"))
+        result = feature_engineer.create_holiday_features(df)
+        for col in (
+            "is_holiday",
+            "is_holiday_eve",
+            "is_holiday_after",
+            "days_to_nearest_holiday",
+            "days_to_holiday",
+            "days_from_holiday",
+        ):
+            assert col in result.columns, f"Existing column {col} was removed"
+
+
 class TestLagFeatures:
     """Test lag feature creation."""
 
