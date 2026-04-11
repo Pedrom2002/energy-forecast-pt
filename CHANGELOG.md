@@ -11,6 +11,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+#### Pipeline v8 — Optuna + Walk-Forward CV + Split Conformal (April 2026)
+- **Hyperparameter tuning**: Optuna 30 trials × 5-fold walk-forward CV with TPE sampler. Replaces the v7 default-params runs.
+- **Walk-forward cross-validation**: new `--cv-mode walk-forward` flag uses sliding-window folds (60% window) instead of expanding TimeSeriesSplit. More representative of production behaviour and produces more stable error estimates.
+- **Split conformal calibration**: validation set is now split 50/50 into early-stopping half and calibration half. The conformal q90 is computed on the untouched calibration half, eliminating leakage from the early-stopping signal.
+- **XGBoost wins both variants** under walk-forward CV (vs LightGBM in v7):
+  - **with_lags**: XGBoost — MAPE **1.44%**, RMSE **22.90**, MAE **13.50**, R² **0.9979**, MASE **0.022**, 78 features after selection
+  - **no_lags**: XGBoost — MAPE **4.77%**, RMSE **54.18**, MAE **37.26**, R² **0.9882**, MASE **0.048**, 56 features
+- **2.6× better than Persistence baseline** (vs 2.5× in v7) — within state-of-the-art range for hourly load forecasting at the regional level.
+- **Per-region with_lags MAPE** (XGBoost, Pipeline v8): Alentejo 1.02%, Algarve 1.31%, Centro 1.09%, Lisboa 1.46%, Norte 2.31%.
+- **`--per-region` flag**: train 5 separate models, one per NUTS-II region (off by default).
+- **Random Forest fully removed** from the registry — consistently the worst and slowest of the 4 candidates. Pipeline now selects between XGBoost, LightGBM, and CatBoost only.
+- **Postal code mapping refined**: 3-digit precision for the ambiguous `2xxx` block (Lisboa AML vs Santarém district), correcting 9 CPs that were previously mis-classified.
+
 #### Pipeline v7 — Honest Regional Data (April 2026)
 - **Abandoned the static-share disaggregation approach (v6)** after discovering it created a structural artefact: regional series were computed as `national[t] × constant_share`, which allowed lag-based models to trivially reconstruct one region from another. The MAPE 1.6% achieved with this approach was inflated by leakage. Verified by training the `no_lags` variant: MAPE jumped to ~5% once lags were removed, confirming the artefact.
 - **Pipeline v7 trains directly on the real e-Redes regional CP4 dataset** (`consumos_horario_codigo_postal`), with each region having genuinely independent dynamics. No fabricated regional split.

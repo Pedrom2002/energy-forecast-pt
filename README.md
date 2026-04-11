@@ -15,12 +15,13 @@ Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter t
 
 | Variant | MAE (MW) | RMSE (MW) | MAPE | R² | Features | Best Model |
 |---------|----------|-----------|------|-----|----------|------------|
-| **with_lags** | **13.78** | **23.44** | **1.51%** | **0.9978** | 52 | LightGBM |
-| no_lags | 44.98 | 64.77 | 5.23% | 0.9831 | 45 | LightGBM |
+| **with_lags** | **13.50** | **22.90** | **1.44%** | **0.9979** | 78 | XGBoost |
+| no_lags | 37.26 | 54.18 | 4.77% | 0.9882 | 56 | XGBoost |
 
-- **60% RMSE reduction** over best baseline (Persistence 58.74) — 2.5x better
-- **MASE 0.023** (with_lags) — model error ~2% of seasonal naive error
-- **90% conformal prediction intervals** with distribution-free coverage guarantee (q90 = 30.16 MW)
+- **Pipeline v8**: Optuna hyperparameter tuning (30 trials, walk-forward CV) + split conformal calibration
+- **61% RMSE reduction** over best baseline (Persistence 58.74) — 2.6x better
+- **MASE 0.022** (with_lags) — model error ~2% of seasonal naive error
+- **90% conformal prediction intervals** computed on a held-out calibration half (split conformal)
 - **5 regions**: Alentejo, Algarve, Centro, Lisboa, Norte
 - **40,075 samples** (39,835 after feature engineering) of REAL regional hourly data (2022-11-01 to 2023-09-30), sourced from e-Redes `consumos_horario_codigo_postal` (CP4) + Open-Meteo
 
@@ -71,7 +72,7 @@ python scripts/retrain.py --skip-optuna --multistep
 ```
 
 The data ingestion pipeline lives in `scripts/data_pipeline/` — see its
-[README](scripts/data_pipeline/README.md) for details on the v7 honest
+[README](scripts/data_pipeline/README.md) for details on the v8 honest
 regional approach.
 
 A monthly automated retrain is configured via
@@ -195,7 +196,7 @@ The API auto-loads models from `data/models/checkpoints/` and selects the best a
 }
 ```
 
-## ML Pipeline (v7)
+## ML Pipeline (v8)
 
 The training pipeline (`scripts/retrain.py`) executes 12 steps per model variant:
 
@@ -243,7 +244,7 @@ energy-forecast-pt/
 │       └── reproducibility.py       # Global seeds, environment snapshots, data hashing
 │
 ├── scripts/
-│   ├── retrain.py                   # Production training pipeline (v7)
+│   ├── retrain.py                   # Production training pipeline (v8)
 │   └── generate_notebooks.py        # Generate analysis notebooks
 │
 ├── notebooks/                        # Analysis-only (no model training/saving)
@@ -467,5 +468,5 @@ Expected behaviour — auto-regressive feedback accumulates error. For horizons 
 
 **Author**: Pedro Marques
 **Version**: 2.1.0
-**Pipeline**: v7
+**Pipeline**: v8
 **Last Updated**: April 2026

@@ -27,10 +27,10 @@ Complete technical documentation for the Energy Forecast PT project.
 
 ```
 Model Performance (2 variants, pipeline v7 — honest regional data):
-  - Best: LightGBM with_lags — MAPE 1.51%, R² 0.9978, RMSE 23.44 MW
-  - Fallback: LightGBM no_lags — MAPE 5.23%, R² 0.9831, RMSE 64.77 MW
+  - Best: LightGBM with_lags — MAPE 1.44%, R² 0.9979, RMSE 22.90 MW
+  - Fallback: LightGBM no_lags — MAPE 4.77%, R² 0.9882, RMSE 54.18 MW
   - 90% conformal prediction intervals (q90 = 30.16 MW with_lags, 101.63 no_lags)
-  - 60% RMSE improvement over best baseline (Persistence 58.74 MW) — 2.5x better
+  - 61% RMSE improvement over best baseline (Persistence 58.74 MW) — 2.6x better
 
 Stack:
   - ML: LightGBM + CatBoost + XGBoost, Python 3.11+
@@ -71,7 +71,7 @@ Stack:
 
 Use the Portuguese docs with translation tools:
 - **PROJECT_OVERVIEW.md** - Full project details
-- **FEATURE_ENGINEERING.md** - All 39-52 features explained
+- **FEATURE_ENGINEERING.md** - All 56-78 features explained
 - **MODELS_AND_METHODOLOGY.md** - ML methodology in depth
 - **API_DOCUMENTATION.md** - Complete API reference
 - **NOTEBOOKS_GUIDE.md** - Development notebooks guide
@@ -164,7 +164,7 @@ curl -X POST "http://localhost:8000/predict" \
 ### EXECUTIVE_SUMMARY.md (English) ⭐
 **30 pages** - Complete technical summary covering:
 - Project overview and results
-- Feature engineering (39-52 features)
+- Feature engineering (56-78 features)
 - Model comparison and selection
 - API endpoints and usage
 - Deployment options
@@ -189,7 +189,7 @@ curl -X POST "http://localhost:8000/predict" \
 
 ### FEATURE_ENGINEERING.md (Portuguese)
 **~100 pages** - Detailed feature engineering:
-- All 39-52 features explained
+- All 56-78 features explained
 - Temporal features (18)
 - Lag features (7)
 - Rolling windows (20)
@@ -244,7 +244,7 @@ curl -X POST "http://localhost:8000/predict" \
 
 - **Project Repository**: [GitHub URL]
 - **Interactive API Docs**: http://localhost:8000/docs
-- **Model Performance**: MAPE 1.51%, R² 0.9978 (Pipeline v7)
+- **Model Performance**: MAPE 1.44%, R² 0.9979 (Pipeline v8)
 - **Technology**: Python, XGBoost, FastAPI, Docker
 
 ---
@@ -292,10 +292,10 @@ The detailed technical documentation is in Portuguese, but:
 ## 📝 Changelog
 
 ### v2.1 (April 2026)
-- ✅ Pipeline v7 — honest regional data (e-Redes CP4 direct, no disaggregation)
+- ✅ Pipeline v8 — honest regional data (e-Redes CP4 direct, no disaggregation)
 - ✅ Dropped static-share disaggregation artefact (see CHANGELOG)
-- ✅ Updated all metrics: MAPE 1.51% (with_lags), 5.23% (no_lags)
-- ✅ Updated MODEL_CARD.md (v3.1, Pipeline v7) with per-region metrics
+- ✅ Updated all metrics: MAPE 1.44% (with_lags), 4.77% (no_lags)
+- ✅ Updated MODEL_CARD.md (v3.1, Pipeline v8) with per-region metrics
 
 ### v2.0 (March 2026)
 - ✅ ML Pipeline documentation (ML_PIPELINE.md)
@@ -324,7 +324,7 @@ The detailed technical documentation is in Portuguese, but:
 ## ⭐ Key Highlights
 
 ```
-✅ Strong model performance (MAPE 1.51%, 60% RMSE improvement over best baseline)
+✅ Strong model performance (MAPE 1.44%, 61% RMSE improvement over best baseline)
 ✅ Production-ready API (FastAPI)
 ✅ Comprehensive documentation
 ✅ 5 development notebooks (01-05)
