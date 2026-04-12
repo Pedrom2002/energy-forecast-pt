@@ -1,0 +1,44 @@
+# Fly.io deployment config for the FastAPI backend.
+# Free-tier friendly: 1 shared-cpu VM, auto-stop when idle, auto-start on request.
+#
+# Quick start:
+#   fly auth login
+#   fly launch --copy-config --no-deploy --name energy-forecast-pt
+#   fly deploy
+#
+# The Dockerfile at the repo root is built and pushed automatically.
+
+app = "energy-forecast-pt"
+primary_region = "mad"   # Madrid — closest to Portugal
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+  dockerfile = "../../Dockerfile"
+
+[env]
+  LOG_LEVEL = "INFO"
+  PORT = "8000"
+  TRUST_PROXY = "1"
+  ENABLE_TRACING = "0"
+  MODELS_DIR = "/app/data/models"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "15s"
+    method = "get"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

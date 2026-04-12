@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: energy-forecast
+
+commonLabels:
+  app.kubernetes.io/name: energy-forecast-pt
+  app.kubernetes.io/part-of: energy-forecast-pt
+  app.kubernetes.io/managed-by: kustomize
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+  # Comment the next line out if the Prometheus Operator CRDs are not installed
+  - servicemonitor.yaml
+
+images:
+  - name: energy-forecast-pt
+    newName: energy-forecast-pt
+    newTag: latest

@@ -1,0 +1,109 @@
+groups:
+  - name: energy-forecast-api.rules
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job="energy-forecast-api",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="energy-forecast-api"}[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: energy-forecast-api
+        annotations:
+          summary: "High 5xx error rate on energy-forecast-api"
+          description: "5xx error rate is {{ $value | humanizePercentage }} (> 5%) over the last 5 minutes on {{ $labels.job }}."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/HighErrorRate"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="energy-forecast-api"}[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: energy-forecast-api
+        annotations:
+          summary: "P95 latency above 500ms"
+          description: "P95 request duration is {{ $value }}s (> 0.5s) over the last 5 minutes."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/HighLatencyP95"
+
+      - alert: HighLatencyP99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="energy-forecast-api"}[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: energy-forecast-api
+        annotations:
+          summary: "P99 latency above 2s"
+          description: "P99 request duration is {{ $value }}s (> 2s) over the last 5 minutes."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/HighLatencyP99"
+
+      - alert: ModelLoadFailure
+        # NOTE: requires the service to expose a counter `model_load_errors_total`
+        # incremented whenever model (joblib/onnx) loading fails on startup or reload.
+        expr: increase(model_load_errors_total{job="energy-forecast-api"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: energy-forecast-api
+        annotations:
+          summary: "Model load failure detected"
+          description: "{{ $value }} model load error(s) observed in the last 5 minutes on {{ $labels.instance }}."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/ModelLoadFailure"
+
+      - alert: ConformalCoverageDrift
+        # Custom gauge emitted by CoverageTracker: empirical coverage over 168h window.
+        # Nominal target is 0.90; alert if deviation exceeds 5 percentage points.
+        expr: abs(conformal_coverage_ratio{job="energy-forecast-api"} - 0.90) > 0.05
+        for: 1h
+        labels:
+          severity: warning
+          service: energy-forecast-api
+        annotations:
+          summary: "Conformal coverage drifting from nominal 0.90"
+          description: "conformal_coverage_ratio = {{ $value }} on {{ $labels.instance }} (deviation > 5pp from 0.90 for 1h)."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/ConformalCoverageDrift"
+
+      - alert: FeatureDrift
+        # Custom gauge sourced from /model/drift detector (e.g. PSI or KS statistic).
+        expr: feature_drift_score{job="energy-forecast-api"} > 3.0
+        for: 30m
+        labels:
+          severity: warning
+          service: energy-forecast-api
+        annotations:
+          summary: "Feature drift score above threshold"
+          description: "feature_drift_score = {{ $value }} (> 3.0) on feature {{ $labels.feature }} for 30m."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/FeatureDrift"
+
+      - alert: ServiceDown
+        expr: up{job="energy-forecast-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: energy-forecast-api
+        annotations:
+          summary: "energy-forecast-api is down"
+          description: "Prometheus target {{ $labels.instance }} has been down for more than 2 minutes."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/ServiceDown"
+
+      - alert: HighMemory
+        expr: process_resident_memory_bytes{job="energy-forecast-api"} > 1073741824
+        for: 10m
+        labels:
+          severity: warning
+          service: energy-forecast-api
+        annotations:
+          summary: "High resident memory usage"
+          description: "Process RSS is {{ $value | humanize1024 }}B (> 1GiB) on {{ $labels.instance }} for 10 minutes."
+          runbook_url: "https://runbooks.example.com/energy-forecast-api/HighMemory"

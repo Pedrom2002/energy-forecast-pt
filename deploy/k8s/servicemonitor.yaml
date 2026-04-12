@@ -1,0 +1,38 @@
+# =============================================================================
+# Prometheus Operator ServiceMonitor
+# -----------------------------------------------------------------------------
+# Requires the Prometheus Operator CRDs to be installed in the cluster:
+#   https://github.com/prometheus-operator/prometheus-operator
+#
+# If the CRD `servicemonitors.monitoring.coreos.com` is NOT present, remove
+# this file from kustomization.yaml — otherwise `kubectl apply` will fail with
+# "no matches for kind ServiceMonitor".
+#
+# The app is expected to expose Prometheus metrics at GET /metrics on port
+# 8000. Adjust `path` / `interval` if your app uses a different route.
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: energy-forecast-api
+  namespace: energy-forecast
+  labels:
+    app.kubernetes.io/name: energy-forecast-pt
+    app.kubernetes.io/component: api
+    # Match the label selector your Prometheus instance scrapes. The default
+    # kube-prometheus-stack selector is `release: kube-prometheus-stack`.
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: energy-forecast-pt
+      app.kubernetes.io/component: api
+  namespaceSelector:
+    matchNames:
+      - energy-forecast
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true

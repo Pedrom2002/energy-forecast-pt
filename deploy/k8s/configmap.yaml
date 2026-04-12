@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: energy-forecast-config
+  namespace: energy-forecast
+  labels:
+    app.kubernetes.io/name: energy-forecast-pt
+    app.kubernetes.io/component: api
+data:
+  # Logging
+  LOG_LEVEL: "info"
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+  # Observability (disabled by default; flip to 1 to enable OTel exporters)
+  ENABLE_TRACING: "0"
+  ENABLE_METRICS: "1"
+  OTEL_SERVICE_NAME: "energy-forecast-pt"
+
+  # Model artefacts — baked into the image under /app and/or mounted via volume.
+  # Override MODEL_PATH if you mount a PVC at a different location.
+  MODEL_PATH: "/app/data/models"
+  MODEL_NAME: "latest"
+
+  # API runtime
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  API_WORKERS: "2"
+
+  # Feature flags / defaults
+  FORECAST_HORIZON_HOURS: "24"
+  DEFAULT_TIMEZONE: "Europe/Lisbon"

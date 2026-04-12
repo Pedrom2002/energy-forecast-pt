@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: energy-forecast
+  labels:
+    name: energy-forecast
+    app.kubernetes.io/name: energy-forecast-pt
+    app.kubernetes.io/part-of: energy-forecast-pt

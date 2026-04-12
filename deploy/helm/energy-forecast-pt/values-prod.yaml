@@ -1,0 +1,55 @@
+# Production overrides for energy-forecast-pt.
+# Usage:
+#   helm upgrade --install energy-forecast deploy/helm/energy-forecast-pt \
+#     --namespace energy-forecast --create-namespace \
+#     -f deploy/helm/energy-forecast-pt/values-prod.yaml
+
+image:
+  repository: ghcr.io/pedrom2002/energy-forecast-pt
+  # Pin to an immutable tag (semver or SHA) in real deployments.
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 15
+  targetCPUUtilizationPercentage: 65
+  targetMemoryUtilizationPercentage: 75
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "4"
+    memory: 6Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: api.energy-forecast.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: energy-forecast-prod-tls
+      hosts:
+        - api.energy-forecast.example.com
+
+serviceMonitor:
+  enabled: true
+
+# In prod, replace these with a SealedSecret / ExternalSecret.
+secrets: {}
+envFrom:
+  configMap:
+    enabled: true
+  secret:
+    enabled: false
+extraEnvFrom:
+  - secretRef:
+      name: energy-forecast-external-secrets

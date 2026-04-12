@@ -1,0 +1,46 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: default-webhook
+  group_by: ["alertname", "service", "severity"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers:
+        - severity = "critical"
+      receiver: critical-webhook
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: false
+    - matchers:
+        - severity = "warning"
+      receiver: warning-webhook
+      repeat_interval: 6h
+      continue: false
+
+receivers:
+  - name: default-webhook
+    webhook_configs:
+      - url: http://webhook-receiver:5001/alerts
+        send_resolved: true
+
+  - name: critical-webhook
+    webhook_configs:
+      - url: http://webhook-receiver:5001/alerts/critical
+        send_resolved: true
+        # TODO: replace with real PagerDuty / Slack / Opsgenie integration
+
+  - name: warning-webhook
+    webhook_configs:
+      - url: http://webhook-receiver:5001/alerts/warning
+        send_resolved: true
+        # TODO: replace with real Slack channel webhook
+
+inhibit_rules:
+  - source_matchers:
+      - severity = "critical"
+    target_matchers:
+      - severity = "warning"
+    equal: ["alertname", "service"]
