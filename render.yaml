@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: energy-forecast-pt
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: LOG_LEVEL
+        value: INFO
+      - key: MODELS_DIR
+        value: /app/data/models
+    healthCheckPath: /health
