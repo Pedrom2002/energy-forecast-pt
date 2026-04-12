@@ -36,6 +36,11 @@ pyyaml>=6.0,<7.0
 prometheus-client>=0.19.0,<1.0
 prometheus-fastapi-instrumentator>=6.1.0,<7.0
 
+# Observability — optional OpenTelemetry tracing (enable via ENABLE_TRACING=1)
+opentelemetry-api>=1.24.0,<2.0
+opentelemetry-sdk>=1.24.0,<2.0
+opentelemetry-instrumentation-fastapi>=0.45b0,<1.0
+
 # Optional: Redis-backed distributed rate limiting
 # Enable by setting the REDIS_URL environment variable at runtime.
 # Install with: pip install redis
