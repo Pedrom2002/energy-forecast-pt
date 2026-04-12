@@ -2,6 +2,10 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+## E2E tests (Playwright)
+
+Smoke tests live in `./e2e` and run independently from the Vitest unit suite. Run with `npm run e2e` (headless) or `npm run e2e:ui` (interactive). First-time setup: `npx playwright install chromium`. The config auto-starts `npm run dev` on port 3000 and mocks `/api/**` so no real backend is needed.
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
