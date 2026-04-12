@@ -7,9 +7,44 @@
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![React 19](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-61DAFB.svg)]()
 
+> **MAPE 1.44%** &nbsp;·&nbsp; **RMSE 22.9 MW** &nbsp;·&nbsp; **2.6× better than persistence baseline** &nbsp;·&nbsp; **R² 0.998** &nbsp;·&nbsp; **780+ tests** &nbsp;·&nbsp; **85% coverage**
+
 Full-stack energy consumption forecasting system for Portugal by region. Gradient-boosted tree models (CatBoost, XGBoost, LightGBM) with a modern React 19 frontend.
 
 Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter tuning, permutation-importance feature selection, conformal prediction calibration, and file-based experiment tracking.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Sources["Data sources"]
+        ER[e-Redes CP4<br/>hourly consumption]
+        OM[Open-Meteo<br/>weather]
+    end
+
+    subgraph Pipeline["ML pipeline (DVC)"]
+        FE[Feature engineering<br/>78 features]
+        CV[5-fold time-series CV]
+        OPT[Optuna<br/>30 trials × 5 folds]
+        CONF[Split conformal<br/>calibration]
+        FE --> CV --> OPT --> CONF
+    end
+
+    subgraph Serving["Serving"]
+        API[FastAPI<br/>7 routers]
+        UI[React 19<br/>+ TypeScript]
+        UI -->|/api| API
+    end
+
+    subgraph Ops["Ops"]
+        PROM[Prometheus<br/>+ Alertmanager]
+        K8S[Kubernetes<br/>+ Helm]
+    end
+
+    Sources --> Pipeline --> API
+    API -.metrics.-> PROM
+    API --> K8S
+```
 
 ## Key Results
 
