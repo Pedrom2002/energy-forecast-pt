@@ -998,6 +998,23 @@ class FeatureEngineer:
         # Simplified feels-like temperature
         df_features["temperature_feels_like"] = df_features["temperature"]
 
+        # Inject derived weather columns expected by the trained model
+        if "dew_point" not in df_features.columns:
+            T = df_features["temperature"]
+            RH = df_features["humidity"].clip(lower=1.0, upper=100.0)
+            _gamma = np.log(RH / 100.0) + (MAGNUS_B * T) / (MAGNUS_C + T)
+            df_features["dew_point"] = (MAGNUS_C * _gamma / (MAGNUS_B - _gamma)).clip(
+                lower=DEW_POINT_LOWER_BOUND, upper=T
+            )
+        if "wind_direction" not in df_features.columns:
+            df_features["wind_direction"] = 180.0
+        if "solar_radiation" not in df_features.columns:
+            ts = pd.to_datetime(df_features["timestamp"], errors="coerce")
+            hour = ts.dt.hour.fillna(12).astype(float)
+            daylight = np.sin(np.pi * ((hour - 6.0).clip(lower=0.0, upper=12.0)) / 12.0)
+            clear_sky = 1.0 - df_features.get("cloud_cover", pd.Series(50.0, index=df_features.index)) / 100.0
+            df_features["solar_radiation"] = (900.0 * daylight * clear_sky).clip(lower=0.0)
+
         # Reuse temporal features from main pipeline
         df_features = self.create_temporal_features(df_features)
 
