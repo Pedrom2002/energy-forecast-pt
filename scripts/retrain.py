@@ -43,6 +43,7 @@ from src.models.model_registry import (
     fit_model,
     get_search_space,
 )
+from src.utils.config import TrainingConfig
 from src.utils.metrics import mean_absolute_scaled_error
 from src.utils.reproducibility import (
     get_reproducibility_info,
@@ -52,24 +53,78 @@ from src.utils.reproducibility import (
 )
 
 # ── Configuration ────────────────────────────────────────────────────────────
+#
+# All hyperparameters are loaded from a YAML config (default:
+# ``configs/training.yaml``) via ``TrainingConfig.from_yaml``. The module-level
+# constants below are populated from that config at import time so existing
+# function signatures (which reference them as defaults) keep working.
+# Override via ``python scripts/retrain.py --config path/to/other.yaml``.
 
-DATA_PATH = Path("data/processed/processed_data.parquet")
-MODEL_PATH = Path("data/models")
-RANDOM_STATE = 42
-TARGET = "consumption_mw"
+DEFAULT_CONFIG_PATH = Path("configs/training.yaml")
 
-# Optuna tuning configuration
-OPTUNA_N_TRIALS = int(OPTUNA_DEFAULTS.get("n_trials", 50))
-OPTUNA_CV_FOLDS = int(OPTUNA_DEFAULTS.get("n_cv_folds", 5))
-OPTUNA_TIMEOUT = None  # No hard timeout — let Optuna run all trials to completion
 
-# Feature selection — relaxed for tree-based models.
-# Tree models handle correlated features natively (splitting on different
-# features at different depths), so aggressive correlation filtering hurts.
-# We only remove near-duplicates (|r| > 0.99) and truly useless features.
-CORRELATION_THRESHOLD = 0.99
-MAX_FEATURES = None  # None = keep all features above min_importance
-MIN_IMPORTANCE = 0.0  # features with zero/negative permutation importance are removed
+def _load_training_config(path: str | Path | None = None) -> TrainingConfig:
+    """Load the training config, falling back to the repo-default path."""
+    cfg_path = Path(path) if path else DEFAULT_CONFIG_PATH
+    return TrainingConfig.from_yaml(cfg_path)
+
+
+def _apply_config(cfg: TrainingConfig) -> None:
+    """Push values from a :class:`TrainingConfig` into the module-level constants.
+
+    Keeps behavioural changes minimal: existing helpers still reference
+    ``OPTUNA_N_TRIALS`` etc. as defaults, so this lets us swap configs at
+    startup without rewriting every call site.
+    """
+    global DATA_PATH, MODEL_PATH, RANDOM_STATE, TARGET
+    global OPTUNA_N_TRIALS, OPTUNA_CV_FOLDS, OPTUNA_TIMEOUT
+    global CORRELATION_THRESHOLD, MAX_FEATURES, MIN_IMPORTANCE
+    global CONFORMAL_ALPHA, CONFORMAL_CALIBRATION_RATIO
+    global TRAINING_CONFIG
+
+    TRAINING_CONFIG = cfg
+    DATA_PATH = Path(cfg.data.data_path)
+    MODEL_PATH = Path(cfg.paths.output_dir)
+    RANDOM_STATE = cfg.general.seed
+    TARGET = cfg.data.target
+
+    OPTUNA_N_TRIALS = int(cfg.optuna.n_trials)
+    OPTUNA_CV_FOLDS = int(cfg.optuna.cv_folds)
+    OPTUNA_TIMEOUT = cfg.optuna.timeout_seconds  # int | None
+
+    CORRELATION_THRESHOLD = cfg.feature_selection.correlation_threshold
+    MAX_FEATURES = cfg.feature_selection.max_features
+    MIN_IMPORTANCE = cfg.feature_selection.permutation_threshold
+
+    CONFORMAL_ALPHA = cfg.conformal.alpha
+    CONFORMAL_CALIBRATION_RATIO = cfg.conformal.calibration_ratio
+
+
+# Seed the module-level constants from the default config so importers
+# (e.g. ``scripts/run_with_lags_only.py``) get sensible values without
+# needing to pass a config explicitly. OPTUNA_DEFAULTS from the model
+# registry is kept imported above for back-compat, but no longer drives
+# these constants.
+TRAINING_CONFIG: TrainingConfig = _load_training_config()
+DATA_PATH: Path = Path(TRAINING_CONFIG.data.data_path)
+MODEL_PATH: Path = Path(TRAINING_CONFIG.paths.output_dir)
+RANDOM_STATE: int = TRAINING_CONFIG.general.seed
+TARGET: str = TRAINING_CONFIG.data.target
+
+OPTUNA_N_TRIALS: int = int(TRAINING_CONFIG.optuna.n_trials)
+OPTUNA_CV_FOLDS: int = int(TRAINING_CONFIG.optuna.cv_folds)
+OPTUNA_TIMEOUT: int | None = TRAINING_CONFIG.optuna.timeout_seconds
+
+CORRELATION_THRESHOLD: float = TRAINING_CONFIG.feature_selection.correlation_threshold
+MAX_FEATURES: int | None = TRAINING_CONFIG.feature_selection.max_features
+MIN_IMPORTANCE: float = TRAINING_CONFIG.feature_selection.permutation_threshold
+
+CONFORMAL_ALPHA: float = TRAINING_CONFIG.conformal.alpha
+CONFORMAL_CALIBRATION_RATIO: float = TRAINING_CONFIG.conformal.calibration_ratio
+
+# Silence the unused-import lint for OPTUNA_DEFAULTS — it may be useful for
+# scripts importing from here; retained for backwards compatibility.
+_ = OPTUNA_DEFAULTS
 
 # Configure logging
 logging.basicConfig(
@@ -348,11 +403,20 @@ def optuna_tune(
 
 
 def compute_conformal_q90(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """Compute the 90th percentile of absolute residuals for conformal CI."""
+    """Compute the conformal quantile of absolute residuals.
+
+    The quantile level is ``(1 - CONFORMAL_ALPHA) * 100``. With the default
+    ``alpha=0.1`` this is the 90th percentile ("q90"). The function name is
+    retained for backwards compatibility with callers/metadata fields.
+    """
     residuals = np.abs(y_true - y_pred)
-    q90 = float(np.percentile(residuals, 90))
-    print(f"  Conformal q90: {q90:.2f} MW (from {len(residuals)} residuals)")
-    return q90
+    quantile_level = (1.0 - CONFORMAL_ALPHA) * 100.0
+    q = float(np.percentile(residuals, quantile_level))
+    print(
+        f"  Conformal q{int(round(quantile_level))}: {q:.2f} MW "
+        f"(from {len(residuals)} residuals, alpha={CONFORMAL_ALPHA})"
+    )
+    return q
 
 
 # ── Main training pipeline ──────────────────────────────────────────────────
@@ -416,9 +480,13 @@ def _train_variant(
     print(f"  Done in {time.time() - t0:.1f}s")
     print(f"  Features: {len(df_features)} rows, {len(df_features.columns)} columns")
 
-    # Step 4: Temporal split
+    # Step 4: Temporal split (fractions from config)
     print("\nSplitting data...")
-    train, val, test = temporal_split(df_features)
+    train, val, test = temporal_split(
+        df_features,
+        train_frac=TRAINING_CONFIG.data.train_frac,
+        val_frac=TRAINING_CONFIG.data.val_frac,
+    )
 
     feature_cols = get_feature_columns(train, exclude_cols=feature_exclude)
     print(f"  Feature columns: {len(feature_cols)}")
@@ -471,7 +539,10 @@ def _train_variant(
     X_trainval = np.concatenate([X_train, X_val])
     y_trainval = np.concatenate([y_train, y_val])
     best_key, cv_scores = cross_validate_model_selection(
-        X_trainval, y_trainval, n_splits=5, cv_mode=cv_mode
+        X_trainval,
+        y_trainval,
+        n_splits=TRAINING_CONFIG.cv.n_folds,
+        cv_mode=cv_mode,
     )
 
     # Step 7: Optuna hyperparameter optimisation
@@ -542,12 +613,17 @@ def _train_variant(
     # which removes the mild leakage caused by reusing the early-stopping set
     # for calibration.
     n_val = len(X_val)
-    half = n_val // 2
-    X_val_es, X_val_cal = X_val[:half], X_val[half:]
-    y_val_es, y_val_cal = y_val[:half], y_val[half:]
+    # Split-conformal calibration ratio comes from the config (default 0.5).
+    # The *calibration_ratio* fraction of the val set is held out for
+    # conformal q-quantile estimation; the remainder drives early stopping.
+    cal_size = max(1, int(round(n_val * CONFORMAL_CALIBRATION_RATIO)))
+    es_size = n_val - cal_size
+    X_val_es, X_val_cal = X_val[:es_size], X_val[es_size:]
+    y_val_es, y_val_cal = y_val[:es_size], y_val[es_size:]
     print(
         f"\nSplit-conformal: val split into early-stopping ({len(X_val_es)}) "
-        f"and calibration ({len(X_val_cal)}) halves"
+        f"and calibration ({len(X_val_cal)}) halves "
+        f"(calibration_ratio={CONFORMAL_CALIBRATION_RATIO})"
     )
 
     print(f"Training intermediate {DISPLAY_NAMES[best_key]} (train + early-stopping val half)...")
@@ -998,6 +1074,14 @@ if __name__ == "__main__":
         description="Retrain energy forecasting models (pipeline v5)",
     )
     parser.add_argument(
+        "--config",
+        type=str,
+        default=str(DEFAULT_CONFIG_PATH),
+        help="Path to training YAML config (default: configs/training.yaml). "
+        "All hyperparameters (seed, Optuna trials, search spaces, conformal "
+        "alpha, CV folds, etc.) are loaded from this file.",
+    )
+    parser.add_argument(
         "--skip-advanced",
         action="store_true",
         help="Skip the advanced variant (faster iteration)",
@@ -1028,11 +1112,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    use_optuna = not args.skip_optuna
+    # Reload config from the CLI-specified path (may differ from the default
+    # used at import time) and push values into the module-level constants.
+    cli_cfg = _load_training_config(args.config)
+    _apply_config(cli_cfg)
+
+    use_optuna = (not args.skip_optuna) and cli_cfg.optuna.enabled
     cv_mode = args.cv_mode
 
     print("RETRAINING MODELS WITH MODEL REGISTRY (v5)")
     print("=" * 60)
+    print(f"Config file: {args.config}")
+    print(f"Experiment name: {cli_cfg.general.experiment_name}")
     print(f"Random seed: {RANDOM_STATE}")
     print(f"Optuna: {'ON (' + str(OPTUNA_N_TRIALS) + ' trials)' if use_optuna else 'OFF (--skip-optuna)'}")
     print(f"CV mode: {cv_mode}")
