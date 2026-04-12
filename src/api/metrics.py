@@ -14,6 +14,14 @@ Exposed metrics:
 - ``energy_forecast_model_coverage`` (Gauge — current empirical CI coverage)
 - ``energy_forecast_anomaly_rate`` (Gauge — current rolling anomaly rate)
 - ``energy_forecast_model_age_days`` (Gauge — days since model was trained)
+- ``conformal_coverage_ratio`` (Gauge, labels: region — empirical coverage
+  ratio emitted by ``CoverageTracker``, consumed by the
+  ``ConformalCoverageDrift`` alert in ``deploy/prometheus/alerts.yml``)
+- ``feature_drift_score`` (Gauge, labels: feature — absolute z-score per
+  feature emitted from the ``/model/drift`` endpoints, consumed by the
+  ``FeatureDrift`` alert)
+- ``model_load_errors_total`` (Counter — incremented whenever a model fails
+  to load on startup or reload, consumed by the ``ModelLoadFailure`` alert)
 
 The metrics are registered against a private :class:`CollectorRegistry` so
 they do not collide with metrics already registered by other libraries
@@ -136,6 +144,24 @@ class MetricsRegistry:
                 "Days since the deployed model was last trained.",
                 registry=self.registry,
             )
+            # ── Alerting metrics referenced by deploy/prometheus/alerts.yml ──
+            self.conformal_coverage_ratio = Gauge(
+                "conformal_coverage_ratio",
+                "Empirical coverage of conformal prediction intervals (sliding window).",
+                labelnames=("region",),
+                registry=self.registry,
+            )
+            self.feature_drift_score = Gauge(
+                "feature_drift_score",
+                "Drift score per feature (absolute z-score vs training baseline).",
+                labelnames=("feature",),
+                registry=self.registry,
+            )
+            self.model_load_errors_total = Counter(
+                "model_load_errors_total",
+                "Total number of model load failures (startup or reload).",
+                registry=self.registry,
+            )
         else:  # pragma: no cover - import-time fallback
             self.registry = CollectorRegistry()
             self.predictions_total = _NoopMetric()
@@ -144,6 +170,9 @@ class MetricsRegistry:
             self.model_coverage = _NoopMetric()
             self.anomaly_rate = _NoopMetric()
             self.model_age_days = _NoopMetric()
+            self.conformal_coverage_ratio = _NoopMetric()
+            self.feature_drift_score = _NoopMetric()
+            self.model_load_errors_total = _NoopMetric()
 
     # ------------------------------------------------------------------
     # Convenience helpers used from the FastAPI app.
@@ -222,6 +251,49 @@ class MetricsRegistry:
         except Exception:
             logger.debug("Failed to update model age gauge for value=%r", trained_at, exc_info=True)
 
+    def update_conformal_coverage_ratio(
+        self,
+        ratio: float | None,
+        region: str = "global",
+    ) -> None:
+        """Update the ``conformal_coverage_ratio`` gauge for a region.
+
+        Emitted from the ``/model/coverage`` endpoints so the
+        ``ConformalCoverageDrift`` Prometheus alert can fire when empirical
+        coverage drifts more than 5pp from the nominal 0.90 target.
+        """
+        if ratio is None:
+            return
+        try:
+            self.conformal_coverage_ratio.labels(region=region).set(float(ratio))
+        except Exception:  # pragma: no cover - defensive only
+            logger.debug("Failed to update conformal_coverage_ratio gauge", exc_info=True)
+
+    def update_feature_drift_score(self, feature: str, score: float | None) -> None:
+        """Update the ``feature_drift_score`` gauge for one feature.
+
+        Emitted from the ``/model/drift`` / ``/model/drift/check`` endpoints
+        after the drift detector computes per-feature z-scores.  The
+        ``FeatureDrift`` alert watches for ``feature_drift_score > 3.0``.
+        """
+        if score is None:
+            return
+        try:
+            self.feature_drift_score.labels(feature=feature).set(abs(float(score)))
+        except Exception:  # pragma: no cover - defensive only
+            logger.debug("Failed to update feature_drift_score gauge", exc_info=True)
+
+    def inc_model_load_errors(self, amount: float = 1.0) -> None:
+        """Increment the ``model_load_errors_total`` counter by *amount*.
+
+        Called from the model load / reload path in ``src.api.main`` whenever
+        a model fails to deserialise.  Powers the ``ModelLoadFailure`` alert.
+        """
+        try:
+            self.model_load_errors_total.inc(amount)
+        except Exception:  # pragma: no cover - defensive only
+            logger.debug("Failed to increment model_load_errors_total", exc_info=True)
+
     def render(self) -> tuple[bytes, str]:
         """Render the metrics in Prometheus text format.
 
@@ -235,9 +307,22 @@ class MetricsRegistry:
 # Module-level singleton — imported by ``src.api.main``.
 metrics = MetricsRegistry()
 
+# Module-level singletons for the alert-driven metrics, exposed by name so
+# call sites that prefer direct imports (and the alert contract in
+# deploy/prometheus/alerts.yml) can reach the objects without going through
+# ``MetricsRegistry``.  They point at the same Gauge/Counter instances held
+# by :data:`metrics`, so updates are visible to ``/metrics`` regardless of
+# which handle is used.
+CONFORMAL_COVERAGE_RATIO = metrics.conformal_coverage_ratio
+FEATURE_DRIFT_SCORE = metrics.feature_drift_score
+MODEL_LOAD_ERRORS_TOTAL = metrics.model_load_errors_total
+
 
 __all__ = [
     "CONTENT_TYPE_LATEST",
+    "CONFORMAL_COVERAGE_RATIO",
+    "FEATURE_DRIFT_SCORE",
+    "MODEL_LOAD_ERRORS_TOTAL",
     "MetricsRegistry",
     "PROMETHEUS_AVAILABLE",
     "metrics",
