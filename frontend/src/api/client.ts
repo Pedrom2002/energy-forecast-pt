@@ -118,7 +118,7 @@ export const api = {
   predictBatch: (items: EnergyData[]) =>
     request<BatchPredictionResponse>('/predict/batch', {
       method: 'POST',
-      body: JSON.stringify({ items }),
+      body: JSON.stringify(items),
     }),
 
   predictSequential: (history: unknown[], forecast: EnergyData[]) =>
