@@ -1,0 +1,49 @@
+energy-forecast-pt has been installed.
+
+Release name:  {{ .Release.Name }}
+Namespace:     {{ .Release.Namespace }}
+Chart version: {{ .Chart.Version }}
+App version:   {{ .Chart.AppVersion }}
+
+1. Check pod rollout:
+
+   kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "energy-forecast-pt.fullname" . }}
+
+2. Reach the API:
+{{- if .Values.ingress.enabled }}
+   Ingress is enabled. It should be reachable at:
+   {{- range .Values.ingress.hosts }}
+     https://{{ .host }}
+   {{- end }}
+
+   Make sure your DNS points these hostnames at your ingress controller's
+   external IP and that cert-manager has issued the TLS certificate:
+
+     kubectl -n {{ .Release.Namespace }} get certificate
+     kubectl -n {{ .Release.Namespace }} describe ingress {{ include "energy-forecast-pt.fullname" . }}
+{{- else }}
+   Ingress is disabled. Port-forward for a quick smoke test:
+
+     kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "energy-forecast-pt.fullname" . }} 8080:{{ .Values.service.port }}
+     curl http://localhost:8080/health
+{{- end }}
+
+3. Health and metrics endpoints:
+     GET /health   - liveness / readiness
+     GET /metrics  - Prometheus scrape target (port 8000)
+
+{{- if not .Values.serviceMonitor.enabled }}
+
+4. ServiceMonitor is disabled. To enable after installing the Prometheus
+   Operator, upgrade with:
+
+     helm upgrade {{ .Release.Name }} deploy/helm/energy-forecast-pt \
+       --namespace {{ .Release.Namespace }} \
+       --set serviceMonitor.enabled=true
+{{- end }}
+
+5. Next steps:
+     - Replace the plaintext Secret with sealed-secrets / External Secrets
+       (see values.yaml comments).
+     - Pin image.tag to a SHA or semver (avoid :latest in prod).
+     - Tune HPA + resources against real load tests.

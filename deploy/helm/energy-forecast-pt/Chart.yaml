@@ -1,0 +1,21 @@
+apiVersion: v2
+name: energy-forecast-pt
+description: |
+  Helm chart for the energy-forecast-pt FastAPI service — a machine learning
+  API that serves short-term electricity demand forecasts for Portugal.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+icon: https://raw.githubusercontent.com/cncf/artwork/main/other/illustrations/ashley-mcnamara/transparent/cncf-stacked-color.png
+keywords:
+  - ml
+  - forecasting
+  - fastapi
+  - energy
+  - timeseries
+maintainers:
+  - name: energy-forecast-pt maintainers
+    email: maintainers@example.com
+    url: https://github.com/pedrom2002/energy-forecast-pt
+sources:
+  - https://github.com/pedrom2002/energy-forecast-pt

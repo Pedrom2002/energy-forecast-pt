@@ -1,0 +1,45 @@
+# Development overrides for energy-forecast-pt.
+# Usage:
+#   helm upgrade --install energy-forecast deploy/helm/energy-forecast-pt \
+#     --namespace energy-forecast-dev --create-namespace \
+#     -f deploy/helm/energy-forecast-pt/values-dev.yaml
+
+image:
+  repository: energy-forecast-pt
+  tag: "dev"
+  pullPolicy: Always
+
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+
+pdb:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 2Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  hosts:
+    - host: energy-forecast.dev.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: energy-forecast-dev-tls
+      hosts:
+        - energy-forecast.dev.example.com
+
+config:
+  LOG_LEVEL: "debug"
+  ENABLE_TRACING: "1"

@@ -1,0 +1,295 @@
+# Default values for energy-forecast-pt.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# -- Number of replicas when autoscaling is disabled. When autoscaling.enabled
+# is true this value is ignored after the first rollout.
+replicaCount: 2
+
+image:
+  # -- Container image repository.
+  repository: energy-forecast-pt
+  # -- Image tag. Overrides the chart's appVersion when set.
+  tag: "latest"
+  # -- Image pull policy. One of Always | IfNotPresent | Never.
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries.
+imagePullSecrets: []
+#  - name: regcred
+
+# -- Override the chart name (short release name).
+nameOverride: ""
+# -- Fully override the generated resource name.
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Specifies whether a ServiceAccount should be created.
+  create: true
+  # -- Annotations to add to the ServiceAccount (e.g. IAM role ARNs).
+  annotations: {}
+  # -- The name of the ServiceAccount to use. If empty and create is true a
+  # name is generated using the fullname template.
+  name: ""
+  # -- Disable token automount for defence in depth. Flip to true if your app
+  # actually calls the Kubernetes API.
+  automountServiceAccountToken: false
+
+# -- Extra annotations for the pod template.
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+# -- Extra labels for the pod template.
+podLabels: {}
+
+# -- Pod-level security context. Runs non-root, enforces the RuntimeDefault
+# seccomp profile and an explicit fsGroup so mounted volumes are writable.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container-level security context. Drops all Linux capabilities and
+# disables privilege escalation. readOnlyRootFilesystem is false because the
+# service writes logs and tmp data under /app and /tmp; mount an emptyDir if
+# you want to tighten this.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  # -- Service type. ClusterIP is the default — Ingress handles external traffic.
+  type: ClusterIP
+  # -- Service port (external).
+  port: 80
+  # -- Target port on the container. Matches the FastAPI uvicorn port.
+  targetPort: 8000
+
+ingress:
+  # -- Enable Ingress resource creation.
+  enabled: true
+  # -- IngressClass name. Set to "" to let the cluster default kick in.
+  className: nginx
+  # -- Annotations passed through to the Ingress resource. The defaults below
+  # target ingress-nginx + cert-manager Let's Encrypt. Override for other
+  # controllers / issuers.
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: energy-forecast.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: energy-forecast-tls
+      hosts:
+        - energy-forecast.example.com
+
+# -- Resource requests and limits. Start here and tune from real load tests.
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+autoscaling:
+  # -- Enable HorizontalPodAutoscaler. Requires metrics-server in the cluster.
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  # -- Optional behavior block. Leave empty {} to use controller defaults.
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+      selectPolicy: Max
+
+pdb:
+  # -- Enable PodDisruptionBudget. Keep at least this many pods up during
+  # voluntary disruptions (node drains, upgrades).
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1  # mutually exclusive with minAvailable
+
+# -- Node selector for pod assignment.
+nodeSelector: {}
+
+# -- Tolerations for pod scheduling.
+tolerations: []
+
+# -- Affinity rules for pod scheduling.
+affinity: {}
+
+# -- Extra environment variables for the container. Map form; values can be
+# strings or full valueFrom blocks.
+#   env:
+#     FOO: "bar"
+#     BAZ:
+#       valueFrom:
+#         fieldRef:
+#           fieldPath: metadata.name
+env: {}
+
+# -- envFrom sources to pull into the container. Defaults pick up the chart's
+# own ConfigMap and Secret. Set to [] to disable.
+envFrom:
+  configMap:
+    # -- Use the ConfigMap rendered from .Values.config. Disable if you want
+    # to wire your own ConfigMap by name via extraEnvFrom.
+    enabled: true
+  secret:
+    # -- Use the Secret rendered from .Values.secrets. Disable if you inject
+    # secrets via ESO / sealed-secrets / Vault.
+    enabled: true
+
+# -- Extra raw envFrom entries appended to the list (e.g. externally managed
+# ConfigMap or Secret names).
+extraEnvFrom: []
+#  - configMapRef:
+#      name: shared-config
+#  - secretRef:
+#      name: external-secrets-output
+
+# -- Non-secret config values. Rendered into a ConfigMap and consumed via
+# envFrom. Set to {} to skip ConfigMap creation.
+config:
+  LOG_LEVEL: "info"
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  ENABLE_TRACING: "0"
+  ENABLE_METRICS: "1"
+  OTEL_SERVICE_NAME: "energy-forecast-pt"
+  MODEL_PATH: "/app/data/models"
+  MODEL_NAME: "latest"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  API_WORKERS: "2"
+  FORECAST_HORIZON_HOURS: "24"
+  DEFAULT_TIMEZONE: "Europe/Lisbon"
+
+# =============================================================================
+# SECRETS — DO NOT COMMIT REAL VALUES
+# -----------------------------------------------------------------------------
+# The `secrets` map below is rendered into a plain Kubernetes Secret so the
+# chart installs out of the box in a dev cluster. In ANY real environment
+# (staging / prod) you MUST NOT put plaintext secrets into values.yaml that
+# ends up in git.
+#
+# Recommended approaches:
+#   - Bitnami sealed-secrets:    https://github.com/bitnami-labs/sealed-secrets
+#   - External Secrets Operator: https://external-secrets.io/
+#   - SOPS + age / KMS:          https://github.com/getsops/sops
+#   - Cloud-native (AWS SM, GCP Secret Manager, Azure Key Vault)
+#
+# To disable the chart-managed Secret and wire in an externally managed one,
+# set `secrets: {}` and point `extraEnvFrom` at your SealedSecret / ES output.
+# =============================================================================
+secrets:
+  REDIS_URL: "redis://:CHANGE_ME@redis.energy-forecast.svc.cluster.local:6379/0"
+  SENTRY_DSN: ""
+  API_AUTH_TOKEN: "CHANGE_ME"
+  ENTSOE_API_KEY: "CHANGE_ME"
+  WEATHER_API_KEY: "CHANGE_ME"
+
+serviceMonitor:
+  # -- Enable ServiceMonitor. Requires the Prometheus Operator CRDs
+  # (monitoring.coreos.com/v1). Off by default so the chart installs cleanly
+  # on clusters without the Operator.
+  enabled: false
+  # -- Scrape interval.
+  interval: 30s
+  # -- Scrape timeout.
+  scrapeTimeout: 10s
+  # -- Metrics path.
+  path: /metrics
+  # -- Honor labels from the target.
+  honorLabels: true
+  # -- Extra labels on the ServiceMonitor (e.g. your Prometheus selector).
+  labels:
+    release: kube-prometheus-stack
+
+# -- Liveness probe. Path and port come from the service port above.
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# -- Readiness probe.
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# -- Startup probe. Gives slow model loaders up to failureThreshold * period
+# seconds before liveness/readiness start running.
+startupProbe:
+  httpGet:
+    path: /health
+    port: http
+  failureThreshold: 30
+  periodSeconds: 5
+  timeoutSeconds: 3
+
+# -- Rolling update strategy parameters.
+rollingUpdate:
+  maxSurge: 1
+  maxUnavailable: 0
+
+# -- Revision history kept by the Deployment.
+revisionHistoryLimit: 5
+
+# -- Termination grace period for pod shutdown.
+terminationGracePeriodSeconds: 30
+
+# -- Extra volumes for the pod. The chart already mounts emptyDir volumes for
+# /app/logs and /tmp (see below) — this list is appended to those.
+volumes: []
+#  - name: model-cache
+#    persistentVolumeClaim:
+#      claimName: model-cache
+
+# -- Extra volume mounts for the container. Appended to the default logs /
+# tmp mounts. Use to mount the extra volumes declared above.
+volumeMounts: []
+#  - name: model-cache
+#    mountPath: /app/data/models

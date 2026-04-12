@@ -1,0 +1,24 @@
+# Patterns to ignore when building Helm packages.
+# Operates on the chart directory; uses the same syntax as .gitignore.
+.DS_Store
+# Common VCS dirs
+.git/
+.gitignore
+.bzr/
+.bzrignore
+.hg/
+.hgignore
+.svn/
+# Common backup files
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+# Various IDEs
+.project
+.idea/
+*.tmproj
+.vscode/
+# Local dev files
+values-*.local.yaml

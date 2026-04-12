@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: energy-forecast-api
+  namespace: energy-forecast
+  labels:
+    app.kubernetes.io/name: energy-forecast-pt
+    app.kubernetes.io/component: api
+    app.kubernetes.io/part-of: energy-forecast-pt
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: energy-forecast-pt
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: energy-forecast-pt
+        app.kubernetes.io/component: api
+        app.kubernetes.io/part-of: energy-forecast-pt
+      annotations:
+        # Force a rolling restart whenever ConfigMap/Secret change by bumping
+        # these annotations (e.g. with `kubectl rollout restart deploy/...`
+        # or via a Kustomize transformer).
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          image: energy-forecast-pt:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: energy-forecast-config
+            - secretRef:
+                name: energy-forecast-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            # Models + logs need write access — root FS stays writable.
+            # Tighten with a dedicated emptyDir per writable path if needed.
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          # Startup probe gives the model loader up to 30 * 5s = 150s before
+          # liveness/readiness kick in. Bump failureThreshold if cold-start
+          # of joblib/onnx artefacts takes longer on your node class.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: logs
+          emptyDir:
+            sizeLimit: 500Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 200Mi

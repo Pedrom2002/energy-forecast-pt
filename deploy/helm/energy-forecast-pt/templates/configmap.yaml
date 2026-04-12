@@ -1,0 +1,12 @@
+{{- if .Values.config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "energy-forecast-pt.fullname" . }}-config
+  labels:
+    {{- include "energy-forecast-pt.labels" . | nindent 4 }}
+data:
+  {{- range $key, $val := .Values.config }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}
+{{- end }}
