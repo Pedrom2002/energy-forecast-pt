@@ -1071,6 +1071,27 @@ class FeatureEngineer:
         df["longitude"] = df["region"].map(lambda x: REGION_COORDS.get(x, (0, 0))[1])
         df["temperature_feels_like"] = df["temperature"]
 
+        # v8 models trained on Open-Meteo data require dew_point, wind_direction
+        # and solar_radiation. The API request schema does not expose the latter
+        # two (users only supply 6 weather fields), so we inject deterministic
+        # defaults: dew_point from Magnus formula, wind_direction = 180° (south),
+        # solar_radiation as a daylight×clear-sky proxy from hour and cloud_cover.
+        if "dew_point" not in df.columns:
+            T = df["temperature"]
+            RH = df["humidity"].clip(lower=1.0, upper=100.0)
+            _gamma = np.log(RH / 100.0) + (MAGNUS_B * T) / (MAGNUS_C + T)
+            df["dew_point"] = (MAGNUS_C * _gamma / (MAGNUS_B - _gamma)).clip(
+                lower=DEW_POINT_LOWER_BOUND, upper=T
+            )
+        if "wind_direction" not in df.columns:
+            df["wind_direction"] = 180.0
+        if "solar_radiation" not in df.columns:
+            ts = pd.to_datetime(df["timestamp"], errors="coerce")
+            hour = ts.dt.hour.fillna(12).astype(float)
+            daylight = np.sin(np.pi * ((hour - 6.0).clip(lower=0.0, upper=12.0)) / 12.0)
+            clear_sky = 1.0 - df.get("cloud_cover", pd.Series(50.0, index=df.index)) / 100.0
+            df["solar_radiation"] = (900.0 * daylight * clear_sky).clip(lower=0.0)
+
         if use_advanced:
             df = self.create_weather_derived_features(df)
             logger.debug("Created weather derived features")
