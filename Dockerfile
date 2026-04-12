@@ -77,9 +77,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # thing we need from the compile environment.
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 
-# Copy application source. Data/models are mounted as a volume at runtime
-# (see docker-compose.yml), so they are intentionally excluded from the image.
+# Copy application source and model artefacts. For docker-compose the models
+# directory is overlaid by a volume mount; for standalone/Fly.io deploys the
+# baked-in copy is used directly.
 COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser data/models/ ./data/models/
 
 USER appuser
 

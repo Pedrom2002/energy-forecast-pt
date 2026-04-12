@@ -9,7 +9,7 @@
 # The Dockerfile at the repo root is built and pushed automatically.
 
 app = "energy-forecast-pt"
-primary_region = "mad"   # Madrid — closest to Portugal
+primary_region = "cdg"   # Paris — closest available to Portugal
 kill_signal = "SIGINT"
 kill_timeout = "30s"
 
