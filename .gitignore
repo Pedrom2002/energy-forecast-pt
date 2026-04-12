@@ -68,7 +68,6 @@ data/raw/real/
 data/processed/*_backup.parquet
 
 # Models (large binary files)
-data/models/checkpoints/*.pkl
 data/models/checkpoints/*.h5
 data/models/checkpoints/*.pt
 data/models/checkpoints/*.joblib
