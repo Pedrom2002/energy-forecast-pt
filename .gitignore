@@ -40,6 +40,7 @@ htmlcov/
 coverage.xml
 .mypy_cache/
 .ruff_cache/
+.playwright-mcp/
 
 # Logs
 *.log
