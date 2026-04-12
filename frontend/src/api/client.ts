@@ -11,7 +11,7 @@
  * See `frontend/.env.example` for documentation.
  */
 export const BASE_URL: string =
-  (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || '/api';
+  (import.meta.env?.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
