@@ -1,22 +1,27 @@
 # syntax=docker/dockerfile:1.6
 #
-# Multi-stage build for the Energy Forecast PT FastAPI backend.
+# Multi-stage build for Energy Forecast PT (API + frontend).
 #
-# Stage 1 (builder): installs build toolchain, compiles wheels for all
-#   dependencies listed in requirements.txt into an isolated virtualenv.
-# Stage 2 (runtime): slim image with only the runtime shared libraries,
-#   the pre-built virtualenv, and the application source. No compilers,
-#   no pip cache, no apt lists. Runs as non-root `appuser`.
+# Stage 1 (frontend): builds the React SPA into static assets.
+# Stage 2 (builder): compiles Python wheels into an isolated virtualenv.
+# Stage 3 (runtime): slim image with venv, source, models, and frontend dist.
 #
-# Expected image size: ~1.0-1.3 GB (vs ~3-4 GB for a single-stage build).
-#
-# Base pin tip: for supply-chain safety, replace the tag with a digest:
-#   docker pull python:3.11-slim
-#   docker inspect --format='{{index .RepoDigests 0}}' python:3.11-slim
-#   FROM python:3.11-slim@sha256:<digest> AS builder
+# Expected image size: ~1.0-1.3 GB.
 
 # ----------------------------------------------------------------------------
-# Stage 1: builder
+# Stage 1: frontend
+# ----------------------------------------------------------------------------
+FROM node:20-slim AS frontend
+
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY frontend/ .
+ENV VITE_API_URL=""
+RUN npx vite build
+
+# ----------------------------------------------------------------------------
+# Stage 2: builder
 # ----------------------------------------------------------------------------
 FROM python:3.11-slim AS builder
 
@@ -82,6 +87,7 @@ COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 # baked-in copy is used directly.
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser data/models/ ./data/models/
+COPY --from=frontend --chown=appuser:appuser /frontend/dist/ ./frontend/dist/
 
 USER appuser
 

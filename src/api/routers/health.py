@@ -18,17 +18,6 @@ from src.api.store import ModelStore
 router = APIRouter()
 
 
-@router.get("/", tags=["core"])
-async def root():
-    """Root endpoint with basic API information."""
-    return {
-        "message": "Energy Forecast PT API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/health",
-    }
-
-
 @router.get("/health", tags=["core"])
 async def health(request: Request):
     """Health check endpoint.  Always returns 200 for liveness probes.

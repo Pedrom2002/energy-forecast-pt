@@ -407,6 +407,16 @@ app.include_router(explain.router)
 app.include_router(monitoring.router)
 app.include_router(admin.router)
 
+# Serve the React SPA when frontend/dist/ is present (production image).
+# StaticFiles with html=True serves index.html for any path without a file
+# extension, which is exactly what React Router needs for client-side routing.
+# API routes registered above take priority over this catch-all mount.
+_FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist")
+if os.path.isdir(_FRONTEND_DIR):
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
+
 
 if __name__ == "__main__":  # pragma: no cover
     import uvicorn
