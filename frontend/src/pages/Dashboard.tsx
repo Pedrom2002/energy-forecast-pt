@@ -235,9 +235,9 @@ export default function Dashboard() {
             type="button"
             onClick={() => load()}
             className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center gap-2 text-sm font-medium
-              text-primary-700 dark:text-primary-300 bg-white/70 dark:bg-surface-subtle
-              hover:bg-white dark:hover:bg-surface border border-primary-200 dark:border-primary-800/50
-              backdrop-blur-sm rounded-lg px-4 cursor-pointer transition-colors
+              text-text-secondary hover:text-text-primary bg-transparent hover:bg-surface-bright
+              border border-border hover:border-primary-300 dark:hover:border-primary-700
+              rounded-lg px-4 cursor-pointer transition-colors
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
             aria-label="Atualizar dados"
           >
