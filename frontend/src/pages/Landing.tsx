@@ -44,7 +44,7 @@ interface RegionDot {
 const REGIONS: RegionDot[] = [
   { id: 'norte', label: 'Norte', cx: 6200, cy: 2800 },
   { id: 'centro', label: 'Centro', cx: 6400, cy: 10500 },
-  { id: 'lisboa', label: 'Lisboa', cx: 1700, cy: 17200 },
+  { id: 'lisboa', label: 'Lisboa', cx: 1100, cy: 17200 },
   { id: 'alentejo', label: 'Alentejo', cx: 7400, cy: 19800 },
   { id: 'algarve', label: 'Algarve', cx: 6000, cy: 25600 },
 ];
