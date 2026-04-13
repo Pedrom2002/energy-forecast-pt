@@ -17,15 +17,10 @@ from src.api.store import ModelStore
 
 router = APIRouter()
 
-@router.get("/", tags=["core"])
-async def root(request: Request):
-    """API metadata root."""
-    return {
-        "message": "Energy Forecast PT API",
-        "version": request.app.version,
-        "docs": "/docs",
-        "health": "/health",
-    }
+
+# NOTE: GET / is intentionally NOT registered here. The React SPA is mounted
+# at "/" via StaticFiles in main.py and must serve index.html for the root URL.
+# API metadata is available at /docs (Swagger) and /openapi.json.
 
 
 @router.get("/health", tags=["core"])

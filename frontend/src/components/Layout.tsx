@@ -6,8 +6,6 @@ import {
   Activity,
   Menu,
   X,
-  Sun,
-  Moon,
   Github,
   Linkedin,
   BookOpen,
@@ -15,12 +13,10 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useTheme } from '../hooks/useTheme';
 import LanguageToggle from './LanguageToggle';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { toggle, isDark } = useTheme();
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
   const [apiOnline, setApiOnline] = useState(false);
@@ -263,17 +259,6 @@ export default function Layout() {
 
           <div className="flex items-center gap-3 flex-wrap">
             <LanguageToggle />
-            <button
-              type="button"
-              onClick={toggle}
-              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg
-                text-text-secondary hover:text-primary-600 transition-colors cursor-pointer
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-              aria-label={isDark ? t('common.lightTheme') : t('common.darkTheme')}
-              title={isDark ? t('common.lightTheme') : t('common.darkTheme')}
-            >
-              {isDark ? <Sun className="w-4 h-4" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
-            </button>
             <div
               className="flex items-center gap-2"
               aria-live="polite"
