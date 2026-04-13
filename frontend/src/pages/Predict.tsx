@@ -3,8 +3,9 @@ import { api, type EnergyData, type PredictionResponse } from '../api/client';
 import { Card } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatMW, formatDateTime } from '../utils/format';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import WeatherForm from '../components/WeatherForm';
-import { Zap, ArrowRight, TrendingUp, TrendingDown, Shield } from 'lucide-react';
+import { Zap, ArrowRight, TrendingUp, TrendingDown, Shield, HelpCircle } from 'lucide-react';
 
 function getDefaultTimestamp(): string {
   const now = new Date();
@@ -13,6 +14,7 @@ function getDefaultTimestamp(): string {
 }
 
 export default function Predict() {
+  useDocumentTitle('Previsão');
   const [data, setData] = useState<EnergyData>({
     timestamp: getDefaultTimestamp(),
     region: 'Lisboa',
@@ -33,7 +35,7 @@ export default function Predict() {
     try {
       const res = await api.predict(data);
       setResult(res);
-      toast.success(`Previsao: ${formatMW(res.predicted_consumption_mw)} para ${res.region}`);
+      toast.success(`Previsão: ${formatMW(res.predicted_consumption_mw)} para ${res.region}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
     } finally {
@@ -44,9 +46,9 @@ export default function Predict() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsao Individual</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsão Individual</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Obtenha uma previsao de consumo energetico para um momento e regiao especificos
+          Obtenha uma previsão de consumo energetico para um momento e região especificos
         </p>
       </div>
 
@@ -90,7 +92,7 @@ export default function Predict() {
           {result && (
             <div className="space-y-4 stagger-children">
               {/* Main prediction */}
-              <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-xl p-6 text-white shadow-lg" aria-live="polite">
+              <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-6 text-white shadow-lg animate-fade-in-up" aria-live="polite">
                 <div className="flex items-center gap-2 text-primary-200 text-sm mb-2">
                   <Zap className="w-4 h-4" aria-hidden="true" />
                   Consumo Previsto
@@ -104,13 +106,24 @@ export default function Predict() {
               </div>
 
               {/* CI */}
-              <Card title="Intervalo de Confianca" subtitle={`${(result.confidence_level * 100).toFixed(0)}% - Metodo: ${result.ci_method}`}>
+              <Card
+                title="Intervalo de Confiança"
+                subtitle={`${(result.confidence_level * 100).toFixed(0)}% - Metodo: ${result.ci_method}`}
+                action={
+                  <span title="O intervalo é calculado por split conformal prediction a 90%" className="inline-flex items-center">
+                    <HelpCircle
+                      className="w-3.5 h-3.5 text-text-muted"
+                      aria-label="O intervalo é calculado por split conformal prediction a 90%"
+                    />
+                  </span>
+                }
+              >
                 <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="flex-1 text-center p-3 sm:p-4 bg-blue-50 rounded-lg hover:bg-blue-100/60 transition-colors">
-                    <TrendingDown className="w-5 h-5 text-blue-500 mx-auto mb-1" aria-hidden="true" />
+                  <div className="flex-1 text-center p-3 sm:p-4 bg-primary-50/60 rounded-lg hover:bg-primary-100/60 transition-colors">
+                    <TrendingDown className="w-5 h-5 text-primary-500 mx-auto mb-1" aria-hidden="true" />
                     <p className="text-xs text-text-muted">Limite Inferior</p>
-                    <p className="text-base sm:text-lg font-bold text-blue-700 tabular-nums">
-                      {result.confidence_interval_lower.toFixed(1)} MW
+                    <p className="text-base sm:text-lg font-bold text-primary-700 tabular-nums">
+                      {formatMW(result.confidence_interval_lower)}
                     </p>
                     {result.ci_lower_clipped && (
                       <span className="inline-flex items-center gap-1 text-[10px] text-yellow-700 bg-yellow-50 px-1.5 py-0.5 rounded mt-1">
@@ -120,16 +133,16 @@ export default function Predict() {
                   </div>
                   <div className="flex-1 text-center p-3 sm:p-4 bg-primary-50 rounded-lg border-2 border-primary-200">
                     <Zap className="w-5 h-5 text-primary-600 mx-auto mb-1" aria-hidden="true" />
-                    <p className="text-xs text-text-muted">Previsao</p>
+                    <p className="text-xs text-text-muted">Previsão</p>
                     <p className="text-lg sm:text-xl font-bold text-primary-700 tabular-nums">
-                      {result.predicted_consumption_mw.toFixed(1)} MW
+                      {formatMW(result.predicted_consumption_mw)}
                     </p>
                   </div>
-                  <div className="flex-1 text-center p-3 sm:p-4 bg-blue-50 rounded-lg hover:bg-blue-100/60 transition-colors">
-                    <TrendingUp className="w-5 h-5 text-blue-500 mx-auto mb-1" aria-hidden="true" />
+                  <div className="flex-1 text-center p-3 sm:p-4 bg-primary-50/60 rounded-lg hover:bg-primary-100/60 transition-colors">
+                    <TrendingUp className="w-5 h-5 text-primary-500 mx-auto mb-1" aria-hidden="true" />
                     <p className="text-xs text-text-muted">Limite Superior</p>
-                    <p className="text-base sm:text-lg font-bold text-blue-700 tabular-nums">
-                      {result.confidence_interval_upper.toFixed(1)} MW
+                    <p className="text-base sm:text-lg font-bold text-primary-700 tabular-nums">
+                      {formatMW(result.confidence_interval_upper)}
                     </p>
                   </div>
                 </div>
@@ -144,7 +157,7 @@ export default function Predict() {
                         : 50;
                       return (
                         <>
-                          <div className="absolute inset-0 bg-gradient-to-r from-blue-200 via-primary-300 to-blue-200 rounded-full" />
+                          <div className="absolute inset-0 bg-gradient-to-r from-primary-200 via-primary-400 to-primary-200 rounded-full" />
                           <div
                             className="absolute top-0 bottom-0 w-1 bg-primary-700 rounded-full transition-all duration-300"
                             style={{ left: `${Math.max(0, Math.min(100, predPos))}%` }}
@@ -154,8 +167,8 @@ export default function Predict() {
                     })()}
                   </div>
                   <div className="flex justify-between text-[11px] text-text-muted mt-1 tabular-nums">
-                    <span>{result.confidence_interval_lower.toFixed(0)} MW</span>
-                    <span>{result.confidence_interval_upper.toFixed(0)} MW</span>
+                    <span>{formatMW(result.confidence_interval_lower, 0)}</span>
+                    <span>{formatMW(result.confidence_interval_upper, 0)}</span>
                   </div>
                 </div>
               </Card>

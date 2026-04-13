@@ -10,13 +10,16 @@ import {
   X,
   Sun,
   Moon,
+  Github,
+  Linkedin,
+  BookOpen,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/predict', icon: Zap, label: 'Previsao' },
+  { to: '/predict', icon: Zap, label: 'Previsão' },
   { to: '/batch', icon: Layers, label: 'Batch' },
   { to: '/forecast', icon: TrendingUp, label: 'Forecast' },
   { to: '/monitoring', icon: Activity, label: 'Monitoring' },
@@ -28,6 +31,27 @@ export default function Layout() {
   const { theme, toggle, isDark } = useTheme();
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
+  const [apiOnline, setApiOnline] = useState(false);
+
+  // Poll backend health (reuse same localhost:8000 assumption as sidebar)
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        const res = await fetch(`${base}/health`, { method: 'GET' });
+        if (!cancelled) setApiOnline(res.ok);
+      } catch {
+        if (!cancelled) setApiOnline(false);
+      }
+    };
+    check();
+    const id = setInterval(check, 30000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   // Focus main content on route change — accessibility: focus-on-route-change
   useEffect(() => {
@@ -41,7 +65,7 @@ export default function Layout() {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:bg-primary-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-medium focus:outline-none focus:ring-2 focus:ring-primary-300"
       >
-        Ir para conteudo principal
+        Ir para conteúdo principal
       </a>
 
       {/* Mobile overlay */}
@@ -109,24 +133,6 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border space-y-3">
-          {/* Dark mode toggle */}
-          <button
-            type="button"
-            onClick={toggle}
-            className="w-full flex items-center gap-3 px-3 min-h-[40px] rounded-lg text-xs font-medium text-text-secondary
-              hover:bg-surface-bright transition-colors cursor-pointer
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            aria-label={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-          >
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {isDark ? 'Tema Claro' : 'Tema Escuro'}
-          </button>
-          <p className="text-[11px] text-text-muted px-3">
-            API: <span className="text-energy-green font-medium">localhost:8000</span>
-          </p>
-        </div>
       </aside>
 
       {/* Main content */}
@@ -163,6 +169,101 @@ export default function Layout() {
             <Outlet />
           </div>
         </main>
+
+        {/* Page footer — portfolio-grade */}
+        <footer
+          className="shrink-0 border-t border-border-subtle bg-surface/60 backdrop-blur-sm
+            px-3 py-4 lg:px-4 lg:py-3
+            flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4
+            text-xs text-text-secondary"
+          aria-label="Rodape do site"
+        >
+          {/* Author + version */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Built by{' '}
+              <strong className="font-semibold text-primary-700 dark:text-primary-400">
+                Pedro Marques
+              </strong>
+            </span>
+            <span className="text-text-muted">v0.1.0</span>
+          </div>
+
+          <div className="hidden lg:block flex-1" aria-hidden="true" />
+
+          {/* Icon links */}
+          <nav
+            className="flex items-center gap-1"
+            aria-label="Links externos do autor"
+          >
+            <a
+              href="https://github.com/Pedrom2002/energy-forecast-pt"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="GitHub"
+              aria-label="Abrir repositorio no GitHub (nova aba)"
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg
+                text-text-secondary hover:text-primary-600 transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            >
+              <Github className="w-4 h-4" aria-hidden="true" />
+            </a>
+            <a
+              href="https://www.linkedin.com/in/pedro-marques-056baa366/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="LinkedIn"
+              aria-label="Abrir perfil do LinkedIn (nova aba)"
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg
+                text-text-secondary hover:text-primary-600 transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            >
+              <Linkedin className="w-4 h-4" aria-hidden="true" />
+            </a>
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="API Docs"
+              aria-label="Abrir documentacao da API (nova aba)"
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg
+                text-text-secondary hover:text-primary-600 transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+            >
+              <BookOpen className="w-4 h-4" aria-hidden="true" />
+            </a>
+          </nav>
+
+          {/* Dark mode toggle + API status */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggle}
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg
+                text-text-secondary hover:text-primary-600 transition-colors cursor-pointer
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
+              aria-label={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+              title={isDark ? 'Tema claro' : 'Tema escuro'}
+            >
+              {isDark ? <Sun className="w-4 h-4" aria-hidden="true" /> : <Moon className="w-4 h-4" aria-hidden="true" />}
+            </button>
+            <div
+              className="flex items-center gap-2"
+              aria-live="polite"
+              title={apiOnline ? 'API online' : 'API offline'}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  apiOnline ? 'bg-energy-green animate-pulse' : 'bg-text-muted'
+                }`}
+                aria-hidden="true"
+              />
+              <span className="text-[11px] text-text-muted">
+                API {apiOnline ? 'online' : 'offline'}
+              </span>
+            </div>
+          </div>
+        </footer>
       </div>
     </div>
   );

@@ -3,9 +3,11 @@ import { api } from '../api/client';
 import { Card, CardSkeleton } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatKey } from '../utils/format';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Activity, AlertTriangle, CheckCircle, RefreshCw, Shield, Info } from 'lucide-react';
 
 export default function Monitoring() {
+  useDocumentTitle('Monitorização');
   const [coverage, setCoverage] = useState<Record<string, unknown> | null>(null);
   const [drift, setDrift] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,7 @@ export default function Monitoring() {
       if (cov.status === 'fulfilled') setCoverage(cov.value);
       if (dr.status === 'fulfilled') setDrift(dr.value);
       if (cov.status === 'rejected' && dr.status === 'rejected') {
-        setError('Nao foi possivel obter dados de monitoramento');
+        setError('Não foi possivel obter dados de monitoramento');
       } else {
         toast.success('Dados de monitoramento atualizados');
       }
@@ -76,7 +78,7 @@ export default function Monitoring() {
       )}
 
       {/* Coverage Section */}
-      <Card title="Cobertura dos Intervalos de Confianca" subtitle="Janela deslizante de 168 observacoes (1 semana)">
+      <Card title="Cobertura dos Intervalos de Confiança" subtitle="Janela deslizante de 168 observacoes (1 semana)">
         {coverage ? (
           <div className="space-y-5">
             {Object.entries(coverage).map(([key, value]) => {
@@ -185,7 +187,7 @@ export default function Monitoring() {
             <div className="w-14 h-14 rounded-2xl bg-surface-dim flex items-center justify-center mx-auto mb-3">
               <Activity className="w-8 h-8 text-text-muted" aria-hidden="true" />
             </div>
-            <p className="text-sm font-medium text-text-secondary">Baseline nao disponivel</p>
+            <p className="text-sm font-medium text-text-secondary">Baseline não disponível</p>
             <p className="text-xs text-text-muted mt-1.5 max-w-sm mx-auto">
               O modelo precisa de ter <code className="bg-surface-bright px-1.5 py-0.5 rounded text-xs font-mono">feature_stats</code> nos metadados.
             </p>

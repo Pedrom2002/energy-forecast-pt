@@ -4,7 +4,10 @@ import { Card, CardSkeleton } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatMW, formatPercent, exportCSV } from '../utils/format';
 import WeatherForm from '../components/WeatherForm';
-import { Brain, Zap, ArrowRight, AlertTriangle, Download } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { ExplainIllustration } from '../components/illustrations/ExplainIllustration';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { Zap, ArrowRight, AlertTriangle, Download, Brain } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -22,12 +25,16 @@ function getDefaultTimestamp(): string {
   return now.toISOString().slice(0, 19);
 }
 
-const CHART_COLORS = [
-  '#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',
-  '#1d4ed8', '#1e3a8a', '#2563eb', '#3b82f6', '#60a5fa',
-];
+const POSITIVE_COLORS = ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5']; // amber/orange for positive contribution
+const NEGATIVE_COLORS = ['#0369a1', '#0284c7', '#0ea5e9', '#38bdf8', '#7dd3fc']; // blue for negative (energy-blue scale) — kept blue intentionally for POS vs NEG distinction
+
+function pickColor(contribution: number, idx: number): string {
+  const palette = contribution < 0 ? NEGATIVE_COLORS : POSITIVE_COLORS;
+  return palette[idx % palette.length];
+}
 
 export default function Explain() {
+  useDocumentTitle('Explicabilidade');
   const [data, setData] = useState<EnergyData>({
     timestamp: getDefaultTimestamp(),
     region: 'Lisboa',
@@ -52,11 +59,11 @@ export default function Explain() {
     try {
       const res = await api.predictExplain(data, topN);
       setResult(res);
-      toast.success(`Explicacao gerada: ${res.top_features.length} features analisadas`);
+      toast.success(`Explicação gerada: ${res.top_features.length} features analisadas`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido';
       setError(msg);
-      toast.error('Falha ao gerar explicacao');
+      toast.error('Falha ao gerar explicação');
     } finally {
       setLoading(false);
       setTimeout(() => setSubmitting(false), 1000);
@@ -77,13 +84,17 @@ export default function Explain() {
     toast.success('CSV exportado com sucesso');
   };
 
-  const chartData = result?.top_features.map((f) => ({
-    name: f.feature.length > 22 ? f.feature.slice(0, 20) + '...' : f.feature,
-    fullName: f.feature,
-    importance: +(f.importance * 100).toFixed(2),
-    value: f.value,
-    rank: f.rank,
-  })) || [];
+  const chartData = result?.top_features.map((f) => {
+    const contribution = (f as unknown as { contribution?: number }).contribution ?? f.importance;
+    return {
+      name: f.feature.length > 28 ? f.feature.slice(0, 26) + '...' : f.feature,
+      fullName: f.feature,
+      importance: +(f.importance * 100).toFixed(2),
+      contribution,
+      value: f.value,
+      rank: f.rank,
+    };
+  }) || [];
 
   // Sort columns
   const [sortCol, setSortCol] = useState<'rank' | 'importance' | 'value'>('rank');
@@ -106,7 +117,7 @@ export default function Explain() {
       <div>
         <h1 className="text-2xl font-bold text-text-primary tracking-tight">Explicabilidade</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Entenda quais features mais influenciam a previsao do modelo
+          Entenda quais features mais influenciam a previsão do modelo
         </p>
       </div>
 
@@ -147,7 +158,7 @@ export default function Explain() {
             ) : (
               <>
                 <Brain className="w-4 h-4" aria-hidden="true" />
-                Explicar Previsao
+                Explicar Previsão
                 <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </>
             )}
@@ -159,7 +170,7 @@ export default function Explain() {
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
               <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-red-800 dark:text-red-200">Erro na explicacao</p>
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">Erro na explicação</p>
                 <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{error}</p>
                 <div className="flex gap-3 mt-3">
                   <button type="button" onClick={handleExplain} className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer">
@@ -182,17 +193,17 @@ export default function Explain() {
 
           {result && !loading && (
             <div className="space-y-4 stagger-children">
-              <div className="bg-gradient-to-br from-purple-700 to-primary-800 rounded-xl p-6 text-white shadow-lg" aria-live="polite">
+              <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-xl p-6 text-white shadow-lg" aria-live="polite">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm text-purple-200 flex items-center gap-1.5">
-                      <Zap className="w-4 h-4" aria-hidden="true" /> Previsao
+                    <p className="text-sm text-primary-100 flex items-center gap-1.5">
+                      <Zap className="w-4 h-4" aria-hidden="true" /> Previsão
                     </p>
                     <p className="text-3xl font-bold mt-1 tabular-nums">
                       {formatMW(result.prediction.predicted_consumption_mw)}
                     </p>
                   </div>
-                  <div className="text-sm text-purple-200 space-y-0.5">
+                  <div className="text-sm text-primary-100 space-y-0.5">
                     <p>Metodo: <span className="text-white font-medium">{result.explanation_method}</span></p>
                     <p><span className="text-white font-medium tabular-nums">{result.total_features}</span> features totais</p>
                     <p>Top <span className="text-white font-medium tabular-nums">{result.top_features.length}</span> mostradas</p>
@@ -202,13 +213,13 @@ export default function Explain() {
 
               <Card title="Importancia das Features" subtitle={`Metodo: ${result.explanation_method}`}>
                 <p className="sr-only">
-                  Grafico de barras mostrando as {chartData.length} features mais importantes.
+                  Gráfico de barras mostrando as {chartData.length} features mais importantes.
                   A feature mais importante e {chartData[0]?.fullName} com {chartData[0]?.importance}% de importancia.
                 </p>
                 <div className="h-[320px] sm:h-[380px]" role="img" aria-label="Importancia das features do modelo">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
+                    <BarChart data={chartData} layout="vertical" margin={{ top: 5, right: 20, left: 150, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.25)" horizontal={false} />
                       <XAxis
                         type="number"
                         tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
@@ -217,18 +228,21 @@ export default function Explain() {
                       <YAxis
                         type="category"
                         dataKey="name"
-                        tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
-                        width={typeof window !== 'undefined' && window.innerWidth < 640 ? 80 : 110}
+                        tick={{ fontSize: 12, fill: 'var(--color-text-body)' }}
+                        width={150}
                       />
                       <Tooltip
                         content={({ active, payload }) => {
                           if (!active || !payload?.length) return null;
                           const d = payload[0].payload;
                           return (
-                            <div className="bg-surface border border-border rounded-lg p-3 shadow-lg text-xs">
+                            <div className="bg-white border border-primary-200 rounded-md p-3 shadow-lg text-xs">
                               <p className="font-semibold text-text-primary">{d.fullName}</p>
                               <p className="text-text-secondary mt-1">
                                 Importancia: <span className="font-mono tabular-nums">{formatPercent(d.importance, 2)}</span>
+                              </p>
+                              <p className="text-text-secondary">
+                                Contribuicao: <span className="font-mono tabular-nums">{formatMW(d.contribution)}</span>
                               </p>
                               <p className="text-text-secondary">
                                 Valor: <span className="font-mono tabular-nums">{d.value.toFixed(4)}</span>
@@ -239,8 +253,8 @@ export default function Explain() {
                         }}
                       />
                       <Bar dataKey="importance" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                        {chartData.map((_, idx) => (
-                          <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                        {chartData.map((d, idx) => (
+                          <Cell key={idx} fill={pickColor(d.contribution, idx)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -275,25 +289,29 @@ export default function Explain() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedFeatures.map((f) => (
+                      {sortedFeatures.map((f) => {
+                        const contribution = (f as unknown as { contribution?: number }).contribution ?? f.importance;
+                        const contribColor = contribution >= 0 ? 'text-emerald-600' : 'text-rose-600';
+                        return (
                         <tr key={f.rank} className="border-b border-border/50 hover:bg-surface-dim transition-colors">
                           <td className="py-2.5 px-3 text-text-muted tabular-nums">{f.rank}</td>
-                          <td className="py-2.5 px-3 font-mono text-xs text-text-primary break-all">{f.feature}</td>
+                          <td className="py-2.5 px-3 font-mono text-xs text-text-primary whitespace-normal">{f.feature}</td>
                           <td className="py-2.5 px-3 text-right">
                             <div className="flex items-center justify-end gap-2">
                               <div className="w-16 h-2 bg-surface-bright rounded-full overflow-hidden" role="progressbar" aria-valuenow={+(f.importance * 100).toFixed(1)} aria-valuemin={0} aria-valuemax={100}>
                                 <div className="h-full bg-primary-500 rounded-full transition-all duration-300" style={{ width: `${Math.min(100, f.importance * 100)}%` }} />
                               </div>
-                              <span className="font-mono text-xs text-text-primary w-14 text-right tabular-nums">
+                              <span className={`font-mono text-xs w-20 text-right tabular-nums ${contribColor}`}>
                                 {formatPercent(f.importance * 100)}
                               </span>
                             </div>
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-xs text-text-secondary tabular-nums hidden sm:table-cell">
+                          <td className={`py-2.5 px-3 text-right font-mono text-xs tabular-nums hidden sm:table-cell ${contribColor}`}>
                             {f.value.toFixed(4)}
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -302,14 +320,12 @@ export default function Explain() {
           )}
 
           {!result && !error && !loading && (
-            <div className="bg-surface border border-border rounded-xl p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-purple-50 flex items-center justify-center mx-auto mb-4">
-                <Brain className="w-8 h-8 text-purple-300" aria-hidden="true" />
-              </div>
-              <p className="text-sm font-medium text-text-secondary">Pronto para analisar</p>
-              <p className="text-xs text-text-muted mt-1.5 max-w-xs mx-auto">
-                Preencha os parametros e clique em "Explicar Previsao" para ver a importancia de cada feature
-              </p>
+            <div className="bg-surface border border-border rounded-xl">
+              <EmptyState
+                illustration={<ExplainIllustration />}
+                title="Nenhuma explicação gerada"
+                description="Preenche os parâmetros e clica em Explicar Previsão para ver as contribuições das features."
+              />
             </div>
           )}
         </div>

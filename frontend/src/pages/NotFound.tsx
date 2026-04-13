@@ -6,9 +6,9 @@ export default function NotFound() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
       <div className="text-center">
         <p className="text-7xl font-bold text-primary-200 tabular-nums">404</p>
-        <h1 className="text-2xl font-bold text-text-primary mt-4">Pagina nao encontrada</h1>
+        <h1 className="text-2xl font-bold text-text-primary mt-4">Pagina não encontrada</h1>
         <p className="text-sm text-text-secondary mt-2 max-w-sm mx-auto">
-          A pagina que procura nao existe ou foi movida.
+          A pagina que procura não existe ou foi movida.
         </p>
         <div className="flex items-center justify-center gap-3 mt-6">
           <button

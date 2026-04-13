@@ -60,7 +60,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
 
   return (
     <fieldset className="space-y-4">
-      <legend className="sr-only">Dados meteorologicos para previsao</legend>
+      <legend className="sr-only">Dados meteorologicos para previsão</legend>
 
       {showTimestamp && (
         <div>
@@ -80,7 +80,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
 
       <RegionSelect
         id={`${idPrefix}-region`}
-        label="Regiao"
+        label="Região"
         value={data.region as Region}
         onChange={(r) => update('region', r)}
       />
