@@ -29,6 +29,7 @@ import { FadeInView } from '../components/motion/FadeInView';
 import { GlassCard } from '../components/motion/GlassCard';
 import { StaggerGroup, StaggerItem } from '../components/motion/StaggerGroup';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { PORTUGAL_PATH } from '../assets/portugalPath';
 
 interface RegionDot {
   id: string;
@@ -37,12 +38,13 @@ interface RegionDot {
   cy: number;
 }
 
+// Coordinates in the 12969 × 26674 viewBox of the continental Portugal path.
 const REGIONS: RegionDot[] = [
-  { id: 'norte', label: 'Norte', cx: 40, cy: 15 },
-  { id: 'centro', label: 'Centro', cx: 38, cy: 42 },
-  { id: 'lisboa', label: 'Lisboa', cx: 18, cy: 60 },
-  { id: 'alentejo', label: 'Alentejo', cx: 40, cy: 82 },
-  { id: 'algarve', label: 'Algarve', cx: 30, cy: 105 },
+  { id: 'norte', label: 'Norte', cx: 6500, cy: 2800 },
+  { id: 'centro', label: 'Centro', cx: 6200, cy: 8800 },
+  { id: 'lisboa', label: 'Lisboa', cx: 2400, cy: 13500 },
+  { id: 'alentejo', label: 'Alentejo', cx: 7200, cy: 17500 },
+  { id: 'algarve', label: 'Algarve', cx: 5600, cy: 24000 },
 ];
 
 interface TechPill {
@@ -79,20 +81,13 @@ const ARCH_STEPS: ArchStep[] = [
 ];
 
 function PortugalMap() {
-  // Stylised but recognisable silhouette of continental Portugal:
-  // north-south oblong with NE Spain-border jags, distinctive west-coast
-  // concavity (Peniche/Setúbal) and near-horizontal Algarve south coast.
-  const portugalPath =
-    'M 22 5 L 36 4 L 48 6 L 56 11 L 54 18 L 60 24 L 56 30 L 61 37 L 56 44 ' +
-    'L 60 52 L 55 60 L 59 68 L 54 76 L 58 84 L 52 92 L 55 99 L 50 106 ' +
-    'L 38 111 L 22 111 L 14 107 L 10 100 L 13 91 L 8 82 L 13 74 L 9 66 ' +
-    'L 7 56 L 11 47 L 8 38 L 12 30 L 7 22 L 14 14 Z';
   return (
     <svg
-      viewBox="0 0 70 120"
-      className="h-full w-full max-h-[220px]"
+      viewBox="0 0 12969 26674"
+      className="h-full w-full max-h-[240px]"
       aria-label="Mapa de Portugal continental com 5 regiões"
       role="img"
+      preserveAspectRatio="xMidYMid meet"
     >
       <defs>
         <linearGradient id="pt-fill" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -100,33 +95,33 @@ function PortugalMap() {
           <stop offset="100%" stopColor="var(--color-primary-600, #d97706)" />
         </linearGradient>
       </defs>
-      {/* Filled Portugal shape in amber */}
+      {/* Continental Portugal — data from AfonsoFG/PortugalSVG (CC BY-SA 4.0) */}
       <path
-        d={portugalPath}
+        d={PORTUGAL_PATH}
         fill="url(#pt-fill)"
         stroke="#b45309"
-        strokeOpacity={0.6}
-        strokeWidth={0.8}
+        strokeOpacity={0.45}
+        strokeWidth={40}
         strokeLinejoin="round"
       />
-      {/* Region dots with a soft halo */}
+      {/* Region dots with pulsing halo */}
       {REGIONS.map((r, i) => (
         <g key={r.id}>
           <motion.circle
             cx={r.cx}
             cy={r.cy}
-            r={6}
-            className="fill-primary-100/70 dark:fill-primary-200/30"
-            animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }}
+            r={650}
+            className="fill-white/70"
+            animate={{ scale: [1, 1.9, 1], opacity: [0.55, 0, 0.55] }}
             transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
             style={{ transformOrigin: `${r.cx}px ${r.cy}px` }}
           />
           <circle
             cx={r.cx}
             cy={r.cy}
-            r={2.2}
+            r={240}
             className="fill-white stroke-primary-900"
-            strokeWidth={1}
+            strokeWidth={80}
           />
         </g>
       ))}

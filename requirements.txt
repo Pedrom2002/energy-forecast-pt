@@ -1,6 +1,7 @@
 # Core Data Science
 numpy>=1.26.0,<2.3
 pandas>=2.1.0,<2.3
+pyarrow>=15.0.0,<21.0
 
 # Machine Learning
 scikit-learn>=1.4.0,<2.0

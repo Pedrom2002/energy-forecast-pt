@@ -171,7 +171,7 @@ class TestFeatureToModelPipeline:
         y = df["consumption_mw"].values
 
         split = int(len(X) * 0.8)
-        model = create_model("random_forest", {"n_estimators": 20})
+        model = create_model("xgboost", {"n_estimators": 20})
         fit_model(model, X[:split], y[:split])
         y_pred = model.predict(X[split:])
 
