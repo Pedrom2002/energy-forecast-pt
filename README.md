@@ -49,7 +49,8 @@ flowchart LR
     subgraph Serving["Serving"]
         API[FastAPI<br/>7 routers: admin/batch/explain/<br/>forecast/health/monitoring/predict]
         UI[React 19 + TypeScript<br/>4 pages · EN/PT · dark-only]
-        UI -->|/api| API
+        UI -->|HTTP requests| API
+        API -->|JSON predictions| UI
     end
 
     subgraph Ops["Ops"]
@@ -59,7 +60,8 @@ flowchart LR
 
     Sources --> Pipeline --> API
     API -.metrics.-> PROM
-    API --> HF
+    HF -.hosts.-> API
+    HF -.serves.-> UI
 ```
 
 ## Key Results
