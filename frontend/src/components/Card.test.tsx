@@ -85,6 +85,6 @@ describe('CardSkeleton', () => {
 
   it('has aria-busy attribute', () => {
     render(<CardSkeleton />)
-    expect(screen.getByLabelText('A carregar...')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByLabelText('Loading...')).toHaveAttribute('aria-busy', 'true')
   })
 })

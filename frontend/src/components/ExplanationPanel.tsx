@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, type EnergyData, type ExplanationResponse } from '../api/client';
 import { CardSkeleton } from './Card';
 import { formatMW, formatPercent } from '../utils/format';
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function ExplanationPanel({ weather }: Props) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [result, setResult] = useState<ExplanationResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,7 +47,7 @@ export function ExplanationPanel({ weather }: Props) {
       const res = await api.predictExplain(weather, 10);
       setResult(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      setError(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
       setLoading(false);
     }
@@ -112,7 +114,7 @@ export function ExplanationPanel({ weather }: Props) {
       >
         <span className="flex items-center gap-2">
           <Brain className="w-4 h-4" aria-hidden="true" />
-          Explicar esta previsão
+          {t('explain.button')}
         </span>
         {expanded ? (
           <ChevronUp className="w-4 h-4" aria-hidden="true" />
@@ -141,7 +143,7 @@ export function ExplanationPanel({ weather }: Props) {
                 />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-red-800 dark:text-red-200">
-                    Não foi possível gerar a explicação.
+                    {t('explain.errorTitle')}
                   </p>
                   <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{error}</p>
                   <button
@@ -150,7 +152,7 @@ export function ExplanationPanel({ weather }: Props) {
                     className="mt-2 text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer
                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 rounded"
                   >
-                    Tentar novamente
+                    {t('common.retry')}
                   </button>
                 </div>
               </div>
@@ -159,13 +161,13 @@ export function ExplanationPanel({ weather }: Props) {
             {result && !loading && !error && (
               <>
                 <p className="text-sm text-text-secondary">
-                  Top 10 features que mais influenciaram esta previsão (SHAP)
+                  {t('explain.description')}
                 </p>
 
                 <div
                   className="h-[280px]"
                   role="img"
-                  aria-label="Contribuição SHAP das features"
+                  aria-label={t('explain.chartAria')}
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
@@ -182,7 +184,7 @@ export function ExplanationPanel({ weather }: Props) {
                         type="number"
                         tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
                         label={{
-                          value: 'Importancia (%)',
+                          value: t('explain.importance'),
                           position: 'insideBottom',
                           offset: -5,
                           style: { fontSize: 11, fill: 'var(--color-text-muted)' },
@@ -204,12 +206,12 @@ export function ExplanationPanel({ weather }: Props) {
                                 {d.fullName}
                               </p>
                               <p className="text-text-secondary mt-1">
-                                Contribuicao:{' '}
+                                {t('explain.contribution')}:{' '}
                                 <span className="font-mono tabular-nums">
                                   {formatMW(d.contribution)}
                                 </span>
                               </p>
-                              <p className="text-text-muted">Rank: #{d.rank}</p>
+                              <p className="text-text-muted">{t('explain.rank')}: #{d.rank}</p>
                             </div>
                           );
                         }}
@@ -231,7 +233,7 @@ export function ExplanationPanel({ weather }: Props) {
                   className="text-xs font-medium text-primary-600 hover:text-primary-800 underline cursor-pointer
                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded"
                 >
-                  {showTable ? 'Ocultar tabela completa' : 'Ver tabela completa'}
+                  {showTable ? t('explain.hideTable') : t('explain.showTable')}
                 </button>
 
                 {showTable && (
@@ -241,7 +243,7 @@ export function ExplanationPanel({ weather }: Props) {
                   >
                     <table
                       className="w-full text-sm"
-                      aria-label="Detalhes das features mais importantes"
+                      aria-label={t('explain.tableAria')}
                     >
                       <thead>
                         <tr className="border-b border-border">
@@ -257,10 +259,10 @@ export function ExplanationPanel({ weather }: Props) {
                             scope="col"
                             className="text-left py-3 px-3 text-xs font-medium text-text-muted"
                           >
-                            Feature
+                            {t('explain.colFeature')}
                           </th>
                           <SortableHeader
-                            label="Importancia"
+                            label={t('explain.colImportance')}
                             column="importance"
                             current={sortCol}
                             asc={sortAsc}
@@ -268,7 +270,7 @@ export function ExplanationPanel({ weather }: Props) {
                             className="text-right"
                           />
                           <SortableHeader
-                            label="Valor"
+                            label={t('explain.colValue')}
                             column="value"
                             current={sortCol}
                             asc={sortAsc}

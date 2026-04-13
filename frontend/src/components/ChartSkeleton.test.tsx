@@ -18,7 +18,7 @@ describe('ChartSkeleton', () => {
 
   it('has aria-busy attribute', () => {
     render(<ChartSkeleton />)
-    expect(screen.getByLabelText('A carregar grafico...')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByLabelText('Loading...')).toHaveAttribute('aria-busy', 'true')
   })
 
   it('renders Y-axis placeholders', () => {

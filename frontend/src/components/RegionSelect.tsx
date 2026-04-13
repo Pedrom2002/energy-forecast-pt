@@ -1,5 +1,6 @@
 import { REGIONS, type Region } from '../api/client';
 import { MapPin } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface RegionSelectProps {
   value: Region;
@@ -10,6 +11,7 @@ interface RegionSelectProps {
 }
 
 export default function RegionSelect({ value, onChange, className = '', id = 'region-select', label }: RegionSelectProps) {
+  const { t } = useTranslation();
   return (
     <div>
       {label && (
@@ -22,7 +24,7 @@ export default function RegionSelect({ value, onChange, className = '', id = 're
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value as Region)}
-        aria-label={label ? undefined : 'Selecionar regiao'}
+        aria-label={label ? undefined : t('predict.form.regionAria')}
         className={`block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm text-text-primary shadow-xs cursor-pointer
           focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition ${className}`}
       >

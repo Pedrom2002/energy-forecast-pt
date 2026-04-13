@@ -74,7 +74,7 @@ describe('ToastContainer', () => {
 
     expect(screen.getByText('Dismissable')).toBeInTheDocument()
 
-    const closeButton = screen.getByRole('button', { name: /fechar/i })
+    const closeButton = screen.getByRole('button', { name: /close/i })
     await user.click(closeButton)
 
     expect(screen.queryByText('Dismissable')).not.toBeInTheDocument()
@@ -101,7 +101,7 @@ describe('ToastContainer', () => {
       toast.info('Accessible')
     })
 
-    const container = screen.getByLabelText('Notificacoes')
+    const container = screen.getByLabelText('Notifications')
     expect(container).toHaveAttribute('aria-live', 'polite')
   })
 

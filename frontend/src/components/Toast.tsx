@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { CheckCircle, AlertTriangle, X, Info } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -43,6 +44,7 @@ let nextId = 0;
 
 export function ToastContainer() {
   const [messages, setMessages] = useState<ToastMessage[]>([]);
+  const { t } = useTranslation();
 
   const add = useCallback((type: ToastType, text: string) => {
     const id = ++nextId;
@@ -67,7 +69,7 @@ export function ToastContainer() {
     <div
       className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none"
       aria-live="polite"
-      aria-label="Notificacoes"
+      aria-label={t('toast.listAria')}
     >
       {messages.map((msg) => (
         <div
@@ -83,7 +85,7 @@ export function ToastContainer() {
             type="button"
             onClick={() => dismiss(msg.id)}
             className="shrink-0 p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
-            aria-label="Fechar notificacao"
+            aria-label={t('toast.closeAria')}
           >
             <X className="w-3.5 h-3.5" />
           </button>

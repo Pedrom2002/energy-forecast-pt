@@ -2,12 +2,15 @@
  * Chart skeleton with axis placeholders
  * rule: loading-chart — skeleton instead of empty axis frame
  */
+import { useTranslation } from 'react-i18next';
+
 export function ChartSkeleton({ height = 350 }: { height?: number }) {
+  const { t } = useTranslation();
   return (
     <div
       className="bg-surface rounded-xl border border-border shadow-sm overflow-hidden"
       aria-busy="true"
-      aria-label="A carregar grafico..."
+      aria-label={t('common.loading')}
     >
       {/* Header */}
       <div className="px-5 sm:px-6 py-4 border-b border-border">

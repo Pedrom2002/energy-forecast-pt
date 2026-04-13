@@ -45,7 +45,7 @@ describe('RegionSelect', () => {
 
   it('uses default aria-label when no label provided', () => {
     render(<RegionSelect {...defaultProps} />)
-    expect(screen.getByLabelText('Selecionar regiao')).toBeInTheDocument()
+    expect(screen.getByLabelText('Select region')).toBeInTheDocument()
   })
 
   it('does not set aria-label when label prop is provided', () => {
