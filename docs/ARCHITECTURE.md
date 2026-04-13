@@ -408,7 +408,7 @@ graph LR
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Cloud deployment guides |
 | [MONITORING.md](MONITORING.md) | Production monitoring setup |
 | [SECURITY.md](SECURITY.md) | Security architecture |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
+| [DECISIONS.md](DECISIONS.md) | Trade-offs and reversals (PT) |
 
 ## Future Improvements
 

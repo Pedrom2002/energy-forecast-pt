@@ -99,6 +99,5 @@ uvicorn src.api.main:app --reload
 ## 🔗 Related Documentation
 
 - [MODEL_CARD.md](../../docs/MODEL_CARD.md) - Detailed model information
-- [EXECUTIVE_SUMMARY.md](../../docs/EXECUTIVE_SUMMARY.md) - Complete technical overview
 - [Notebook 02](../../notebooks/02_model_training.ipynb) - Model training with lags
 - [Notebook 03](../../notebooks/03_model_training_no_lags.ipynb) - Model training without lags
