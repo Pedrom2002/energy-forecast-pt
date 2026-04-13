@@ -34,7 +34,10 @@ export default function Layout() {
     let cancelled = false;
     const check = async () => {
       try {
-        const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8000';
+        // Use the same BASE_URL the rest of the app uses (honours the Vite
+        // proxy in dev and the same-origin deploy on HF Space).
+        const envBase = (import.meta as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL;
+        const base = envBase !== undefined ? envBase.replace(/\/$/, '') : '/api';
         const res = await fetch(`${base}/health`, { method: 'GET' });
         if (!cancelled) setApiOnline(res.ok);
       } catch {
