@@ -33,22 +33,24 @@
   --color-energy-red: #dc2626;
   --color-energy-blue: #0ea5e9;
 
-  /* Surface tokens — light */
-  --color-surface: #ffffff;
-  --color-surface-dim: #f8fafc;
-  --color-surface-bright: #f1f5f9;
-  --color-border: #e2e8f0;
+  /* Surface tokens — light. Hierarchy: bg < dim < bright < surface (cards) */
+  --color-background: #eef2f7;          /* page bg — visibly cooler than cards */
+  --color-surface: #ffffff;             /* cards / panels — clean white lift */
+  --color-surface-dim: #f1f5f9;         /* slightly tinted panels (skeleton, code) */
+  --color-surface-bright: #e2e8f0;      /* hover surfaces — visible state change */
+  --color-border: #cbd5e1;              /* default borders — readable on cards */
+  --color-border-subtle: #e2e8f0;       /* divider lines */
 
   /* Text tokens — contrast ratio >= 4.5:1 on white */
   --color-text-primary: #020617;
   --color-text-secondary: #334155;
   --color-text-muted: #64748b;
 
-  /* Elevation scale (4 tiers) */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  /* Elevation scale — slate-tinted shadows for cohesion with neutral surfaces */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.05);
+  --shadow-md: 0 4px 8px -2px rgb(15 23 42 / 0.10), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  --shadow-lg: 0 12px 24px -6px rgb(15 23 42 / 0.12), 0 4px 8px -4px rgb(15 23 42 / 0.06);
 
   /* Typography scale */
   --font-size-hero: clamp(2rem, 5vw + 1rem, 4rem);
@@ -79,10 +81,12 @@
 
 /* ── Dark mode overrides ── */
 .dark {
-  --color-surface: #0f172a;
-  --color-surface-dim: #0c1222;
-  --color-surface-bright: #1e293b;
+  --color-background: #0a0f1c;          /* deepest layer — page bg */
+  --color-surface: #0f172a;             /* cards */
+  --color-surface-dim: #0c1222;         /* skeleton/code blocks */
+  --color-surface-bright: #1e293b;      /* hover */
   --color-border: #334155;
+  --color-border-subtle: #1e293b;
   --color-text-primary: #f1f5f9;
   --color-text-secondary: #cbd5e1;
   --color-text-muted: #94a3b8;
@@ -113,7 +117,7 @@ body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  background: var(--color-surface-dim);
+  background: var(--color-background);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
