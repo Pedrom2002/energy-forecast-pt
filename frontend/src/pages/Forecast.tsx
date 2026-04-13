@@ -210,9 +210,9 @@ export default function Forecast() {
           </div>
         </form>
 
-        <div className="flex items-start gap-2 mt-4 p-3 bg-primary-50 rounded-lg text-xs text-primary-700">
-          <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-          <p>Dados meteorologicos simulados para demonstracao. Em produção, integre com dados reais de estacoes meteorologicas.</p>
+        <div className="flex items-center gap-2.5 mt-4 px-3 py-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-xs text-primary-700 dark:text-primary-300 leading-relaxed">
+          <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
+          <p>Dados meteorológicos simulados para demonstração. Em produção, integre com dados reais de estações meteorológicas.</p>
         </div>
       </Card>
 
