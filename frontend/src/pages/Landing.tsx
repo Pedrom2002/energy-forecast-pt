@@ -42,7 +42,7 @@ interface RegionDot {
 // Approximate centroids of the 5 NUTS-II regions (lat/lon mapped linearly onto
 // the viewBox: lat 37-42°N, lon -9.5/-6.5°W).
 const REGIONS: RegionDot[] = [
-  { id: 'norte', label: 'Norte', cx: 6200, cy: 2800 },
+  { id: 'norte', label: 'Norte', cx: 6200, cy: 4500 },
   { id: 'centro', label: 'Centro', cx: 6400, cy: 10500 },
   { id: 'lisboa', label: 'Lisboa', cx: 1100, cy: 17200 },
   { id: 'alentejo', label: 'Alentejo', cx: 7400, cy: 19800 },
