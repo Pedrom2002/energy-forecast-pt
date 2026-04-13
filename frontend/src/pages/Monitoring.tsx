@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
+import { formatLocale } from '../i18n';
 import { Card, CardSkeleton } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatKey, formatNumber, formatPercent } from '../utils/format';
@@ -102,7 +104,8 @@ interface DriftCheckEntry {
 }
 
 export default function Monitoring() {
-  useDocumentTitle('Monitorização');
+  const { t } = useTranslation();
+  useDocumentTitle(t('monitoring.title'));
   const [coverage, setCoverage] = useState<AnyRecord | null>(null);
   const [drift, setDrift] = useState<AnyRecord | null>(null);
   const [metrics, setMetrics] = useState<AnyRecord | null>(null);
@@ -129,10 +132,10 @@ export default function Monitoring() {
       if (dr.status === 'fulfilled') setDrift(dr.value as AnyRecord);
       if (met.status === 'fulfilled') setMetrics(met.value as AnyRecord);
       if (cov.status === 'rejected' && dr.status === 'rejected') {
-        setError('Não foi possível obter dados de monitorização. Verifique a ligação à API.');
+        setError(t('monitoring.errorLoad'));
       } else {
         setLastUpdated(new Date());
-        toast.success('Dados de monitorização atualizados');
+        toast.success(t('monitoring.toastUpdated'));
       }
     } finally {
       setLoading(false);
@@ -185,7 +188,7 @@ export default function Monitoring() {
   const driftAlert = coverage?.alert === true || coverageStatus === 'bad';
 
   const lastUpdatedLabel = lastUpdated
-    ? lastUpdated.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    ? lastUpdated.toLocaleTimeString(formatLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '—';
 
   // Filter truly-useful metrics (numeric scalars only)
@@ -217,7 +220,7 @@ export default function Monitoring() {
       const res = await api.driftCheck(features);
       setSimResult(res as AnyRecord);
     } catch (err) {
-      setSimError(err instanceof Error ? err.message : 'Erro ao executar simulação');
+      setSimError(err instanceof Error ? err.message : t('monitoring.simError'));
     } finally {
       setSimLoading(false);
     }
@@ -266,10 +269,10 @@ export default function Monitoring() {
       <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-text-primary leading-tight">
-            Monitorização
+            {t('monitoring.title')}
           </h1>
           <p className="mt-2 text-sm md:text-base text-text-secondary max-w-2xl">
-            Saúde do modelo em produção · cobertura conformal e drift de features
+            {t('monitoring.subtitle')}
           </p>
         </div>
         <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
@@ -281,13 +284,13 @@ export default function Monitoring() {
               border border-border hover:border-primary-300 dark:hover:border-primary-700
               rounded-lg px-4 cursor-pointer transition-colors
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            aria-label="Atualizar dados de monitorização"
+            aria-label={t('monitoring.refreshAria')}
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">Atualizar</span>
+            <span className="hidden sm:inline">{t('common.refresh')}</span>
           </button>
           <p className="text-xs text-text-muted tabular-nums">
-            última verificação: {lastUpdatedLabel}
+            {t('monitoring.lastCheck', { when: lastUpdatedLabel })}
           </p>
         </div>
       </section>
@@ -299,14 +302,14 @@ export default function Monitoring() {
         >
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">Dados limitados</p>
+            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{t('monitoring.limitedData')}</p>
             <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1">{error}</p>
             <p className="text-xs text-amber-800/80 dark:text-amber-300/70 mt-2">
-              Verifique se a API está disponível em{' '}
+              {t('monitoring.apiHint')}{' '}
               <code className="bg-amber-100/60 dark:bg-amber-900/40 px-1.5 py-0.5 rounded text-[11px] font-mono">
                 localhost:8000
               </code>
-              {' '}e se o modelo tem observações registadas.
+              {' '}{t('monitoring.andModel')}
             </p>
           </div>
         </div>
@@ -317,7 +320,7 @@ export default function Monitoring() {
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Cobertura empírica
+              {t('monitoring.empiricalCoverage')}
             </p>
             {coverageStatus === 'ok' && <CheckCircle className="w-4 h-4 text-energy-green" aria-hidden="true" />}
             {coverageStatus === 'warn' && <AlertTriangle className="w-4 h-4 text-energy-yellow" aria-hidden="true" />}
@@ -345,7 +348,7 @@ export default function Monitoring() {
               )}
             </div>
             <p className="mt-1 text-xs text-text-secondary">
-              alvo {formatPercent(nominalPct, 0)} · janela {Math.round(windowSize)}h
+              {t('monitoring.target', { value: formatPercent(nominalPct, 0) })} · {t('monitoring.window', { hours: Math.round(windowSize) })}
             </p>
           </div>
         </BentoCard>
@@ -353,7 +356,7 @@ export default function Monitoring() {
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Observações
+              {t('monitoring.observations')}
             </p>
             <Activity className="w-4 h-4 text-primary-500" aria-hidden="true" />
           </div>
@@ -363,14 +366,14 @@ export default function Monitoring() {
               format={(n) => formatNumber(Math.round(n), 0)}
               className="text-3xl font-bold md:text-4xl tabular-nums"
             />
-            <p className="mt-1 text-xs text-text-secondary">registadas na janela</p>
+            <p className="mt-1 text-xs text-text-secondary">{t('monitoring.observationsSubtitle')}</p>
           </div>
         </BentoCard>
 
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Estado de drift
+              {t('monitoring.driftState')}
             </p>
             <Sparkles className="w-4 h-4 text-primary-500" aria-hidden="true" />
           </div>
@@ -383,10 +386,10 @@ export default function Monitoring() {
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${driftAlert ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
-              {driftAlert ? 'Drift detectado' : 'Estável'}
+              {driftAlert ? t('monitoring.driftDetected') : t('monitoring.stable')}
             </span>
             <p className="mt-2 text-xs text-text-secondary">
-              última verificação: <span className="tabular-nums">{lastUpdatedLabel}</span>
+              {t('monitoring.lastCheck', { when: lastUpdatedLabel })}
             </p>
           </div>
         </BentoCard>
@@ -395,26 +398,25 @@ export default function Monitoring() {
       {/* Coverage section */}
       <FadeInView delay={0.05}>
         <Card
-          title="Calibração Conformal · cobertura dos IC 90%"
-          subtitle={`Janela deslizante de ${Math.round(windowSize)} observações`}
+          title={t('monitoring.coverageTitle')}
+          subtitle={t('monitoring.coverageSubtitle', { hours: Math.round(windowSize) })}
         >
           {empiricalPct != null ? (
             <div className="space-y-5">
               <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                 <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
                 <p>
-                  <strong>Demo:</strong> 168 observações sintéticas semeadas no arranque (~92% cobertura) para que esta página tenha sempre dados visíveis.
-                  Em produção, esta janela seria preenchida via <code className="font-mono px-1 py-0.5 bg-amber-100/60 dark:bg-amber-900/40 rounded">POST /model/coverage/record</code> à medida que chegam observações reais.
+                  <strong>{t('monitoring.demoLabel')}</strong>{' '}
+                  {t('monitoring.demoCoverageBody', { endpoint: 'POST /model/coverage/record' })}
                 </p>
               </div>
               <p className="text-xs text-text-secondary leading-relaxed">
-                O modelo deve cobrir {formatPercent(nominalPct, 0)} dos casos reais.
-                A linha verde marca o alvo, a amarela o limite de alerta ({formatPercent(alertPct, 0)}).
+                {t('monitoring.coverageExplain', { nominal: formatPercent(nominalPct, 0), alert: formatPercent(alertPct, 0) })}
               </p>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-text-primary">Cobertura empírica</span>
+                  <span className="text-sm font-medium text-text-primary">{t('monitoring.empiricalCoverageLine')}</span>
                   <span
                     className={`flex items-center gap-1.5 text-base font-semibold tabular-nums ${
                       coverageStatus === 'ok'
@@ -441,7 +443,7 @@ export default function Monitoring() {
                   aria-valuenow={+empiricalPct.toFixed(1)}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-label={`Cobertura empírica: ${empiricalPct.toFixed(1)}%`}
+                  aria-label={t('monitoring.coverageAria', { value: empiricalPct.toFixed(1) })}
                 >
                   <div
                     className={`h-full rounded-full transition-all duration-700 ease-out ${
@@ -469,222 +471,28 @@ export default function Monitoring() {
 
                 <div className="flex justify-between text-[11px] text-text-muted tabular-nums">
                   <span>0%</span>
-                  <span className="text-energy-yellow font-medium">{alertPct.toFixed(0)}% alerta</span>
-                  <span className="text-energy-green font-medium">{nominalPct.toFixed(0)}% alvo</span>
+                  <span className="text-energy-yellow font-medium">{t('monitoring.alertLabel', { value: alertPct.toFixed(0) })}</span>
+                  <span className="text-energy-green font-medium">{t('monitoring.targetLabel', { value: nominalPct.toFixed(0) })}</span>
                   <span>100%</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                <NumStat label="Alvo" value={formatPercent(nominalPct, 1)} />
-                <NumStat label="Actual" value={formatPercent(empiricalPct, 1)} />
+                <NumStat label={t('monitoring.statTarget')} value={formatPercent(nominalPct, 1)} />
+                <NumStat label={t('monitoring.statActual')} value={formatPercent(empiricalPct, 1)} />
                 <NumStat
-                  label="Desvio"
+                  label={t('monitoring.statDeviation')}
                   value={deviation != null ? `${deviation >= 0 ? '+' : ''}${(deviation * 100).toFixed(2)}pp` : '—'}
                   tone={deviation != null && Math.abs(deviation) > 0.1 ? 'bad' : 'ok'}
                 />
-                <NumStat label="Janela" value={`${Math.round(windowSize)}h`} />
+                <NumStat label={t('monitoring.statWindow')} value={`${Math.round(windowSize)}h`} />
               </div>
             </div>
           ) : (
             <EmptyState
               icon={<Shield className="w-8 h-8" />}
-              title="Sem dados de cobertura"
-              hint={
-                <>
-                  Registe observações via{' '}
-                  <code className="bg-surface-bright px-1.5 py-0.5 rounded text-xs font-mono">
-                    POST /model/coverage/record
-                  </code>{' '}
-                  para iniciar o tracking.
-                </>
-              }
-            />
-          )}
-        </Card>
-      </FadeInView>
-
-      {/* Drift section */}
-      <FadeInView delay={0.1}>
-        <Card
-          title="Distribuição de Features · baseline de treino"
-          subtitle={`Estatísticas de ${featureList.length} features para detecção de drift`}
-        >
-          {featureList.length > 0 ? (
-            <div className="space-y-5">
-              <div className="flex items-start gap-2 p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-xs text-primary-800 dark:text-primary-200">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-                <p>
-                  Envie features para{' '}
-                  <code className="bg-primary-100 dark:bg-primary-900/40 px-1 rounded font-mono">
-                    POST /model/drift/check
-                  </code>{' '}
-                  para comparar com este baseline. Z-score |z| ≥ 3 indica drift significativo.
-                </p>
-              </div>
-
-              {/* Chart */}
-              <div className="h-[360px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topFeatures} layout="vertical" margin={{ top: 8, right: 16, bottom: 8, left: 8 }}>
-                    <CartesianGrid horizontal={false} stroke="var(--color-border, #e5e7eb)" strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
-                      axisLine={{ stroke: 'var(--color-border, #e5e7eb)' }}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={160}
-                      tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
-                      axisLine={{ stroke: 'var(--color-border, #e5e7eb)' }}
-                      tickLine={false}
-                    />
-                    <Tooltip
-                      cursor={{ fill: 'var(--color-surface-bright, #f5f5f4)', opacity: 0.5 }}
-                      contentStyle={{
-                        background: 'var(--color-surface, #fff)',
-                        border: '1px solid var(--color-border, #e5e7eb)',
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                      formatter={(v: number) => [v.toFixed(3), 'Amplitude (p99−p1)']}
-                    />
-                    <Bar dataKey="range" radius={[0, 6, 6, 0]} onClick={(d: { name?: string }) => d?.name && setExpandedFeature(d.name === expandedFeature ? null : d.name)}>
-                      {topFeatures.map((f) => (
-                        <Cell
-                          key={f.name}
-                          fill={expandedFeature === f.name ? 'var(--color-primary-700, #b45309)' : 'var(--color-primary-500, #f59e0b)'}
-                          cursor="pointer"
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Expanded feature detail */}
-              {expandedFeature && featureStats[expandedFeature] && (
-                <div className="p-4 rounded-xl border border-primary-200 dark:border-primary-800 bg-primary-50/50 dark:bg-primary-900/20 animate-fade-in-up">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold text-text-primary">{expandedFeature}</p>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedFeature(null)}
-                      className="text-xs text-text-muted hover:text-text-primary cursor-pointer"
-                    >
-                      fechar
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {(['mean', 'std', 'min', 'p1', 'p99', 'max'] as const).map((stat) => {
-                      const v = featureStats[expandedFeature][stat];
-                      return (
-                        <div key={stat} className="text-center p-2 bg-surface rounded-lg">
-                          <p className="text-[10px] text-text-muted uppercase tracking-wider">{stat}</p>
-                          <p className="text-xs font-mono text-text-primary tabular-nums mt-0.5">
-                            {isFiniteNumber(v) ? v.toFixed(3) : '—'}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Feature list — click-to-expand alternate */}
-              <div className="space-y-1">
-                {topFeatures.map((f) => {
-                  const expanded = expandedFeature === f.name;
-                  return (
-                    <button
-                      type="button"
-                      key={f.name}
-                      onClick={() => setExpandedFeature(expanded ? null : f.name)}
-                      className="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-dim transition-colors text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 cursor-pointer"
-                    >
-                      <span className="text-sm text-text-primary font-medium truncate flex-1">{f.name}</span>
-                      <span className="text-xs text-text-muted font-mono tabular-nums mr-3">
-                        σ={f.std.toFixed(2)} · Δ={f.range.toFixed(2)}
-                      </span>
-                      <ChevronDown
-                        className={`w-4 h-4 text-text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
-                        aria-hidden="true"
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Simulator */}
-              <div className="pt-4 border-t border-border/50">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <p className="text-sm font-semibold text-text-primary">Simular drift</p>
-                    <p className="text-xs text-text-secondary mt-0.5">
-                      Gera perturbações sintéticas em torno do baseline e envia para{' '}
-                      <code className="font-mono text-[11px]">/model/drift/check</code>.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={runSimulation}
-                    disabled={simLoading}
-                    className="min-h-[44px] inline-flex items-center gap-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed px-4 rounded-lg cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                  >
-                    <Zap className={`w-4 h-4 ${simLoading ? 'animate-pulse' : ''}`} aria-hidden="true" />
-                    {simLoading ? 'A simular…' : 'Executar simulação'}
-                  </button>
-                </div>
-
-                {simError && (
-                  <p className="mt-3 text-xs text-energy-red">{simError}</p>
-                )}
-
-                {simEntries.length > 0 && (
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {simEntries.slice(0, 16).map(([name, z]) => {
-                      const high = Math.abs(z) >= 3;
-                      const mid = Math.abs(z) >= 2;
-                      return (
-                        <div
-                          key={name}
-                          className={`p-2.5 rounded-lg border ${
-                            high
-                              ? 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-800'
-                              : mid
-                                ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800'
-                                : 'border-border bg-surface-dim'
-                          }`}
-                        >
-                          <p className="text-[11px] text-text-secondary truncate">{name}</p>
-                          <p
-                            className={`text-sm font-mono font-semibold tabular-nums mt-0.5 ${
-                              high ? 'text-energy-red' : mid ? 'text-energy-yellow' : 'text-text-primary'
-                            }`}
-                          >
-                            z = {z.toFixed(2)}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <EmptyState
-              icon={<Activity className="w-8 h-8" />}
-              title="Baseline não disponível"
-              hint={
-                <>
-                  O modelo precisa de ter{' '}
-                  <code className="bg-surface-bright px-1.5 py-0.5 rounded text-xs font-mono">feature_stats</code>{' '}
-                  nos metadados.
-                </>
-              }
+              title={t('monitoring.noCoverageTitle')}
+              hint={t('monitoring.noCoverageHint', { endpoint: 'POST /model/coverage/record' })}
             />
           )}
         </Card>
@@ -693,7 +501,7 @@ export default function Monitoring() {
       {/* Operational metrics (only if useful) */}
       {usefulMetrics.length >= 2 && (
         <FadeInView delay={0.15}>
-          <Card title="Métricas operacionais · API" subtitle="Resumo de tráfego e latências">
+          <Card title={t('monitoring.opMetricsTitle')} subtitle={t('monitoring.opMetricsSubtitle')}>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 stagger-children">
               {usefulMetrics.map(([key, value]) => (
                 <div key={key} className="p-3.5 bg-surface-dim rounded-lg hover:bg-surface-bright transition-colors">

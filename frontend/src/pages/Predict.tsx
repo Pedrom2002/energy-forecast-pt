@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, type EnergyData, type PredictionResponse } from '../api/client';
 import { Card } from '../components/Card';
 import { toast } from '../components/Toast';
@@ -14,7 +15,8 @@ function getDefaultTimestamp(): string {
 }
 
 export default function Predict() {
-  useDocumentTitle('Previsão');
+  const { t } = useTranslation();
+  useDocumentTitle(t('predict.title'));
   const [data, setData] = useState<EnergyData>({
     timestamp: getDefaultTimestamp(),
     region: 'Lisboa',
@@ -35,9 +37,9 @@ export default function Predict() {
     try {
       const res = await api.predict(data);
       setResult(res);
-      toast.success(`Previsão: ${formatMW(res.predicted_consumption_mw)} para ${res.region}`);
+      toast.success(t('predict.toastSuccess', { value: formatMW(res.predicted_consumption_mw), region: res.region }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+      setError(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
       setLoading(false);
     }
@@ -46,15 +48,15 @@ export default function Predict() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsão Individual</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">{t('predict.title')}</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Obtenha uma previsão de consumo energetico para um momento e região especificos
+          {t('predict.subtitle')}
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Form */}
-        <Card title="Parametros" subtitle="Dados meteorologicos e temporais" className="lg:col-span-2">
+        <Card title={t('predict.params')} subtitle={t('predict.paramsSubtitle')} className="lg:col-span-2">
           <WeatherForm data={data} onChange={setData} idPrefix="pred" />
           <button
             type="button"
@@ -68,12 +70,12 @@ export default function Predict() {
           >
             {loading ? (
               <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" role="status">
-                <span className="sr-only">A processar...</span>
+                <span className="sr-only">{t('common.processing')}</span>
               </div>
             ) : (
               <>
                 <Zap className="w-4 h-4" aria-hidden="true" />
-                Prever Consumo
+                {t('predict.predictButton')}
                 <ArrowRight className="w-4 h-4" aria-hidden="true" />
               </>
             )}
@@ -84,8 +86,8 @@ export default function Predict() {
         <div className="lg:col-span-3 space-y-4">
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 animate-fade-in-up" role="alert">
-              <p className="text-sm text-red-700 dark:text-red-200 font-medium">Erro: {error}</p>
-              <p className="text-xs text-red-500 dark:text-red-400 mt-1">Verifique os parametros e tente novamente.</p>
+              <p className="text-sm text-red-700 dark:text-red-200 font-medium">{t('predict.errorPrefix')}: {error}</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">{t('predict.errorHint')}</p>
             </div>
           )}
 
@@ -95,7 +97,7 @@ export default function Predict() {
               <div className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-2xl p-6 text-white shadow-lg animate-fade-in-up" aria-live="polite">
                 <div className="flex items-center gap-2 text-primary-200 text-sm mb-2">
                   <Zap className="w-4 h-4" aria-hidden="true" />
-                  Consumo Previsto
+                  {t('predict.predictedConsumption')}
                 </div>
                 <p className="text-4xl font-bold tabular-nums">
                   {formatMW(result.predicted_consumption_mw)}
@@ -107,13 +109,13 @@ export default function Predict() {
 
               {/* CI */}
               <Card
-                title="Intervalo de Confiança"
-                subtitle={`${(result.confidence_level * 100).toFixed(0)}% - Metodo: ${result.ci_method}`}
+                title={t('predict.ci')}
+                subtitle={`${(result.confidence_level * 100).toFixed(0)}% - ${t('predict.ciMethod')}: ${result.ci_method}`}
                 action={
-                  <span title="O intervalo é calculado por split conformal prediction a 90%" className="inline-flex items-center">
+                  <span title={t('predict.ciTooltip')} className="inline-flex items-center">
                     <HelpCircle
                       className="w-3.5 h-3.5 text-text-muted"
-                      aria-label="O intervalo é calculado por split conformal prediction a 90%"
+                      aria-label={t('predict.ciTooltip')}
                     />
                   </span>
                 }
@@ -121,7 +123,7 @@ export default function Predict() {
                 <div className="flex items-center gap-3 sm:gap-4">
                   <div className="flex-1 text-center p-3 sm:p-4 bg-primary-50/60 rounded-lg hover:bg-primary-100/60 transition-colors">
                     <TrendingDown className="w-5 h-5 text-primary-500 mx-auto mb-1" aria-hidden="true" />
-                    <p className="text-xs text-text-muted">Limite Inferior</p>
+                    <p className="text-xs text-text-muted">{t('predict.lowerBound')}</p>
                     <p className="text-base sm:text-lg font-bold text-primary-700 tabular-nums">
                       {formatMW(result.confidence_interval_lower)}
                     </p>
@@ -133,14 +135,14 @@ export default function Predict() {
                   </div>
                   <div className="flex-1 text-center p-3 sm:p-4 bg-primary-50 rounded-lg border-2 border-primary-200">
                     <Zap className="w-5 h-5 text-primary-600 mx-auto mb-1" aria-hidden="true" />
-                    <p className="text-xs text-text-muted">Previsão</p>
+                    <p className="text-xs text-text-muted">{t('predict.prediction')}</p>
                     <p className="text-lg sm:text-xl font-bold text-primary-700 tabular-nums">
                       {formatMW(result.predicted_consumption_mw)}
                     </p>
                   </div>
                   <div className="flex-1 text-center p-3 sm:p-4 bg-primary-50/60 rounded-lg hover:bg-primary-100/60 transition-colors">
                     <TrendingUp className="w-5 h-5 text-primary-500 mx-auto mb-1" aria-hidden="true" />
-                    <p className="text-xs text-text-muted">Limite Superior</p>
+                    <p className="text-xs text-text-muted">{t('predict.upperBound')}</p>
                     <p className="text-base sm:text-lg font-bold text-primary-700 tabular-nums">
                       {formatMW(result.confidence_interval_upper)}
                     </p>
@@ -148,7 +150,7 @@ export default function Predict() {
                 </div>
 
                 {/* CI bar visualization */}
-                <div className="mt-4" role="img" aria-label={`Intervalo de confianca de ${result.confidence_interval_lower.toFixed(0)} a ${result.confidence_interval_upper.toFixed(0)} MW`}>
+                <div className="mt-4" role="img" aria-label={t('predict.ciBarAria', { lower: result.confidence_interval_lower.toFixed(0), upper: result.confidence_interval_upper.toFixed(0) })}>
                   <div className="relative h-3 bg-surface-bright rounded-full overflow-hidden">
                     {(() => {
                       const range = result.confidence_interval_upper - result.confidence_interval_lower;
@@ -178,16 +180,16 @@ export default function Predict() {
                 <div className="flex-1 bg-surface border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 text-xs text-text-muted mb-1">
                     <Shield className="w-3.5 h-3.5" aria-hidden="true" />
-                    Metodo CI
+                    {t('predict.methodCI')}
                   </div>
                   <p className="text-sm font-semibold text-text-primary">
-                    {result.ci_method === 'conformal' ? 'Conformal Prediction' : 'Gaussian Z x RMSE'}
+                    {result.ci_method === 'conformal' ? t('predict.conformal') : t('predict.gaussian')}
                   </p>
                 </div>
                 <div className="flex-1 bg-surface border border-border rounded-xl p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center gap-2 text-xs text-text-muted mb-1">
                     <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-                    Modelo
+                    {t('predict.model')}
                   </div>
                   <p className="text-sm font-semibold text-text-primary">{result.model_name}</p>
                 </div>
@@ -200,9 +202,9 @@ export default function Predict() {
               <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-4">
                 <Zap className="w-8 h-8 text-primary-300" aria-hidden="true" />
               </div>
-              <p className="text-sm font-medium text-text-secondary">Pronto para prever</p>
+              <p className="text-sm font-medium text-text-secondary">{t('predict.readyTitle')}</p>
               <p className="text-xs text-text-muted mt-1.5 max-w-xs mx-auto">
-                Preencha os parametros meteorologicos e clique em "Prever Consumo" para obter a estimativa
+                {t('predict.readyHint')}
               </p>
             </div>
           )}

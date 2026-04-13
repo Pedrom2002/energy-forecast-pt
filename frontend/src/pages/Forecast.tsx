@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, type EnergyData, type PredictionResponse, REGIONS, type Region } from '../api/client';
 import { Card } from '../components/Card';
 import { ChartSkeleton } from '../components/ChartSkeleton';
@@ -73,7 +74,8 @@ const VISIBLE_ROWS = 15;
 const BUFFER_ROWS = 5;
 
 export default function Forecast() {
-  useDocumentTitle('Previsão');
+  const { t } = useTranslation();
+  useDocumentTitle(t('forecast.title'));
   const [region, setRegion] = useState<Region>('Lisboa');
   const [forecastHours, setForecastHours] = useState(24);
   const [results, setResults] = useState<PredictionResponse[]>([]);
@@ -109,11 +111,11 @@ export default function Forecast() {
       setExplainWeather(items[Math.floor(items.length / 2)] ?? null);
       setHistoryData([]); // no history shown — we don't have it
       setModelName(res.predictions[0]?.model_name ?? 'XGBoost (no lags)');
-      toast.success(`Previsão gerada: ${res.predictions.length} pontos para ${region}`);
+      toast.success(t('forecast.forecastGenerated', { count: res.predictions.length, region }));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro desconhecido';
+      const msg = err instanceof Error ? err.message : t('common.unknownError');
       setError(msg);
-      toast.error('Falha ao gerar previsão');
+      toast.error(t('forecast.forecastFailed'));
     } finally {
       setLoading(false);
       setTimeout(() => setSubmitting(false), 1000); // 1s debounce
@@ -133,7 +135,7 @@ export default function Forecast() {
         r.model_name, r.ci_method,
       ]),
     );
-    toast.success('CSV exportado com sucesso');
+    toast.success(t('forecast.csvExported'));
   };
 
   const chartData = [
@@ -201,16 +203,16 @@ export default function Forecast() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsão</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">{t('forecast.title')}</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Previsão lag-aware autoregressiva com histórico e intervalos de confiança
+          {t('forecast.subtitle')}
         </p>
       </div>
 
-      <Card title="Configuração">
+      <Card title={t('forecast.config')}>
         <form onSubmit={(e) => { e.preventDefault(); handleForecast(); }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="fc-region" className="block text-xs font-medium text-text-secondary mb-1.5">Região</label>
+            <label htmlFor="fc-region" className="block text-xs font-medium text-text-secondary mb-1.5">{t('predict.form.region')}</label>
             <select
               id="fc-region"
               value={region}
@@ -225,12 +227,12 @@ export default function Forecast() {
           </div>
           <ValidatedNumberInput
             id="fc-forecast"
-            label="Horas a prever"
+            label={t('forecast.hours')}
             value={forecastHours}
             onChange={setForecastHours}
             min={1}
             max={168}
-            help="1 a 168 (1 semana)"
+            help={t('forecast.hoursHelp')}
           />
           <div>
             <span aria-hidden="true" className="block text-xs font-medium mb-1.5">&nbsp;</span>
@@ -245,12 +247,12 @@ export default function Forecast() {
             >
               {loading ? (
                 <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" role="status">
-                  <span className="sr-only">A gerar forecast...</span>
+                  <span className="sr-only">{t('forecast.runningSr')}</span>
                 </div>
               ) : (
                 <>
                   <Play className="w-4 h-4" aria-hidden="true" />
-                  Executar
+                  {t('forecast.run')}
                 </>
               )}
             </button>
@@ -259,7 +261,7 @@ export default function Forecast() {
 
         <div className="flex items-center gap-2.5 mt-4 px-3 py-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-xs text-primary-700 dark:text-primary-300 leading-relaxed">
           <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
-          <p>Dados meteorológicos simulados para demonstração. Em produção, integre com dados reais de estações meteorológicas.</p>
+          <p>{t('forecast.demoInfo')}</p>
         </div>
       </Card>
 
@@ -267,7 +269,7 @@ export default function Forecast() {
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
           <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800 dark:text-red-200">Erro no forecast</p>
+            <p className="text-sm font-medium text-red-800 dark:text-red-200">{t('forecast.errorTitle')}</p>
             <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{error}</p>
             <div className="flex gap-3 mt-3">
               <button
@@ -275,20 +277,20 @@ export default function Forecast() {
                 onClick={handleForecast}
                 className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
               >
-                Tentar novamente
+                {t('common.retry')}
               </button>
               <button
                 type="button"
                 onClick={() => { setForecastHours(12); }}
                 className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
               >
-                Reduzir parametros
+                {t('forecast.reduceParams')}
               </button>
               <a
                 href="/monitoring"
                 className="text-xs font-medium text-red-700 hover:text-red-900 underline"
               >
-                Ver estado da API
+                {t('forecast.seeApiStatus')}
               </a>
             </div>
           </div>
@@ -302,7 +304,7 @@ export default function Forecast() {
           {/* View toggle — segmented control */}
           <div
             role="radiogroup"
-            aria-label="Modo de visualização"
+            aria-label={t('forecast.viewMode')}
             className="inline-flex items-center gap-1 p-1 bg-surface border border-border rounded-lg shadow-xs"
           >
             <button
@@ -315,7 +317,7 @@ export default function Forecast() {
                 ${view === 'chart' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-text-secondary hover:text-text-primary'}`}
             >
               <LineChart className="w-3.5 h-3.5" aria-hidden="true" />
-              Chart
+              {t('forecast.chart')}
             </button>
             <button
               type="button"
@@ -327,22 +329,22 @@ export default function Forecast() {
                 ${view === 'table' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-text-secondary hover:text-text-primary'}`}
             >
               <TableIcon className="w-3.5 h-3.5" aria-hidden="true" />
-              Tabela
+              {t('forecast.table')}
             </button>
           </div>
 
           {view === 'chart' && (
             <div className="animate-fade-in-up shadow-lg rounded-[var(--radius-lg)]">
               <Card
-                title="Gráfico de Previsão"
-                subtitle={`Modelo: ${modelName} | Região: ${region}`}
+                title={t('forecast.chartTitle')}
+                subtitle={t('forecast.chartSubtitle', { model: modelName, region })}
                 action={
                   <button
                     type="button"
                     onClick={handleExportCSV}
                     className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
                       min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
-                    aria-label="Exportar forecast como CSV"
+                    aria-label={t('forecast.exportCsvAria')}
                   >
                     <Download className="w-3.5 h-3.5" aria-hidden="true" />
                     CSV
@@ -350,11 +352,15 @@ export default function Forecast() {
                 }
               >
                 <p className="sr-only">
-                  Gráfico de area mostrando {historyData.length} horas de histórico e {results.length} horas de previsão
-                  para a região {region}. Previsão media: {results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0} MW.
+                  {t('forecast.chartDescription', {
+                    history: historyData.length,
+                    forecast: results.length,
+                    region,
+                    avg: results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0,
+                  })}
                 </p>
 
-                <div className="h-[350px] sm:h-[420px]" role="img" aria-label="Gráfico de previsão de consumo energetico">
+                <div className="h-[350px] sm:h-[420px]" role="img" aria-label={t('forecast.chartAria')}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <defs>
@@ -395,16 +401,16 @@ export default function Forecast() {
                         }}
                         formatter={(value: number, name: string) => [
                           formatMW(value),
-                          name === 'actual' ? 'Consumo Real' : name === 'predicted' ? 'Previsão' : name,
+                          name === 'actual' ? t('forecast.actualConsumption') : name === 'predicted' ? t('forecast.predictionSeries') : name,
                         ]}
                       />
                       {nowLabel && (
-                        <ReferenceLine x={nowLabel} stroke="var(--color-accent)" strokeDasharray="4 4" label={{ value: 'Agora ➤', position: 'top', fill: 'var(--color-accent)', fontSize: 12, fontWeight: 600 }} />
+                        <ReferenceLine x={nowLabel} stroke="var(--color-accent)" strokeDasharray="4 4" label={{ value: `${t('forecast.now')} ➤`, position: 'top', fill: 'var(--color-accent)', fontSize: 12, fontWeight: 600 }} />
                       )}
                       {visibleSeries.ci && (
                         <>
-                          <Area type="monotone" dataKey="ciUpper" stroke="none" fill="url(#ciGrad)" name="CI Superior" />
-                          <Area type="monotone" dataKey="ciLower" stroke="none" fill="transparent" name="CI Inferior" />
+                          <Area type="monotone" dataKey="ciUpper" stroke="none" fill="url(#ciGrad)" name={t('forecast.ciUpper')} />
+                          <Area type="monotone" dataKey="ciLower" stroke="none" fill="transparent" name={t('forecast.ciLower')} />
                         </>
                       )}
                       {visibleSeries.actual && (
@@ -424,30 +430,30 @@ export default function Forecast() {
                     onClick={() => toggleSeries('actual')}
                     className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.actual ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
                     aria-pressed={visibleSeries.actual}
-                    aria-label="Toggle consumo real"
+                    aria-label={t('forecast.toggleActual')}
                   >
                     <span className="w-4 h-0.5 bg-energy-green rounded" aria-hidden="true" />
-                    Consumo Real
+                    {t('forecast.actualConsumption')}
                   </button>
                   <button
                     type="button"
                     onClick={() => toggleSeries('predicted')}
                     className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.predicted ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
                     aria-pressed={visibleSeries.predicted}
-                    aria-label="Toggle previsão"
+                    aria-label={t('forecast.togglePredicted')}
                   >
                     <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #d97706' }} aria-hidden="true" />
-                    Previsão
+                    {t('forecast.predictionSeries')}
                   </button>
                   <button
                     type="button"
                     onClick={() => toggleSeries('ci')}
                     className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.ci ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
                     aria-pressed={visibleSeries.ci}
-                    aria-label="Toggle intervalo de confianca"
+                    aria-label={t('forecast.toggleCi')}
                   >
                     <span className="w-4 h-3 bg-primary-200 rounded" aria-hidden="true" />
-                    IC 90%
+                    {t('forecast.ci90')}
                   </button>
                 </div>
               </Card>
@@ -457,18 +463,18 @@ export default function Forecast() {
           {view === 'table' && (
             <div className="animate-fade-in-up">
               <Card
-                title={`Resultados — ${formatNumber(results.length, 0)} previsoes`}
-                subtitle={`Modelo: ${modelName} | Região: ${region}`}
+                title={t('forecast.resultsTitle', { count: formatNumber(results.length, 0) })}
+                subtitle={t('forecast.chartSubtitle', { model: modelName, region })}
                 action={
                   <button
                     type="button"
                     onClick={handleExportCSV}
                     className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
                       min-h-[44px] px-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
-                    aria-label="Exportar resultados como CSV"
+                    aria-label={t('forecast.exportCsvAria')}
                   >
                     <Download className="w-3.5 h-3.5" aria-hidden="true" />
-                    Exportar CSV
+                    {t('forecast.exportCsv')}
                   </button>
                 }
               >
@@ -477,27 +483,27 @@ export default function Forecast() {
                   className="overflow-x-auto -mx-5 sm:-mx-6 px-5 sm:px-6"
                   style={useVirtualization ? { maxHeight: VISIBLE_ROWS * ROW_HEIGHT + 44, overflowY: 'auto' } : undefined}
                 >
-                  <table className="w-full text-sm" aria-label="Resultados das previsoes">
+                  <table className="w-full text-sm" aria-label={t('forecast.tableAria')}>
                     <thead className="sticky top-0 bg-surface z-10">
                       <tr className="border-b border-border">
                         <th className="text-left py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'time' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
                           <button type="button" onClick={() => handleSort('time')} className="flex items-center gap-1 cursor-pointer hover:text-text-primary transition">
-                            Hora {sortCol === 'time' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                            {t('forecast.colTime')} {sortCol === 'time' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                           </button>
                         </th>
                         <th className="text-right py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'prediction' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
                           <button type="button" onClick={() => handleSort('prediction')} className="flex items-center gap-1 justify-end cursor-pointer hover:text-text-primary transition ml-auto">
-                            Previsão {sortCol === 'prediction' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                            {t('forecast.colPrediction')} {sortCol === 'prediction' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                           </button>
                         </th>
-                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Inferior</th>
-                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Superior</th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">{t('forecast.colCiLower')}</th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">{t('forecast.colCiUpper')}</th>
                         <th className="text-right py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'amplitude' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
                           <button type="button" onClick={() => handleSort('amplitude')} className="flex items-center gap-1 justify-end cursor-pointer hover:text-text-primary transition ml-auto">
-                            Amplitude {sortCol === 'amplitude' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                            {t('forecast.colAmplitude')} {sortCol === 'amplitude' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                           </button>
                         </th>
-                        <th className="text-center py-3 px-3 text-xs font-medium text-text-muted hidden md:table-cell">Metodo</th>
+                        <th className="text-center py-3 px-3 text-xs font-medium text-text-muted hidden md:table-cell">{t('forecast.colMethod')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -527,7 +533,7 @@ export default function Forecast() {
                                   ? 'bg-green-50 text-green-700'
                                   : 'bg-yellow-50 text-yellow-700'
                               }`}>
-                                {r.ci_method === 'conformal' ? 'Conformal' : 'Gaussian'}
+                                {r.ci_method === 'conformal' ? t('forecast.methodConformal') : t('forecast.methodGaussian')}
                               </span>
                             </td>
                           </tr>
@@ -539,7 +545,7 @@ export default function Forecast() {
                 </div>
                 {useVirtualization && (
                   <p className="text-[11px] text-text-muted text-center mt-2">
-                    A mostrar {visibleRows.length} de {formatNumber(sortedResults.length, 0)} resultados (tabela virtualizada)
+                    {t('forecast.virtualized', { shown: visibleRows.length, total: formatNumber(sortedResults.length, 0) })}
                   </p>
                 )}
               </Card>
@@ -549,7 +555,7 @@ export default function Forecast() {
       )}
 
       {explainWeather && results.length > 0 && !loading && (
-        <Card title="Explicabilidade" subtitle="Análise SHAP da previsão central">
+        <Card title={t('forecast.explainTitle')} subtitle={t('forecast.explainSubtitle')}>
           <ExplanationPanel weather={explainWeather} />
         </Card>
       )}
@@ -558,8 +564,8 @@ export default function Forecast() {
         <div className="bg-surface border border-border rounded-xl">
           <EmptyState
             illustration={<ForecastIllustration />}
-            title="Nenhum forecast gerado"
-            description="Configure os parâmetros acima e clique em Executar para gerar previsões sequenciais."
+            title={t('forecast.emptyTitle')}
+            description={t('forecast.emptyDescription')}
           />
         </div>
       )}
@@ -571,17 +577,18 @@ export default function Forecast() {
 function ValidatedNumberInput({ id, label, value, onChange, min, max, help }: {
   id: string; label: string; value: number; onChange: (v: number) => void; min: number; max: number; help: string;
 }) {
+  const { t } = useTranslation();
   const [error, setError] = useState('');
   const [local, setLocal] = useState(String(value));
 
   const handleBlur = () => {
     const n = parseInt(local) || min;
     if (n < min) {
-      setError(`Minimo: ${min}`);
+      setError(t('forecast.minError', { value: min }));
       onChange(min);
       setLocal(String(min));
     } else if (n > max) {
-      setError(`Maximo: ${max}`);
+      setError(t('forecast.maxError', { value: max }));
       onChange(max);
       setLocal(String(max));
     } else {

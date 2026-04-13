@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface CardProps {
   title?: string;
@@ -75,11 +76,12 @@ export function StatCard({ label, value, icon, trend, color = 'primary' }: StatC
 
 /* Skeleton placeholder with shimmer */
 export function CardSkeleton({ lines = 3 }: { lines?: number }) {
+  const { t } = useTranslation();
   return (
     <div
       className="bg-surface rounded-xl border border-border shadow-sm p-6"
       aria-busy="true"
-      aria-label="A carregar..."
+      aria-label={t('common.loading')}
     >
       <div className="h-4 bg-surface-bright rounded w-1/3 mb-4 skeleton-shimmer" />
       {Array.from({ length: lines }).map((_, i) => (

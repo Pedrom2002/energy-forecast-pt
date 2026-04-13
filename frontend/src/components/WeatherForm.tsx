@@ -1,6 +1,7 @@
 import { type EnergyData, type Region } from '../api/client';
 import RegionSelect from './RegionSelect';
 import { Thermometer, Droplets, Wind, CloudRain, Cloud, Gauge } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface WeatherFormProps {
   data: EnergyData;
@@ -30,6 +31,7 @@ function InputField({
   step?: number;
   unit: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div>
       <label htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-1.5">
@@ -49,23 +51,24 @@ function InputField({
         className="block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm text-text-primary shadow-xs
           focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition tabular-nums"
       />
-      <span id={`${id}-range`} className="sr-only">{min} a {max} {unit}</span>
+      <span id={`${id}-range`} className="sr-only">{t('predict.form.rangeSr', { min, max, unit })}</span>
     </div>
   );
 }
 
 export default function WeatherForm({ data, onChange, showTimestamp = true, idPrefix = 'wf' }: WeatherFormProps) {
+  const { t } = useTranslation();
   const update = (field: keyof EnergyData, value: string | number) =>
     onChange({ ...data, [field]: value });
 
   return (
     <fieldset className="space-y-4">
-      <legend className="sr-only">Dados meteorologicos para previsão</legend>
+      <legend className="sr-only">{t('predict.form.weatherLegend')}</legend>
 
       {showTimestamp && (
         <div>
           <label htmlFor={`${idPrefix}-timestamp`} className="block text-xs font-medium text-text-secondary mb-1.5">
-            Timestamp (ISO 8601)
+            {t('predict.form.timestamp')}
           </label>
           <input
             id={`${idPrefix}-timestamp`}
@@ -80,7 +83,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
 
       <RegionSelect
         id={`${idPrefix}-region`}
-        label="Região"
+        label={t('predict.form.region')}
         value={data.region as Region}
         onChange={(r) => update('region', r)}
       />
@@ -88,7 +91,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
       <div className="grid grid-cols-2 gap-3">
         <InputField
           id={`${idPrefix}-temp`}
-          label="Temperatura"
+          label={t('predict.form.temperature')}
           icon={Thermometer}
           value={data.temperature}
           onChange={(v) => update('temperature', v)}
@@ -98,7 +101,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
         />
         <InputField
           id={`${idPrefix}-hum`}
-          label="Humidade"
+          label={t('predict.form.humidity')}
           icon={Droplets}
           value={data.humidity}
           onChange={(v) => update('humidity', v)}
@@ -108,7 +111,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
         />
         <InputField
           id={`${idPrefix}-wind`}
-          label="Vento"
+          label={t('predict.form.wind')}
           icon={Wind}
           value={data.wind_speed}
           onChange={(v) => update('wind_speed', v)}
@@ -118,7 +121,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
         />
         <InputField
           id={`${idPrefix}-precip`}
-          label="Precipitacao"
+          label={t('predict.form.precipitation')}
           icon={CloudRain}
           value={data.precipitation}
           onChange={(v) => update('precipitation', v)}
@@ -128,7 +131,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
         />
         <InputField
           id={`${idPrefix}-cloud`}
-          label="Nebulosidade"
+          label={t('predict.form.cloudCover')}
           icon={Cloud}
           value={data.cloud_cover}
           onChange={(v) => update('cloud_cover', v)}
@@ -138,7 +141,7 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
         />
         <InputField
           id={`${idPrefix}-pressure`}
-          label="Pressao"
+          label={t('predict.form.pressure')}
           icon={Gauge}
           value={data.pressure}
           onChange={(v) => update('pressure', v)}

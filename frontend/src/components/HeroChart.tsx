@@ -9,6 +9,7 @@ import {
   YAxis,
 } from 'recharts';
 import { api, type EnergyData, type PredictionResponse } from '../api/client';
+import { useTranslation } from 'react-i18next';
 
 interface ChartPoint {
   hour: number;
@@ -100,9 +101,10 @@ function Skeleton() {
 }
 
 function OfflineState() {
+  const { t } = useTranslation();
   return (
     <div className="h-48 md:h-56 w-full flex items-center justify-center rounded-lg border border-dashed border-slate-200/60 dark:border-slate-700/60">
-      <span className="text-xs text-slate-400 dark:text-slate-500">Demo offline</span>
+      <span className="text-xs text-slate-400 dark:text-slate-500">{t('hero.offline')}</span>
     </div>
   );
 }
@@ -110,6 +112,7 @@ function OfflineState() {
 export default function HeroChart() {
   const [data, setData] = useState<ChartPoint[] | null>(null);
   const [error, setError] = useState<boolean>(false);
+  const { t } = useTranslation();
 
   useEffect(() => {
     let cancelled = false;
@@ -137,7 +140,7 @@ export default function HeroChart() {
   return (
     <div
       role="img"
-      aria-label="Próximas 24 horas de previsão de consumo para Lisboa"
+      aria-label={t('hero.aria')}
       className="h-48 md:h-56 w-full"
     >
       <ResponsiveContainer width="100%" height="100%">
