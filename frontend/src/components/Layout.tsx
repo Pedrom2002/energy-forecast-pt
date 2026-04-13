@@ -15,10 +15,11 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/predict', icon: Zap, label: 'Previsão' },
   { to: '/batch', icon: Layers, label: 'Batch' },
   { to: '/forecast', icon: TrendingUp, label: 'Forecast' },
@@ -28,10 +29,11 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { theme, toggle, isDark } = useTheme();
+  const { toggle, isDark } = useTheme();
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
   const [apiOnline, setApiOnline] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   // Poll backend health (reuse same localhost:8000 assumption as sidebar)
   useEffect(() => {
@@ -58,6 +60,9 @@ export default function Layout() {
     mainRef.current?.focus({ preventScroll: true });
   }, [location.pathname]);
 
+  const isNavActive = (to: string) =>
+    location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+
   return (
     <div className="flex min-h-dvh overflow-hidden">
       {/* Skip link */}
@@ -83,7 +88,8 @@ export default function Layout() {
         aria-label="Navegacao principal"
         className={`
           fixed lg:static inset-y-0 left-0 z-50
-          w-64 bg-surface border-r border-border
+          w-64 bg-gradient-to-b from-surface to-surface-subtle dark:from-surface dark:to-background
+          border-r border-border backdrop-blur-xl
           transform transition-transform duration-250 ease-[cubic-bezier(0.16,1,0.3,1)]
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           flex flex-col
@@ -91,6 +97,10 @@ export default function Layout() {
       >
         {/* Logo — branded gradient */}
         <div className="h-16 flex items-center gap-3 px-6 border-b border-border relative overflow-hidden">
+          <div
+            className="absolute -left-4 -top-4 w-24 h-24 rounded-full bg-primary-400/20 blur-2xl pointer-events-none"
+            aria-hidden="true"
+          />
           <div className="absolute inset-0 bg-gradient-to-r from-primary-600/5 via-primary-400/3 to-transparent" aria-hidden="true" />
           <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-md" aria-hidden="true">
             <Zap className="w-5 h-5 text-white" />
@@ -102,43 +112,65 @@ export default function Layout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto" aria-label="Menu principal">
-          {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `group flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium
-                transition-all duration-150
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
-                ${isActive
-                  ? 'bg-primary-50 text-primary-700 shadow-xs'
-                  : 'text-text-secondary hover:bg-surface-bright hover:text-text-primary'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150 ${
-                    isActive ? 'bg-primary-100' : 'group-hover:bg-surface-bright'
+        <nav className="flex-1 py-4 px-3 overflow-y-auto" aria-label="Menu principal">
+          <p className="px-3 pb-2 text-xs uppercase tracking-wider text-text-muted font-medium">
+            Menu
+          </p>
+          <div className="relative space-y-1">
+            {NAV_ITEMS.map(({ to, icon: Icon, label }) => {
+              const active = isNavActive(to);
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={to === '/dashboard'}
+                  onClick={() => setSidebarOpen(false)}
+                  className={`relative group flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium
+                    transition-colors duration-150
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+                    ${active
+                      ? 'text-primary-700 dark:text-primary-300'
+                      : 'text-text-secondary hover:bg-surface-bright hover:text-text-primary'
+                    }`}
+                >
+                  {active && (
+                    prefersReducedMotion ? (
+                      <span
+                        className="absolute inset-0 bg-primary-100 dark:bg-primary-900/40 rounded-lg"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <motion.div
+                        layoutId="active-nav"
+                        className="absolute inset-0 bg-primary-100 dark:bg-primary-900/40 rounded-lg"
+                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                        aria-hidden="true"
+                      />
+                    )
+                  )}
+                  <div className={`relative z-10 w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-150 ${
+                    active ? 'bg-primary-200/60 dark:bg-primary-800/50' : 'group-hover:bg-surface-bright'
                   }`}>
                     <Icon className="w-[18px] h-[18px] shrink-0" aria-hidden="true" />
                   </div>
-                  {label}
-                </>
-              )}
-            </NavLink>
-          ))}
+                  <span className="relative z-10">{label}</span>
+                </NavLink>
+              );
+            })}
+          </div>
         </nav>
 
       </aside>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
-        <header className="h-14 bg-surface/80 backdrop-blur-md border-b border-border flex items-center px-4 sm:px-6 shrink-0 sticky top-0 z-30">
+        {/* Top bar — glassmorphism */}
+        <header
+          className="h-14 bg-white/70 dark:bg-surface-bright/70 backdrop-blur-xl backdrop-saturate-150
+            border-b border-white/20 dark:border-border/60
+            shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_4px_16px_rgba(0,0,0,0.03)]
+            flex items-center px-4 sm:px-6 shrink-0 sticky top-0 z-30"
+        >
           <button
             type="button"
             className="lg:hidden mr-3 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-surface-bright cursor-pointer
@@ -165,9 +197,20 @@ export default function Layout() {
           role="main"
           tabIndex={-1}
         >
-          <div key={location.pathname} className="animate-fade-in-up">
-            <Outlet />
-          </div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -8 }}
+              transition={{
+                duration: prefersReducedMotion ? 0.1 : 0.25,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         {/* Page footer — portfolio-grade */}
