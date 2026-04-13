@@ -61,7 +61,8 @@ export default function Layout() {
     location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex flex-col h-dvh overflow-hidden">
+      <div className="flex flex-1 min-h-0">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-2 focus:bg-primary-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:text-sm focus:font-medium focus:outline-none focus:ring-2 focus:ring-primary-300"
@@ -196,14 +197,16 @@ export default function Layout() {
             </motion.div>
           </AnimatePresence>
         </main>
+      </div>
+      </div>
 
-        <footer
-          className="shrink-0 border-t border-border-subtle bg-surface/60 backdrop-blur-sm
-            px-3 py-4 lg:px-4 lg:py-3
-            flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4
-            text-xs text-text-secondary"
-          aria-label={t('layout.footerLabel')}
-        >
+      <footer
+        className="shrink-0 border-t border-border-subtle bg-surface/60 backdrop-blur-sm
+          px-4 py-3 lg:px-6
+          flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4
+          text-xs text-text-secondary"
+        aria-label={t('layout.footerLabel')}
+      >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>
               {t('footer.builtBy')}{' '}
@@ -286,9 +289,8 @@ export default function Layout() {
                 API {apiOnline ? t('common.online') : t('common.offline')}
               </span>
             </div>
-          </div>
-        </footer>
-      </div>
+        </div>
+      </footer>
     </div>
   );
 }
