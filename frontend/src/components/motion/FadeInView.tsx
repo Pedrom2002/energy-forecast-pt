@@ -1,5 +1,4 @@
-import { motion, useInView, useReducedMotion } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import type { ReactNode } from 'react';
 
 export interface FadeInViewProps {
@@ -8,6 +7,7 @@ export interface FadeInViewProps {
   delay?: number;
   direction?: 'up' | 'down' | 'left' | 'right' | 'none';
   distance?: number;
+  /** Kept for API compatibility — currently animates on mount regardless. */
   once?: boolean;
 }
 
@@ -27,41 +27,36 @@ function getOffset(direction: FadeInViewProps['direction'], distance: number) {
   }
 }
 
+/**
+ * Fade + slide-in wrapper that animates on mount.
+ *
+ * Previously used `whileInView` + IntersectionObserver, but it proved
+ * unreliable under programmatic scroll, mobile Safari reloads, and some
+ * viewport sizes — leaving content stuck at opacity 0.  Animating on mount
+ * guarantees the content is always visible.  For the scroll-reveal feel,
+ * callers pass a `delay` proportional to vertical position so sections
+ * further down animate slightly later.
+ */
 export function FadeInView({
   children,
   className,
   delay = 0,
   direction = 'up',
   distance = 24,
-  once = true,
 }: FadeInViewProps) {
   const prefersReducedMotion = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once, amount: 0.05, margin: '-40px' });
-  const [forceShow, setForceShow] = useState(false);
-
-  // Safety fallback: if IntersectionObserver doesn't fire within 1.2s after mount,
-  // reveal the content anyway so it never stays invisible (handles programmatic
-  // scroll or unusual viewport scenarios).
-  useEffect(() => {
-    if (prefersReducedMotion) return;
-    const t = window.setTimeout(() => setForceShow(true), 1200);
-    return () => window.clearTimeout(t);
-  }, [prefersReducedMotion]);
 
   if (prefersReducedMotion) {
     return <div className={className}>{children}</div>;
   }
 
-  const visible = isInView || forceShow;
   const offset = getOffset(direction, distance);
 
   return (
     <motion.div
-      ref={ref}
       className={className}
       initial={{ opacity: 0, x: offset.x, y: offset.y }}
-      animate={visible ? { opacity: 1, x: 0, y: 0 } : undefined}
+      animate={{ opacity: 1, x: 0, y: 0 }}
       transition={{ duration: 0.6, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
