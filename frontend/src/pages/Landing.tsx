@@ -38,11 +38,11 @@ interface RegionDot {
 }
 
 const REGIONS: RegionDot[] = [
-  { id: 'norte', label: 'Norte', cx: 45, cy: 22 },
-  { id: 'centro', label: 'Centro', cx: 42, cy: 48 },
-  { id: 'lisboa', label: 'Lisboa', cx: 22, cy: 68 },
+  { id: 'norte', label: 'Norte', cx: 40, cy: 15 },
+  { id: 'centro', label: 'Centro', cx: 38, cy: 42 },
+  { id: 'lisboa', label: 'Lisboa', cx: 18, cy: 60 },
   { id: 'alentejo', label: 'Alentejo', cx: 40, cy: 82 },
-  { id: 'algarve', label: 'Algarve', cx: 38, cy: 108 },
+  { id: 'algarve', label: 'Algarve', cx: 30, cy: 105 },
 ];
 
 interface TechPill {
@@ -79,32 +79,56 @@ const ARCH_STEPS: ArchStep[] = [
 ];
 
 function PortugalMap() {
+  // Stylised but recognisable silhouette of continental Portugal:
+  // north-south oblong with NE Spain-border jags, distinctive west-coast
+  // concavity (Peniche/Setúbal) and near-horizontal Algarve south coast.
+  const portugalPath =
+    'M 22 5 L 36 4 L 48 6 L 56 11 L 54 18 L 60 24 L 56 30 L 61 37 L 56 44 ' +
+    'L 60 52 L 55 60 L 59 68 L 54 76 L 58 84 L 52 92 L 55 99 L 50 106 ' +
+    'L 38 111 L 22 111 L 14 107 L 10 100 L 13 91 L 8 82 L 13 74 L 9 66 ' +
+    'L 7 56 L 11 47 L 8 38 L 12 30 L 7 22 L 14 14 Z';
   return (
     <svg
-      viewBox="0 0 80 120"
-      className="h-full w-full max-h-[200px]"
-      aria-label="Mapa de Portugal com 5 regiões"
+      viewBox="0 0 70 120"
+      className="h-full w-full max-h-[220px]"
+      aria-label="Mapa de Portugal continental com 5 regiões"
       role="img"
     >
+      <defs>
+        <linearGradient id="pt-fill" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="var(--color-primary-400, #fbbf24)" />
+          <stop offset="100%" stopColor="var(--color-primary-600, #d97706)" />
+        </linearGradient>
+      </defs>
+      {/* Filled Portugal shape in amber */}
       <path
-        d="M 25 5 L 55 8 L 58 25 L 52 45 L 55 65 L 48 85 L 52 105 L 30 115 L 18 100 L 15 75 L 20 50 L 18 25 Z"
-        fill="currentColor"
-        className="text-primary-100 dark:text-primary-900/40"
-        stroke="currentColor"
-        strokeOpacity={0.4}
-        strokeWidth={0.5}
+        d={portugalPath}
+        fill="url(#pt-fill)"
+        stroke="#b45309"
+        strokeOpacity={0.6}
+        strokeWidth={0.8}
+        strokeLinejoin="round"
       />
+      {/* Region dots with a soft halo */}
       {REGIONS.map((r, i) => (
-        <motion.circle
-          key={r.id}
-          cx={r.cx}
-          cy={r.cy}
-          r={3}
-          className="fill-primary-500"
-          animate={{ scale: [1, 1.4, 1], opacity: [0.8, 1, 0.8] }}
-          transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
-          style={{ transformOrigin: `${r.cx}px ${r.cy}px` }}
-        />
+        <g key={r.id}>
+          <motion.circle
+            cx={r.cx}
+            cy={r.cy}
+            r={6}
+            className="fill-primary-100/70 dark:fill-primary-200/30"
+            animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+            style={{ transformOrigin: `${r.cx}px ${r.cy}px` }}
+          />
+          <circle
+            cx={r.cx}
+            cy={r.cy}
+            r={2.2}
+            className="fill-white stroke-primary-900"
+            strokeWidth={1}
+          />
+        </g>
       ))}
     </svg>
   );
