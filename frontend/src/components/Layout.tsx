@@ -2,7 +2,6 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Zap,
-  Layers,
   TrendingUp,
   Activity,
   Brain,
@@ -20,8 +19,7 @@ import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/predict', icon: Zap, label: 'Previsão' },
-  { to: '/batch', icon: Layers, label: 'Batch' },
+  { to: '/predict', icon: Zap, label: 'Previsão Pontual' },
   { to: '/forecast', icon: TrendingUp, label: 'Forecast' },
   { to: '/monitoring', icon: Activity, label: 'Monitoring' },
   { to: '/explain', icon: Brain, label: 'Explicabilidade' },
