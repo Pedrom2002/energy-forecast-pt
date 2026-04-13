@@ -19,11 +19,15 @@ short_description: Portugal energy forecasting — XGBoost + conformal
 [![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![React 19](https://img.shields.io/badge/Frontend-React%2019%20%2B%20TypeScript-61DAFB.svg)]()
 
-> **MAPE 1.44%** &nbsp;·&nbsp; **RMSE 22.9 MW** &nbsp;·&nbsp; **2.6× better than persistence baseline** &nbsp;·&nbsp; **R² 0.998** &nbsp;·&nbsp; **780+ tests** &nbsp;·&nbsp; **85% coverage**
+> **Live demo:** [pedrom02-energy-forecast-pt.hf.space](https://pedrom02-energy-forecast-pt.hf.space) &nbsp;·&nbsp; **Source:** [github.com/Pedrom2002/energy-forecast-pt](https://github.com/Pedrom2002/energy-forecast-pt)
 
-Full-stack energy consumption forecasting system for Portugal by region. Gradient-boosted tree models (CatBoost, XGBoost, LightGBM) with a modern React 19 frontend.
+> **Demo model (no_lags):** MAPE 4.77%, RMSE 53.52 MW &nbsp;·&nbsp; **Production model (with_lags):** MAPE 1.44%, RMSE 22.90 MW &nbsp;·&nbsp; **R² 0.998** &nbsp;·&nbsp; **EN / PT i18n** &nbsp;·&nbsp; **760+ tests**
 
-Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter tuning, permutation-importance feature selection, conformal prediction calibration, and file-based experiment tracking.
+Full-stack energy consumption forecasting system for Portugal by region. Gradient-boosted tree models (XGBoost / LightGBM / CatBoost) with a modern React 19 frontend, bilingual (English/Portuguese), dark-only UI, and a one-click HuggingFace Spaces deployment.
+
+The public demo runs the **no_lags** model (MAPE 4.77%) because the Space has no real consumption feed. The **with_lags** model (MAPE 1.44%) is available via `POST /predict/sequential` for integrations that can supply 48 h of consumption history.
+
+Fully reproducible ML pipeline with baseline comparison, Optuna hyperparameter tuning, permutation-importance feature selection, split conformal prediction calibration, and file-based experiment tracking.
 
 ## Architecture
 
@@ -43,27 +47,29 @@ flowchart LR
     end
 
     subgraph Serving["Serving"]
-        API[FastAPI<br/>7 routers]
-        UI[React 19<br/>+ TypeScript]
+        API[FastAPI<br/>7 routers: admin/batch/explain/<br/>forecast/health/monitoring/predict]
+        UI[React 19 + TypeScript<br/>4 pages · EN/PT · dark-only]
         UI -->|/api| API
     end
 
     subgraph Ops["Ops"]
-        PROM[Prometheus<br/>+ Alertmanager]
-        K8S[Kubernetes<br/>+ Helm]
+        HF[HuggingFace Space<br/>Docker · port 8000]
+        PROM[Prometheus<br/>instrumentator]
     end
 
     Sources --> Pipeline --> API
     API -.metrics.-> PROM
-    API --> K8S
+    API --> HF
 ```
 
 ## Key Results
 
-| Variant | MAE (MW) | RMSE (MW) | MAPE | R² | Features | Best Model |
-|---------|----------|-----------|------|-----|----------|------------|
-| **with_lags** | **13.50** | **22.90** | **1.44%** | **0.9979** | 78 | XGBoost |
-| no_lags | 37.26 | 54.18 | 4.77% | 0.9882 | 56 | XGBoost |
+Numbers taken directly from `data/models/metadata/training_metadata.json` and `training_metadata_no_lags.json` (pipeline v8, trained 2026-04-11, seed 42).
+
+| Variant | MAE (MW) | RMSE (MW) | MAPE | R² | MASE | Features | Best Model | Role |
+|---------|----------|-----------|------|-----|------|----------|------------|------|
+| **with_lags** | 13.50 | 22.90 | **1.44%** | **0.9979** | 0.022 | 78 | XGBoost | Production (`/predict/sequential`) |
+| no_lags | 37.22 | 53.52 | 4.77% | 0.9885 | 0.048 | 56 | XGBoost | Public demo (`/predict`, `/predict/batch`) |
 
 - **Pipeline v8**: Optuna hyperparameter tuning (30 trials, walk-forward CV) + split conformal calibration
 - **61% RMSE reduction** over best baseline (Persistence 58.74) — 2.6x better
@@ -170,10 +176,14 @@ npm run dev
 ```
 
 - Frontend: **http://localhost:3000**
-- Pages: Dashboard, Predict, Batch, Forecast, Monitoring, Explain
-- Features: Dark mode, toast notifications, CSV export, virtualized tables
+- **4 pages**: Dashboard (entry), Previsão Pontual (single-point `/predict`), Forecast (sequential batch — uses `no_lags` via `/predict/batch`, has an embedded SHAP explainability panel), Monitoring (CI coverage tracker).
+- **i18n**: English default + Portuguese, switched from a footer toggle (`react-i18next`).
+- **Dark-only UI**: light-mode tokens remain in the theme but no toggle is exposed.
+- Toast notifications, CSV export, virtualized tables.
 
-The API auto-loads models from `data/models/checkpoints/` and selects the best available: advanced > with_lags > no_lags.
+> The former stand-alone **Batch** page has been merged into **Forecast**; the **Explicabilidade** page has been replaced by a collapsible explainability panel inside **Forecast**.
+
+The API auto-loads models from `data/models/checkpoints/`: `best_model.pkl` (with_lags) and `best_model_no_lags.pkl` (no_lags). Endpoints select the appropriate variant automatically — `/predict`, `/predict/batch` and `/predict/explain` default to the no_lags model unless the request provides 48 h of consumption history, while `/predict/sequential` always uses the with_lags model and feeds its own predictions back as lag inputs.
 
 ## API Endpoints
 
@@ -315,7 +325,7 @@ energy-forecast-pt/
 │
 ├── frontend/                        # React 19 + TypeScript + Vite
 │   ├── src/
-│   │   ├── pages/                  # 6 pages (Dashboard, Predict, Batch, Forecast, Monitoring, Explain)
+│   │   ├── pages/                  # 4 pages (Dashboard, Predict, Forecast, Monitoring)
 │   │   ├── components/             # Card, Layout, Toast, ChartSkeleton, ErrorBoundary, etc.
 │   │   ├── hooks/                  # useTheme, useDebounce
 │   │   ├── utils/                  # Formatting utilities (formatMW, exportCSV, etc.)
@@ -323,7 +333,7 @@ energy-forecast-pt/
 │   ├── vitest.config.ts            # Frontend test configuration
 │   └── package.json                # React 19, Tailwind CSS v4, Recharts
 │
-├── tests/                            # 745+ tests (pytest)
+├── tests/                            # 760+ backend tests (pytest) across 33 files
 │   ├── test_api.py                 # API endpoint tests
 │   ├── test_full_integration.py    # End-to-end integration (44 tests)
 │   ├── test_property_based.py      # Hypothesis property-based (21 tests)
@@ -369,7 +379,7 @@ energy-forecast-pt/
 ### Backend (Python)
 
 ```bash
-# Run all 745+ tests
+# Run all 760+ tests
 pytest -v
 
 # With coverage report
@@ -393,6 +403,14 @@ npm test                    # Run all 71 tests (Vitest)
 npm run test:coverage       # With coverage report
 npm run test:watch          # Watch mode
 ```
+
+## Live Deployment — HuggingFace Spaces
+
+The project is live at **https://pedrom02-energy-forecast-pt.hf.space**. The Space is configured as a Docker SDK (see the YAML front-matter at the top of this README), listens on port 8000, and serves both the FastAPI backend and the static React frontend bundled inside the same container.
+
+No auth is required for the public demo. On startup the backend seeds **168 synthetic observations** into the coverage tracker (~92% empirical coverage) so the Monitoring page is never empty.
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#huggingface-spaces-live-demo) for a full walkthrough.
 
 ## Docker Deployment
 

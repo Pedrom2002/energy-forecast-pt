@@ -1,8 +1,11 @@
 # Architecture Documentation
 
+> **Live demo:** https://pedrom02-energy-forecast-pt.hf.space (HuggingFace Space, Docker SDK, port 8000)
+> **Source:** https://github.com/Pedrom2002/energy-forecast-pt
+
 ## System Overview
 
-Energy Forecast PT is an end-to-end ML system for predicting energy consumption in Portugal by region using gradient boosting models.
+Energy Forecast PT is an end-to-end ML system for forecasting hourly energy consumption in the 5 NUTS-II regions of Portugal. It ships two sibling XGBoost models (no_lags for stateless predictions, with_lags for auto-regressive forecasts), a FastAPI backend with seven routers, and a React 19 + TypeScript frontend with four pages, English/Portuguese internationalisation and a dark-only UI.
 
 ## 🏗️ High-Level Architecture
 
@@ -20,26 +23,24 @@ graph TB
         F --> G[Trained Models<br/>.pkl files]
     end
 
-    subgraph "API Layer"
+    subgraph "API Layer (FastAPI · 7 routers)"
         G --> H[FastAPI Server<br/>Uvicorn]
-        H --> I{Model Selection}
-        I -->|With History 48h+| J[Model WITH Lags<br/>LightGBM MAPE 1.44% ✅]
-        I -->|No History| K[Model WITHOUT Lags<br/>LightGBM MAPE 4.77%]
+        H --> I{Which endpoint?}
+        I -->|/predict/sequential<br/>auto-regressive| J[Model WITH Lags<br/>XGBoost MAPE 1.44%]
+        I -->|/predict · /predict/batch<br/>/predict/explain| K[Model WITHOUT Lags<br/>XGBoost MAPE 4.77%]
     end
 
     subgraph "Client Layer"
-        H --> L[REST API<br/>/predict, /batch, /explain]
-        L --> M[React Frontend<br/>6 pages, dark mode]
-        L --> N[Python SDK]
-        L --> O[External Clients]
+        H --> L[REST API<br/>admin · batch · explain · forecast<br/>health · monitoring · predict]
+        L --> M[React 19 Frontend<br/>4 pages · EN/PT · dark-only]
+        L --> N[Python / curl clients]
     end
 
     subgraph "DevOps Layer"
-        P[GitHub Actions<br/>CI/CD] --> Q[Docker<br/>Container]
-        Q --> R{Cloud Platform}
-        R --> S[AWS ECS]
-        R --> T[Azure Container Apps]
-        R --> U[GCP Cloud Run]
+        P[GitHub Actions<br/>CI/CD] --> Q[Docker Image]
+        Q --> R{Where it runs}
+        R --> HF[HuggingFace Space<br/>live demo, port 8000]
+        R --> S[AWS ECS / Azure / GCP<br/>optional cloud targets]
     end
 
     style A fill:#e1f5ff
@@ -98,12 +99,12 @@ sequenceDiagram
     FE->>FE: Extract temporal features
     FE->>FE: Check for historical data
 
-    alt Has 48h history
-        FE->>Model: Features WITH lags (52)
-        Model->>Model: LightGBM prediction (MAPE 1.44%)
-    else No history
-        FE->>Model: Features WITHOUT lags (45)
-        Model->>Model: Fallback model prediction (MAPE 4.77%)
+    alt /predict/sequential (48h history seeded, auto-regressive)
+        FE->>Model: Features WITH lags (78)
+        Model->>Model: XGBoost prediction (MAPE 1.44%)
+    else /predict, /predict/batch, /predict/explain
+        FE->>Model: Features WITHOUT lags (56)
+        Model->>Model: No-lags XGBoost prediction (MAPE 4.77%)
     end
 
     Model->>Response: Prediction + confidence interval
@@ -162,27 +163,25 @@ sequenceDiagram
 - Trials: 50 per model (sufficient for convergence)
 - Timeout: 3600s safety net
 
-### 3. API Server (`src/api/main.py`)
+### 3. API Server (`src/api/main.py` + `src/api/routers/*`)
 
-**Responsibilities:**
-- Serve predictions via REST API
-- Load and manage models
-- Validate inputs
-- Handle errors gracefully
+The FastAPI app mounts seven routers, each defined in `src/api/routers/`:
 
-**Endpoints:**
-- `GET /` - API info
-- `GET /health` - Liveness probe (version, uptime, model status, coverage alert)
-- `GET /regions` - Available regions
-- `POST /predict` - Single prediction with 90% CI
-- `POST /predict/batch` - Batch predictions (max 1000, vectorised)
-- `POST /predict/sequential` - Lag-aware auto-regressive forecast
-- `POST /predict/explain` - Prediction + top-N feature importance
-- `GET /model/info` - Model metadata and checksums
-- `GET /model/drift` - Feature distribution baselines
-- `POST /model/drift/check` - Live drift detection (z-score)
-- `GET /model/coverage` - Sliding-window empirical CI coverage
-- `POST /admin/reload-models` - Hot-reload models (ADMIN_API_KEY)
+| Router | File | Purpose |
+|---|---|---|
+| `health` | `health.py` | `GET /`, `GET /health`, `GET /regions`, `GET /limitations` — always unauthenticated. |
+| `predict` | `predict.py` | `POST /predict` (single), `POST /predict/sequential` (auto-regressive, with_lags). |
+| `batch` | `batch.py` | `POST /predict/batch` — vectorised, up to 1000 items. |
+| `explain` | `explain.py` | `POST /predict/explain` — prediction + top-N feature importance (SHAP or global). |
+| `forecast` | `forecast.py` | Horizon-specific helpers (1 h, 6 h, 12 h, 24 h multi-step). |
+| `monitoring` | `monitoring.py` | `GET /metrics/summary`, `GET /model/coverage`, `POST /model/coverage/record`, `GET /model/drift`, `POST /model/drift/check`, `GET /model/info`. |
+| `admin` | `admin.py` | `POST /admin/reload-models` — requires `ADMIN_API_KEY`. |
+
+Interactive OpenAPI docs are served at `/docs` (`https://pedrom02-energy-forecast-pt.hf.space/docs` in production).
+
+**Instrumentation:** `prometheus-fastapi-instrumentator` auto-registers a `/metrics` endpoint on startup when available.
+
+**Coverage seed at startup:** the backend seeds 168 synthetic observations into the `CoverageTracker` on startup (~92 % empirical coverage) so the Monitoring page is never empty on the public demo. See `src/api/monitoring.py`.
 
 **Design Patterns:**
 - **Singleton**: Model loaded once on startup
@@ -251,21 +250,41 @@ sequenceDiagram
 
 ### Feature Space
 
-**Model WITH Lags (52 features, primary):**
-- Temporal features (raw + cyclical)
-- 6 meteorological features
-- 7 lag features (1, 2, 3, 6, 12, 24, 48h)
-- 20 rolling window features
-- Holiday features (PT holidays)
-- Interaction features
+Authoritative lists live in `data/models/features/feature_names.txt` (78) and `feature_names_no_lags.txt` (56).
 
-**Model WITHOUT Lags (45 features, fallback):**
-- Temporal features (raw + cyclical)
-- Meteorological features (+ derived)
-- Holiday features
-- Interaction features (no autoregressive inputs)
+**with_lags (78 features — used by `/predict/sequential`):** temporal + cyclical, weather (raw + derived), Portuguese holidays, interactions, 7 lag features, 20 rolling-window features, diff features.
+
+**no_lags (56 features — used by `/predict`, `/predict/batch`, `/predict/explain`):** same feature groups as above minus the lag / rolling / diff features.
+
+### Frontend (React 19 + TypeScript + Vite)
+
+Four pages — one-to-one with `frontend/src/pages/`:
+
+| Route | Component | Purpose | Calls |
+|---|---|---|---|
+| `/` | `Dashboard.tsx` | Landing / entry page with KPIs and links to the other pages. | `/health`, `/metrics/summary` |
+| `/predict` | `Predict.tsx` | Single-point prediction form ("Previsão Pontual"). | `POST /predict` |
+| `/forecast` | `Forecast.tsx` | Sequential forecast over N hours; includes an embedded collapsible SHAP explainability panel (`components/ExplanationPanel.tsx`). | `POST /predict/batch`, `POST /predict/explain` |
+| `/monitoring` | `Monitoring.tsx` | Coverage tracker only — shows a 168-observation sliding window and the seed banner. | `GET /model/coverage` |
+
+Sidebar navigation (`frontend/src/components/Layout.tsx`) has exactly four entries: **Dashboard**, **Previsão Pontual**, **Forecast**, **Monitoring**. The older **Batch** page has been merged into **Forecast**, and the older **Explicabilidade** page has been replaced by the embedded panel inside **Forecast**. The drift bar chart and simulator previously on **Monitoring** have been removed.
+
+**i18n.** `react-i18next` with English as the default and a Portuguese translation; the language is toggled from a footer control (`components/LanguageToggle.tsx`).
+
+**Theme.** Dark-only. The light-mode design tokens are still defined in the Tailwind theme but no toggle is exposed in the UI.
 
 ## 🚀 Deployment Architecture
+
+### Live — HuggingFace Spaces (primary)
+
+The project is deployed as a Docker-SDK HuggingFace Space at
+**https://pedrom02-energy-forecast-pt.hf.space**. The Space builds from the
+root `Dockerfile`, listens on port 8000 and serves the FastAPI backend plus
+the pre-built React bundle in a single container. No authentication is
+configured — the demo is intentionally open.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md#huggingface-spaces-live-demo) for a full
+walkthrough.
 
 ### Docker Container
 
@@ -408,12 +427,21 @@ graph LR
 - [x] Reproducibility module
 - [x] Comprehensive ML pipeline documentation
 
+### Completed in v2.2 (April 2026)
+- [x] Frontend consolidated to 4 pages (Dashboard, Previsão Pontual, Forecast, Monitoring)
+- [x] Explicabilidade merged into Forecast as a collapsible SHAP panel
+- [x] Batch page merged into Forecast
+- [x] Monitoring simplified to the coverage tracker (drift bar chart / simulator removed)
+- [x] `react-i18next` English + Portuguese with footer toggle
+- [x] Dark-only UI (light-mode tokens retained but no toggle)
+- [x] Live HuggingFace Space deployment
+- [x] Startup coverage seed (168 synthetic observations, ~92 % coverage)
+
 ### Completed in v2.1
-- [x] React frontend with 6 pages (Dashboard, Predict, Batch, Forecast, Monitoring, Explain)
 - [x] Dark mode with design system and semantic color tokens
 - [x] Comprehensive test suite (integration, load, stress, property-based, frontend)
 - [x] Mutation testing setup (mutmut)
-- [x] Model explainability (SHAP/global importance via /predict/explain)
+- [x] Model explainability (SHAP / global importance via `/predict/explain`)
 - [x] Error boundaries and 404 page handling
 - [x] Production build optimization (code splitting)
 
@@ -426,4 +454,4 @@ graph LR
 ---
 
 **Last Updated**: April 2026
-**Version**: 2.1 (Pipeline v8)
+**Version**: 2.2 (Pipeline v8)

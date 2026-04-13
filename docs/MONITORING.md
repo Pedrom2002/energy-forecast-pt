@@ -1,6 +1,15 @@
 # Monitoring Guide
 
 Production monitoring reference for the Energy Forecast PT API.
+Live demo: <https://pedrom02-energy-forecast-pt.hf.space>.
+
+> **What the frontend shows.** The Monitoring page in the React frontend
+> currently renders **only the sliding-window CI coverage tracker** plus a
+> banner explaining that 168 synthetic observations are seeded at backend
+> startup (~92 % coverage) so the panel is never empty on the demo. The
+> previous drift bar chart and simulator UI have been removed — the drift
+> endpoints (`GET /model/drift`, `POST /model/drift/check`) are still served
+> by the backend and are documented below for programmatic use.
 
 ---
 

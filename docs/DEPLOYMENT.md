@@ -1,15 +1,75 @@
 # 🚀 Deployment Guide
 
-Guia completo para fazer deploy da API Energy Forecast PT em produção.
+Deployment options for the Energy Forecast PT API. The recommended path for a public demo is **HuggingFace Spaces** (used for the live deployment at <https://pedrom02-energy-forecast-pt.hf.space>); the other cloud targets below are provided for teams that need more control.
 
-## 📋 Índice
+## 📋 Index
 
+- [HuggingFace Spaces (live demo)](#huggingface-spaces-live-demo)
 - [Quick Start com Docker](#quick-start-com-docker)
 - [Deploy em AWS](#deploy-em-aws-ecs-fargate)
 - [Deploy em Azure](#deploy-em-azure-container-apps)
 - [Deploy em GCP](#deploy-em-gcp-cloud-run)
 - [CI/CD com GitHub Actions](#cicd-com-github-actions)
 - [Monitorização](#monitorização)
+
+---
+
+## 🤗 HuggingFace Spaces (live demo)
+
+**Live URL:** <https://pedrom02-energy-forecast-pt.hf.space>
+**API docs:** <https://pedrom02-energy-forecast-pt.hf.space/docs>
+**Health check:** <https://pedrom02-energy-forecast-pt.hf.space/health>
+
+### How it works
+
+The repository root contains a YAML front-matter block at the top of the root `README.md`:
+
+```yaml
+---
+title: Energy Forecast PT
+emoji: ⚡
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 8000
+pinned: false
+license: mit
+---
+```
+
+HuggingFace reads this metadata and:
+
+1. Clones the repo into the Space.
+2. Builds the root `Dockerfile` (multi-stage: Python 3.11 slim + pre-built React frontend).
+3. Starts the container and routes `https://pedrom02-energy-forecast-pt.hf.space/` to `localhost:8000` inside the Space.
+4. Forwards all HTTP traffic — no extra reverse proxy needed.
+
+### What it serves
+
+- FastAPI backend (all seven routers).
+- Pre-built React bundle (4 pages, EN/PT, dark-only).
+- Swagger UI at `/docs`, ReDoc at `/redoc`, Prometheus metrics at `/metrics`.
+
+### Authentication
+
+The public demo is **unauthenticated by design** — no `API_KEY` is set in the Space. To lock down a private copy, add `API_KEY` and (optionally) `ADMIN_API_KEY` as secrets in the Space settings.
+
+### Model behaviour on the Space
+
+Because the Space has no connection to a real consumption feed, `POST /predict`, `POST /predict/batch` and `POST /predict/explain` use the **no_lags** model (MAPE 4.77%). `POST /predict/sequential` still uses the **with_lags** model (MAPE 1.44%) and seeds its own lag history from the first prediction onwards.
+
+At startup, the backend seeds **168 synthetic observations** into the coverage tracker (~92 % empirical coverage) so the Monitoring page is never empty for a first-time visitor.
+
+### Deploying your own copy
+
+```bash
+# 1. Create a new Space on HuggingFace (SDK: Docker, port: 8000).
+# 2. Push this repository to the Space's git remote:
+git remote add hf https://huggingface.co/spaces/<your-user>/<space-name>
+git push hf master
+```
+
+The first build takes ~5-10 minutes (Python deps + frontend build). Subsequent pushes use layer caching and rebuild in ~2-3 minutes.
 
 ---
 

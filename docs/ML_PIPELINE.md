@@ -8,7 +8,7 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        ML PIPELINE (v7)                             │
+│                        ML PIPELINE (v8)                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  1. REPRODUCIBILITY SETUP                                           │
@@ -22,7 +22,7 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 │     └── Weather column validation (hard + soft bounds)               │
 │     └── Data hash verification for reproducibility                   │
 │                                                                     │
-│  3. FEATURE ENGINEERING (45-52 features after selection)              │
+│  3. FEATURE ENGINEERING (56 no_lags · 78 with_lags)                   │
 │     ├── Temporal (13): hour, dow, month + cyclical sin/cos           │
 │     ├── Lag (7): consumption at t-{1,2,3,6,12,24,48}h               │
 │     ├── Rolling (20): mean/std/min/max over {3,6,12,24,48}h         │
@@ -48,7 +48,7 @@ The Energy Forecast PT ML pipeline is a fully reproducible, end-to-end system fo
 │     └── Selection criterion: lowest mean CV RMSE                     │
 │                                                                     │
 │  7. HYPERPARAMETER OPTIMISATION (Optuna)                             │
-│     ├── 50 trials (TPE sampler, seeded)                              │
+│     ├── 30 trials (TPE sampler, seeded)                              │
 │     ├── 5-fold time-series CV objective                              │
 │     ├── 1-hour timeout safety net                                    │
 │     └── Search space: n_estimators, depth, LR, regularisation        │

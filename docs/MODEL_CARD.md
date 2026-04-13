@@ -1,539 +1,283 @@
 # Model Card: Energy Consumption Forecasting for Portugal
 
-## Model Details
+> **Live demo:** https://pedrom02-energy-forecast-pt.hf.space
+> **Source:** https://github.com/Pedrom2002/energy-forecast-pt
+> **Model version:** 3.2 · **Pipeline:** v8 · **Last retrain:** 2026-04-11 UTC
 
-**Model Name:** Energy Forecast PT - Gradient Boosted Trees
-**Model Version:** 3.1 (Pipeline v8)
-**Model Date:** April 2026
-**Model Type:** Gradient Boosting Regression (LightGBM / CatBoost / XGBoost — auto-selected via CV)
-**License:** MIT
-
-### Model Description
-
-Hourly energy consumption forecasting system for Portugal, segmented by 5 NUTS-II regions. The model uses gradient-boosted trees (auto-selected via 5-fold time-series cross-validation) with 52 selected features (with_lags variant, recommended) or 56 features (no_lags variant), including temporal patterns, weather variables, Portuguese holiday features, and interaction terms.
-
-**Pipeline v8 (honest pipeline)** uses **only real regional data** from the e-Redes `consumos_horario_codigo_postal` (CP4) open dataset. Each region has independent dynamics — no disaggregation, no artefacts. Best model: **XGBoost with lags** (MAPE 1.44%, R² 0.9979 on the held-out test set).
-
-**Why v6 was abandoned.** Pipeline v6 disaggregated the national consumption series into 5 regions via **static per-(hour-of-week, region) shares**. Because those shares were constant, each regional series was structurally `national[t] × constant_share`, which allowed any lag-based model to trivially reconstruct one region from another. Test runs on the `no_lags` variant confirmed this: MAPE jumped from ~1.6% (with artefactual leakage) to ~5% once lags were removed. Pipeline v8 eliminates the artefact entirely by training on the real regional CP4 series directly — each region has genuinely independent dynamics and lag features can be safely used.
-
-**Trade-off.** The honest dataset covers 11 months (Nov 2022 – Sep 2023) instead of 3+ years, but it is genuinely regional and the model evaluations are honest. 40k samples is plenty for gradient-boosted tree models.
-
-**Developed by:** Pedro Marques
+All numbers in this card are taken directly from
+`data/models/metadata/training_metadata.json` (with_lags, 78 features) and
+`data/models/metadata/training_metadata_no_lags.json` (no_lags, 56 features).
+Both were produced by the same pipeline run (data hash
+`441ffc5b…0de167`, random seed 42, pipeline v8).
 
 ---
 
-## Intended Use
+## 1. Overview
 
-### Primary Use Cases
+**Model name:** Energy Forecast PT — Gradient Boosted Trees
+**Model type:** Gradient boosting regression (XGBoost / LightGBM / CatBoost, selected via 5-fold time-series CV)
+**Best model (both variants):** **XGBoost**
+**License:** MIT
+**Developed by:** Pedro Marques
 
-1. **Operational Forecasting** - Short-term forecasting (1-24h) for electricity grid operators
-2. **Load Planning** - Optimization of energy distribution by region
-3. **Pattern Analysis** - Identification of consumption patterns and seasonality
-4. **Technical Demonstration** - Data Science and ML Engineering portfolio
+Two sibling models are shipped together:
 
+| Variant | Best model | MAPE | RMSE (MW) | R² | MASE | Features | Needs consumption history? |
+|---------|------------|------|-----------|------|------|----------|----------------------------|
+| **no_lags** | XGBoost | 4.77% | 53.52 | 0.9885 | 0.048 | 56 | No |
+| **with_lags** | XGBoost | **1.44%** | **22.90** | **0.9979** | 0.022 | 78 | Yes — 48 h of recent consumption |
 
+The no_lags model is the **public demo** on HuggingFace Spaces (no real
+consumption feed is available there). The with_lags model is the
+**production** model and is exposed via `POST /predict/sequential`, which
+feeds each prediction back as the next step's lag input.
 
-## Training Data
+## 2. Intended use
 
-### Dataset
+### Primary use cases
+
+1. **Operational forecasting** — short-term (1 h to 24 h) energy demand forecasting for one of 5 NUTS-II regions of Portugal.
+2. **Load planning** — informing dispatch, capacity and procurement decisions.
+3. **Pattern analysis** — identifying intraday, weekly and holiday-driven consumption structure.
+4. **Portfolio / demonstration** — showing an end-to-end ML system (data ingestion, feature engineering, hyperparameter tuning, calibration, API, frontend, monitoring, CI/CD).
+
+### Out of scope
+
+- Sub-hourly forecasts (< 1 hour resolution).
+- Medium / long-term forecasts (> 48 h). Errors compound through auto-regressive feedback; beyond ~48 h the no_lags model is preferable.
+- Forecasts for individual households or postal codes (the model is trained at NUTS-II level).
+- Forecasts outside continental Portugal or outside the 5 regions listed below.
+- Price forecasting, generation-mix forecasting, renewables forecasting.
+
+## 3. Training data
 
 | Property | Value |
 |---|---|
-| **Type** | Real regional hourly data — e-Redes CP4 Open Data (consumption) + Open-Meteo (weather) |
-| **Granularity** | Hourly |
-| **Size** | 40,075 rows (5 regions × 8,015 hourly timestamps); 39,835 rows after feature engineering |
-| **Date range** | 2022-11-01 – 2023-09-30 (11 months, all 5 regions) |
-| **Coverage** | Near-complete hourly series |
-| **Train / Val / Test split** | 70 % / 15 % / 15 % (temporal — no shuffle, to prevent leakage) |
-| **Train period** | 2022-11-01 – 2023-06-22 (~28k rows) |
-| **Validation period** | 2023-06-22 – 2023-08-11 (~6k rows) |
-| **Test period** | 2023-08-11 – 2023-09-30 (~6k rows) |
+| **Sources** | e-Redes `consumos_horario_codigo_postal` (CP4) + Open-Meteo Historical API |
+| **Target** | `consumption_mw` (hourly MW) |
+| **Granularity** | Hourly, per region |
+| **Date range** | 2022-11-01 to 2023-09-30 (11 months) |
+| **Regions** | 5 NUTS-II — Alentejo, Algarve, Centro, Lisboa, Norte |
+| **Raw rows** | 40,075 (8,015 × 5 regions) |
+| **Rows after feature engineering** | 39,835 (first 48 h per region dropped for lag/rolling windows) |
+| **Train / Val / Test** | 70 / 15 / 15, temporal split, no shuffle |
+| **no_lags split** | Train 28,052 · Val 6,011 · Test 6,012 |
+| **with_lags split** | Train 27,884 · Val 5,975 · Test 5,976 |
+| **Data hash (SHA-256)** | `441ffc5b56a982338bedca861061e0bca18016b9b026e59897f362be960de167` |
 
-### Data Sources and Provenance
+### Provenance
 
-The dataset is assembled from **two official, public sources** — real
-measurements, not synthetic, and **no disaggregation**: every regional series
-is a direct measurement, not a projection of the national series.
+- **e-Redes CP4 Open Data** — hourly consumption per 4-digit postal code. CP4 codes are mapped to NUTS-II regions and summed per hour. Every regional series is therefore a direct measurement — there is no national-to-regional disaggregation.
+- **Open-Meteo Historical API** — temperature, humidity, dew point, pressure, cloud cover, wind, precipitation, solar radiation, sampled at each region centroid.
+- **Portuguese public holidays** — computed from statute law (fixed + Easter-derived via the Anonymous Gregorian algorithm).
 
-1. **Regional CP4 dataset — e-Redes Open Data** (primary source)
-   ([`consumos_horario_codigo_postal`](https://e-redes.opendatasoft.com/))
-   Hourly consumption by 4-digit postal code for November 2022 – September 2023
-   (11 months). Each CP4 is mapped to one of 5 NUTS-II regions (Norte, Centro,
-   Lisboa, Alentejo, Algarve) and the CP4 values are **summed** per region per
-   hour to produce genuinely regional time series. Each region therefore has
-   independent dynamics, driven by the actual consumption of households and
-   businesses in that region — not by any share of a national aggregate.
+### Data quality
 
-2. **Weather data — Open-Meteo Historical API**
-   ([`archive-api.open-meteo.com/v1/archive`](https://archive-api.open-meteo.com/v1/archive))
-   Hourly meteorological variables (temperature, humidity, dew point, pressure,
-   cloud cover, wind speed/direction, precipitation, solar radiation) pulled
-   for the centroid of each NUTS-II region over the full study period.
+- Hard physical bounds enforced at ingestion (humidity 0-100 %, temperature -50-60 °C, wind_speed ≥ 0).
+- Soft warnings for values outside the typical Portuguese range.
+- Lag/rolling features use `shift(1)` before applying the window so the current hour's target is never visible to the model.
 
-3. **Holiday calendar** — Portuguese public holidays (fixed + Easter-derived)
-   computed from statute law using the Anonymous Gregorian algorithm
-   (see `src/features/feature_engineering.py::get_portuguese_holidays`).
+## 4. Features
 
-**Pipeline**: (1) download regional CP4 dataset from e-Redes,
-(2) map CP4 → 5 NUTS-II regions and sum hourly values per region,
-(3) join with Open-Meteo weather per region centroid,
-(4) feature engineering + temporal 70/15/15 split.
+Full feature lists live in:
 
-**Honest regional dynamics.** Unlike Pipeline v6 (which disaggregated a
-national series via static shares and created a structural leakage between
-regions), Pipeline v8 uses the raw regional measurements directly. Lag and
-rolling-window features can therefore be safely used: correlations between
-regions reflect real shared drivers (weather, holidays, national-scale events)
-rather than a constructed identity `region[t] = national[t] × constant_share`.
+- `data/models/features/feature_names.txt` — 78 features (with_lags)
+- `data/models/features/feature_names_no_lags.txt` — 56 features (no_lags)
 
-### Data Quality
+### With_lags (78) — breakdown
 
-- **Completeness:** No missing hourly records after generation; NaN rows
-  produced by lag/rolling feature engineering (the first 48 h per region)
-  are dropped before training (< 0.1 % of rows).
-- **Outlier handling:** Hard physical bounds are enforced at ingestion time
-  (`humidity` 0–100 %, `temperature` −50–60 °C, `wind_speed` ≥ 0).
-  Soft warnings are logged for values outside the typical Portuguese range.
-- **Leakage prevention:** Rolling statistics use `shift(1)` before applying
-  the window to ensure the current hour's consumption is never visible to the
-  model as a direct input.
-
-### Regions Covered
-
-1. Alentejo
-2. Algarve
-3. Centro
-4. Lisboa
-5. Norte
-
-### Features (52 selected — with_lags variant, recommended; 45 for no_lags)
-
-See [DATA_DICTIONARY.md](DATA_DICTIONARY.md) for complete feature documentation.
-
-#### 1. Temporal Features (13)
-- Raw: `hour`, `day_of_week`, `month`, `quarter`, `day_of_month`, `week_of_year`, `day_of_year`
-- Cyclical: `hour_sin/cos`, `day_sin/cos`, `month_sin/cos`, `day_of_year_sin/cos`
-- Flags: `is_weekend`, `is_business_hour`
-
-#### 2. Weather Features (6 raw + 6 derived = 12)
-- Raw: `temperature`, `humidity`, `wind_speed`, `precipitation`, `cloud_cover`, `pressure`
-- Derived: `dew_point` (Magnus), `heat_index` (NWS Steadman), `wind_chill` (Environment Canada), `comfort_index` (Thom), `solar_proxy`, `relative_pressure`
-
-#### 3. Lag Features (7)
-- `consumption_mw_lag_{1,2,3,6,12,24,48}` (with `shift(1)` for leakage prevention)
-
-#### 4. Rolling Window Features (20)
-- Windows: 3, 6, 12, 24, 48 hours
-- Statistics: mean, std, min, max per window (with `shift(1)`)
-
-#### 5. Holiday Features (8)
-- `is_holiday`, `is_holiday_eve`, `is_holiday_after`
-- `days_to_holiday`, `days_from_holiday`, `days_to_nearest_holiday`
-- Portuguese holidays: 10 fixed + Easter-derived
-
-#### 6. Interaction Features (5+)
-- `temp_x_weekend`, `temp_x_holiday`, `temp_x_hour`, `wind_x_hour`, `hour_x_dow`
-
-### Data Split
-
-**Temporal split** (no shuffling to preserve temporal order):
-- **Training:** 70% (first 70% chronologically)
-- **Validation:** 15% (next 15%)
-- **Test:** 15% (last 15%)
-
-**Rationale:** Temporal split prevents data leakage and simulates production conditions where predictions are made for the future.
-
----
-
-## Model Architecture
-
-### Algorithm
-
-**Auto-selected via 5-fold time-series CV** from:
-- CatBoost (typically selected — best CV RMSE)
-- XGBoost
-- LightGBM
-- Random Forest
-
-**Selection criterion:** Lowest mean validation RMSE across 5 temporal CV folds.
-
-### Hyperparameters (Optimized via Optuna)
-
-Optimised using Optuna TPE sampler with seeded randomness for reproducibility:
-
-| Parameter | Search Range | Method |
+| Group | Count | Examples |
 |---|---|---|
-| `n_estimators` / `iterations` | 200-1500 | Bayesian (TPE) |
-| `max_depth` | 3-12 | Bayesian (TPE) |
-| `learning_rate` | 0.005-0.3 | Log-uniform |
-| `regularisation` | 1e-8 to 10.0 | Log-uniform |
-| `subsample` | 0.6-1.0 | Uniform |
-| `colsample_bytree` | 0.5-1.0 | Uniform |
+| Temporal (raw + cyclical) | 15 | `hour`, `day_of_week`, `month`, `hour_sin/cos`, `day_sin/cos`, `month_sin/cos`, `is_weekend`, `is_business_hour` |
+| Weather — raw | 8 | `temperature`, `humidity`, `dew_point`, `pressure`, `cloud_cover`, `wind_speed`, `wind_direction`, `precipitation` |
+| Weather — derived | 6 | `temperature_feels_like`, `heat_index`, `wind_chill`, `comfort_index`, `solar_proxy`, `relative_pressure` |
+| Holiday | 8 | `is_holiday`, `is_holiday_eve`, `days_to_holiday`, `days_from_holiday`, etc. |
+| Interaction | 5 | `temp_x_weekend`, `temp_x_hour`, `wind_x_hour`, `hour_x_dow`, `temp_x_holiday` |
+| Lag | 7 | `consumption_mw_lag_{1,2,3,6,12,24,48}` |
+| Rolling window | 20 | mean/std/min/max over {3, 6, 12, 24, 48} h |
+| Diff / geo | 9 | `consumption_mw_diff_*`, `latitude`, `longitude`, region one-hot |
 
-**Optimization Method:** Optuna TPE Sampler (seeded, seed=42)
-**Trials:** 50 (sufficient for TPE convergence on ~10 hyperparameters)
-**Cross-Validation:** TimeSeriesSplit (5 folds)
-**Timeout:** 3600s safety net
+### No_lags (56)
 
-### Ensemble Methods
+Same as above minus the 7 lag features, the 20 rolling-window features and the diff features that depend on historical consumption.
 
-The model supports ensemble methods via:
-1. **Stacking** - Ridge meta-learner combining XGBoost, LightGBM, CatBoost
-2. **Weighted Averaging** - Weights based on RMSE on the validation set
-3. **Simple Averaging** - Arithmetic mean of predictions
+### Top-10 feature importance (with_lags, XGBoost)
 
----
+From `training_metadata.json["feature_importance_top10"]`:
 
-## Performance
+| Rank | Feature | Importance |
+|---|---|---|
+| 1 | `consumption_mw_lag_1` | 0.4495 |
+| 2 | `consumption_mw_lag_24` | 0.1467 |
+| 3 | `consumption_mw_rolling_mean_3` | 0.1055 |
+| 4 | `consumption_mw_rolling_min_3` | 0.0949 |
+| 5 | `consumption_mw_rolling_max_3` | 0.0746 |
+| 6 | `consumption_mw_lag_2` | 0.0443 |
+| 7 | `longitude` | 0.0281 |
+| 8 | `latitude` | 0.0141 |
+| 9 | `hour_cos` | 0.0116 |
+| 10 | `hour` | 0.0055 |
 
-### Test Set Metrics (Best Model: XGBoost with_lags, Pipeline v8)
+## 5. Models trained
 
-| Metric | Value | Interpretation |
-|--------|-------|----------------|
-| **MAE** | 13.50 MW | Mean error of ~14 MW |
-| **RMSE** | 22.90 MW | Root mean squared error |
-| **MAPE** | **1.44%** | Excellent for regional hourly forecasting |
-| **R²** | **0.9979** | Explains 99.78% of variance |
-| **NRMSE** | 0.0257 | Normalized by range |
-| **MASE** | 0.022 | Model error ~2% of seasonal naive error |
+Every training run evaluates all three gradient-boosting families on 5 time-series CV folds and picks the one with the lowest mean validation RMSE. For this run both variants selected XGBoost.
 
-### Test Set Metrics (no_lags variant, for reference)
+**5-fold CV RMSE (with_lags):**
+
+| Fold | XGBoost | LightGBM | CatBoost |
+|---|---|---|---|
+| 1 | 25.59 | 25.48 | 27.97 |
+| 2 | 23.11 | 23.24 | 24.69 |
+| 3 | 26.34 | 26.14 | 32.92 |
+| 4 | 19.92 | 20.89 | 22.48 |
+| 5 | 21.10 | 21.19 | 22.07 |
+| **Mean** | **23.21** | 23.39 | 26.03 |
+
+**5-fold CV RMSE (no_lags):**
+
+| Fold | XGBoost | LightGBM | CatBoost |
+|---|---|---|---|
+| 1 | 49.49 | 49.02 | 44.88 |
+| 2 | 36.38 | 35.03 | 55.02 |
+| 3 | 54.22 | 54.58 | 53.01 |
+| 4 | 30.05 | 37.90 | 31.28 |
+| 5 | 44.13 | 46.23 | 47.21 |
+| **Mean** | **42.85** | 44.55 | 46.28 |
+
+## 6. Hyperparameter tuning
+
+- **Framework:** Optuna, TPE sampler, seeded (seed = 42).
+- **CV strategy:** `TimeSeriesSplit` (5 folds, walk-forward).
+- **Trials:** 30 per model (sufficient for TPE convergence on ≈10 hyperparameters).
+- **Timeout:** 3600 s per model as a safety net.
+- **Final refit:** best model + best params trained on train + validation, evaluated once on the held-out test set.
+
+Best hyperparameters per model are stored in `data/models/metadata/best_hyperparams.json`.
+
+## 7. Evaluation
+
+All numbers below are on the **held-out test set** (last 15% of the timeline).
+
+### with_lags (XGBoost) — `training_metadata.json`
 
 | Metric | Value |
-|--------|-------|
-| MAE | 37.26 MW |
-| RMSE | 54.18 MW |
+|---|---|
+| MAE | 13.50 MW |
+| RMSE | 22.90 MW |
+| MAPE | **1.44%** |
+| R² | **0.9979** |
+| NRMSE | 0.0257 |
+| MASE | 0.022 |
+| conformal q90 | 30.7 MW |
+
+### no_lags (XGBoost) — `training_metadata_no_lags.json`
+
+| Metric | Value |
+|---|---|
+| MAE | 37.22 MW |
+| RMSE | 53.52 MW |
 | MAPE | 4.77% |
-| R² | 0.9882 |
-| MASE | 0.059 |
+| R² | 0.9885 |
+| NRMSE | 0.0602 |
+| MASE | 0.048 |
+| conformal q90 | 101.89 MW |
 
-The sizeable gap between `with_lags` (MAPE 1.44%) and `no_lags` (MAPE 4.77%)
-confirms that the lag features are contributing real autoregressive signal —
-not exploiting any structural artefact. Under Pipeline v6 this gap was
-suspiciously small (~1.6% vs ~5%) because of the static-share leakage; under
-Pipeline v8 the gap is honest and reflects genuine forecasting value of the
-autoregressive inputs.
-
-### Per-Region Metrics (with_lags)
-
-| Region | RMSE (MW) | MAE (MW) | MAPE | R² |
-|--------|-----------|----------|------|-----|
-| Alentejo | 5.64 | 4.03 | 1.13% | 0.9757 |
-| Algarve | 5.95 | 4.42 | 1.55% | 0.9912 |
-| Centro | 19.28 | 13.53 | 1.13% | 0.9911 |
-| Lisboa | 26.57 | 17.78 | 1.42% | 0.9860 |
-| Norte | 40.04 | 29.14 | 2.32% | 0.9786 |
-
-### Baseline Comparison (one-step-ahead, real regional test set)
+### Baselines (one-step-ahead, same test set)
 
 | Baseline | RMSE (MW) | MAPE |
 |---|---|---|
 | Persistence (lag-1) | 58.74 | 4.12% |
-| Seasonal Naive (weekly, 168h) | 86.97 | 6.30% |
-| Seasonal Naive (daily, 24h) | 119.82 | 6.38% |
-| **XGBoost with_lags (this model)** | **22.90** | **1.44%** |
+| Seasonal Naive (weekly, 168 h) | 86.97 | 6.30% |
+| Seasonal Naive (daily, 24 h) | 119.82 | 6.38% |
+| **XGBoost with_lags** | **22.90** | **1.44%** |
 
-**Improvement over best baseline:** 61% RMSE reduction (22.90 vs 58.74) —
-the model is ~2.6× better than persistence on the honest regional test set.
+The with_lags model is ~2.6× better than the strongest baseline (persistence).
 
-### Performance Interpretation
+## 8. Conformal calibration
 
-**MAPE 1.44%** means:
-- For consumption of 1700 MW (Norte peak), average error of **~26 MW**
-- For consumption of 400 MW (Algarve), average error of **~6 MW**
-- Per-region R² ≥ 0.975 across all 5 regions on real regional data
+Split-conformal intervals are calibrated on a held-out half of the validation
+set, separate from the set used for Optuna tuning. `conformal_q90` is the 90th
+percentile of `|y_cal − ŷ_cal|` and gives a distribution-free ≥ 90 % coverage
+guarantee.
 
-### Confidence Intervals
+Both models apply heteroscedastic scaling per hour and per region to the
+interval half-width; see the `rmse_scale_*` fields in the metadata JSON files.
+In production, empirical coverage is tracked over a sliding 168 h window
+(`GET /model/coverage`), and the backend seeds 168 synthetic observations at
+startup so the Monitoring page never starts empty on the demo.
 
-Conformal prediction intervals (distribution-free):
-- **Conformal q90:** 30.16 MW (with_lags) — prediction ± 30.16 MW covers ≥ 90 % of outcomes
-- **Conformal q90:** 101.63 MW (no_lags) — reference fallback model
-- **Calibrated on validation set** (not test set) for proper coverage guarantees.
+## 9. Limitations
 
-#### Empirical CI Coverage
+1. **Training data ends 2023-09-30.** The model has not seen any post-2023 data, and performance will degrade on distribution shifts beyond that horizon (fuel prices, post-2023 holiday patterns, etc.).
+2. **CP4 slice, not full AML.** The dataset is the subset of e-Redes Open Data that is published at CP4 granularity. It is **not** the full grid operator consumption; some industrial / high-voltage consumers are aggregated elsewhere.
+3. **No real-time feed in the public demo.** The HuggingFace Space has no connection to e-Redes' live API, so the public demo runs on the no_lags model. The with_lags model (via `/predict/sequential`) needs 48 h of consumption history at inference time.
+4. **Horizon.** The model is optimised for 1-24 h ahead. Beyond 48 h, auto-regressive feedback amplifies error; use `/predict/batch` with no_lags instead.
+5. **Geographic scope.** Portugal only, 5 NUTS-II regions. The model does not generalise to other countries, nor to sub-regional (CP4, concelho, parish) resolution.
+6. **Special events.** Public holidays are modelled, but one-off events (national sporting events, strikes, regional blackouts) are not. Errors at these timestamps can be much larger than the reported MAPE.
+7. **Covariate shift.** Structural changes in the grid (large-scale EV adoption, industrial closures, new consumption patterns, long-term climate drift) will degrade performance over time. Retrain at least quarterly in production.
+8. **Explainability ≠ causality.** SHAP values and feature importances are available via `POST /predict/explain`, but they describe the model, not the underlying energy system.
 
-| Method | Nominal | Empirical | Notes |
-|---|---|---|---|
-| Gaussian Z × RMSE | 90 % | 93.1 % | Conservative; assumes Normal residuals |
-| Conformal prediction | ≥ 90 % | ≥ 90 % by construction | Distribution-free guarantee |
+## 10. Bias, fairness and ethical considerations
 
-**Conformal prediction** (split-conformal method):
-- Computed as the 90th percentile of `|residuals|` on a held-out calibration
-  set: `conformal_q90 = np.quantile(|y_cal − ŷ_cal|, 0.90)`.
-- Provides a **distribution-free ≥ 90 % coverage guarantee** — no Gaussian
-  assumption required.
-- Particularly useful for the no-lags model whose residuals are asymmetric
-  and right-skewed at high-demand periods.
-- When `conformal_q90` is saved in the model metadata JSON, the API uses it
-  automatically; the `ci_method` field in `PredictionResponse` will show
-  `"conformal"` instead of `"gaussian_z_rmse"`.
+### Regional fairness
 
-**Heteroscedastic scaling** is applied under both methods:
-
-| Factor | Peak (08–19 h) | Transition (06–07, 20–21 h) | Night (22–05 h) |
-|---|---|---|---|
-| Hour scale | × 1.15 | × 1.00 | × 0.85 |
-
-Region scaling (from training residual CV, data-driven when available in metadata):
-
-| Region | Default scale |
-|---|---|
-| Norte | 1.15 |
-| Lisboa | 1.10 |
-| Centro | 1.00 |
-| Alentejo | 0.90 |
-| Algarve | 0.85 |
-
-### Top Features (with_lags)
-
-| Rank | Feature | Importance |
-|---|---|---|
-| 1 | `consumption_mw_diff_1` | 8.4 % |
-| 2 | `consumption_mw_lag_1` | 6.5 % |
-| 3 | `consumption_mw_diff_24` | 5.5 % |
-| 4 | `consumption_mw_lag_24` | 5.0 % |
-| 5 | `hour_cos` | 3.6 % |
-| 6 | `consumption_mw_rolling_std_6` | 3.4 % |
-| 7 | `consumption_mw_rolling_std_3` | 3.4 % |
-| 8 | `hour_sin` | 3.1 % |
-| 9 | `consumption_mw_rolling_std_12` | 3.1 % |
-| 10 | `consumption_mw_lag_48` | 2.8 % |
-
-The distributed importance profile (top-1 only 6.5 %, top-10 cumulative
-44.8 %) is a strong indication that no single feature is acting as a leaky
-proxy for the target — additional evidence that Pipeline v8 is free of the
-static-share artefact that inflated v6 metrics.
-
-### Model Stability
-
-**5-Fold Walk-Forward CV (with_lags XGBoost, Pipeline v8):**
-- Per-fold RMSE: [38.59, 27.73, 38.24, 24.63, 22.03]
-- Mean ≈ 30.2, showing consistent behaviour across temporal folds.
-
----
-
-## Primary Model — with_lags (best_model.pkl)
-
-**This is the recommended model** (Pipeline v8). XGBoost with 78 features
-including temporal, meteorological, holiday, interaction, lag and
-rolling-window features. Requires at least 48 h of recent consumption history
-at inference time.
-
-### Test Set Metrics (with_lags XGBoost)
-
-| Metric | Value | Interpretation |
-|--------|-------|----------------|
-| **MAE** | 13.50 MW | Best across all variants |
-| **RMSE** | 22.90 MW | 60% improvement over best baseline (Persistence 58.74) |
-| **MAPE** | **1.44%** | Best across all variants |
-| **R²** | **0.9979** | Best across all variants |
-| **MASE** | 0.022 | ~2 % of seasonal naive error |
-| **Features** | 52 | Temporal + meteorological + holidays + interactions + lags + rolling |
-
-> **Note:** Exact metrics in `data/models/metadata/training_metadata.json`.
-> The RMSE and `conformal_q90` are loaded by the API at startup to calibrate
-> confidence intervals.
-
-### Fallback — no_lags (best_model_no_lags.pkl)
-
-The no_lags variant (XGBoost, 56 features, MAPE 4.77%) is available as a
-fallback when no consumption history is present. It is strictly worse than
-the with_lags variant on this dataset and should only be used when lag
-features cannot be supplied.
-
-### When to use each model
-
-| Scenario | Recommended Model |
-|----------|-------------------|
-| Production with historical database (≥ 48 h) | **with_lags (MAPE 1.44%)** — recommended |
-| First startup (no history) | no_lags (MAPE 4.77%) — fallback |
-| Forecast for new installation | no_lags (until 48 h of history accumulated) |
-
----
-
-## Limitations
-
-### 1. **Historical Data Dependency**
-
-**Primary model (with_lags, best_model.pkl):**
-- Requires **48 h of consumption history** at inference time.
-- When history is not available, fall back to `best_model_no_lags.pkl`.
-- The no_lags variant is **considerably worse** on this dataset
-  (MAPE 4.77% vs 1.44%) — lag features contribute real forecasting value
-  on the honest regional data.
-
-### 2. **Geographic Scope**
-
-- Trained only for **5 regions of Portugal**
-- Does not generalize to other countries/regions
-- Performance may vary in regions with less data
-
-### 3. **Temporal Horizon**
-
-- Optimized for **1-24h ahead**
-- Performance degrades after 24h
-- Not recommended for >48h without retraining
-
-### 4. **Covariate Shift**
-
-- Performance may degrade if data distribution changes:
-  - Extreme events (heat waves, storms)
-  - Structural changes (new consumption patterns)
-  - Long-term climate changes
-- **Recommendation:** Monitor metrics and retrain periodically
-
-### 5. **Feature Availability**
-
-- Requires real-time meteorological data
-- Prediction quality depends on input quality
-- Missing data may impact performance
-
-### 6. **Special Events**
-
-- Holidays are modelled, but unique events may have higher error:
-  - National sporting events
-  - Energy strikes
-  - Regional blackouts
-
-### 7. **Interpretability**
-
-- Ensemble model is complex
-- Feature importance available, but causality is not guaranteed
-- Does not replace domain expert analysis
-
----
-
-## Ethical Considerations
-
-### Fairness
-
-- **Regional Balance:** Per-region test MAPE ranges from 1.13 % (Centro/Alentejo) to 2.32 % (Norte); all 5 regions achieve R² ≥ 0.975
-- **Equity:** Every region is evaluated independently on real regional data
-- **Mitigation:** Per-region metrics are published in `training_metadata.json`
+All 5 regions are equally represented in both training and evaluation (8,015 hourly rows each, temporal split preserved per region). No region is down-weighted or up-weighted. Per-region test-set MAPE on the with_lags model stays within a ~1 pp band (1.1% – 2.3%) and every region achieves R² ≥ 0.975, so no region is systematically disadvantaged.
 
 ### Privacy
 
-- Data aggregated by region (does not identify individuals)
-- No PII (Personally Identifiable Information)
-- Only aggregate consumption and public meteorology data
+- All data is aggregated at NUTS-II level. No individual households, businesses or postal codes are identifiable.
+- No personally identifiable information (PII) is used anywhere in the pipeline.
+- The API does not log or store prediction payloads beyond the short-lived structured access log.
 
-### Environmental Impact
+### Environmental impact
 
-**Carbon Footprint:**
-- Training: ~2-3 hours on CPU (reduced energy)
-- Inference: < 10 ms per prediction (very efficient)
-- Model size: ~50-100 MB (compact)
-
-**Positive Impact:**
-- Grid optimization leads to reduced energy waste
-- Better planning leads to less dependence on polluting sources
+- Training runs in ~5-15 min on a modern laptop CPU (no GPU required) — well under 0.05 kWh end-to-end.
+- Inference is < 10 ms per prediction; the deployed Space idles at < 100 MB RAM.
+- The intended downstream use (better load planning) has a positive environmental effect by reducing dispatch of peaking plants.
 
 ### Transparency
 
-- Open-source code (MIT License)
-- Feature importance documented
-- Public and reproducible metrics
-- Limitations clearly documented
+- Code is open-source (MIT).
+- Every training run writes a deterministic JSON record to `experiments/<run_id>.json` with the full config, metrics and data hash.
+- This model card, the ML pipeline doc and the data dictionary are versioned alongside the code.
 
----
+## 11. How to retrain
 
-## Recommendations
+```bash
+# 1. Optional — refresh raw data from e-Redes + Open-Meteo
+./scripts/refresh_and_retrain.sh
 
-### Operational Use
-
-1. **Monitoring:**
-   - Monitor daily MAPE
-   - Alert if MAPE > 2% (degradation)
-   - Track covariate shift (feature distributions)
-
-2. **Retraining:**
-   - Retrain monthly with new data
-   - Re-evaluate hyperparameters quarterly
-   - Validate performance after structural changes
-
-3. **Fallback:**
-   - Keep the no-lags model as backup
-   - Implement business rules for extreme cases
-   - Human validation for critical decisions
-
-4. **Input Validation:**
-   - Validate feature ranges (temperature, humidity, etc.)
-   - Reject inputs outside training distribution
-   - Log suspicious inputs for analysis
-
-### Future Improvements
-
-1. **Model Enhancements:**
-   - Add energy price features
-   - Include event data (sporting calendar)
-   - Test deep learning (LSTM, Transformers)
-
-2. **Infrastructure (implemented in v6/v7):**
-   - File-based experiment tracking (see `experiments/`)
-   - DVC pipeline for data versioning (`dvc.yaml`)
-   - Reproducibility module with global seeds
-   - Baseline model comparison in every training run
-
-3. **Monitoring:**
-   - Automatic data drift detection
-   - Model explainability (SHAP values)
-   - Real-time performance dashboards
-
-4. **Coverage:**
-   - Expand to more regions
-   - Add probabilistic forecasts
-   - Simultaneous multi-horizon forecasting
-
----
-
-## Model Card Authors
-
-**Primary Author:** Pedro Marques
-**Contributors:** Energy Forecast PT Team
-**Last Updated:** April 2026
-**Version:** 3.1 (Pipeline v8)
-
----
-
-## Citation
-
-```bibtex
-@misc{energy_forecast_pt_2025,
-  title={Energy Consumption Forecasting for Portugal using XGBoost},
-  author={Pedro Marques},
-  year={2025},
-  url={https://github.com/pedromarques/energy-forecast-pt}
-}
+# 2. Retrain on the existing parquet only
+python scripts/retrain.py                  # full pipeline (Optuna + CV + conformal)
+python scripts/retrain.py --skip-optuna    # fast iteration without hyperparameter search
 ```
 
----
+Artefacts produced in `data/models/`:
 
-## Appendix
+- `checkpoints/best_model.pkl` — with_lags XGBoost
+- `checkpoints/best_model_no_lags.pkl` — no_lags XGBoost
+- `metadata/training_metadata.json` / `training_metadata_no_lags.json`
+- `features/feature_names.txt` / `feature_names_no_lags.txt`
+- `metadata/best_hyperparams.json`
 
-### Model Files
+Reload into the running API without restart:
 
-Located in `data/models/checkpoints/`:
+```bash
+curl -X POST "$API_URL/admin/reload-models" -H "X-API-Key: $ADMIN_API_KEY"
+```
 
-- `best_model.pkl` -- **Best model**, XGBoost with lags (MAPE 1.44%)
-- `best_model_no_lags.pkl` -- Fallback, XGBoost no lags (MAPE 4.77%)
-- `best_model_advanced.pkl` -- Model with advanced features
-- `best_model_optimized.pkl` -- Optimized model (Optuna tuning)
-- `ensemble_stacking.pkl` - Model ensemble (optional)
-- `feature_names.txt` - Feature list
-- `training_metadata.json` - Training metadata
+A monthly automated retrain runs via `.github/workflows/retrain-monthly.yml`
+and opens a PR if metrics did not regress.
 
-### References
+## 12. References
 
-1. Chen, T., & Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. KDD '16.
-2. Hong, T., et al. (2016). Probabilistic energy forecasting: Global Energy Forecasting Competition 2014.
-3. Time Series Cross-Validation: scikit-learn TimeSeriesSplit documentation
-
-### Contact
-
-For questions, bugs, or contributions:
-- **GitHub:** [github.com/pedromarques/energy-forecast-pt](https://github.com/pedromarques/energy-forecast-pt)
-- **Issues:** [github.com/pedromarques/energy-forecast-pt/issues](https://github.com/pedromarques/energy-forecast-pt/issues)
+1. Chen, T. & Guestrin, C. (2016). *XGBoost: A Scalable Tree Boosting System*. KDD '16.
+2. Vovk, V., Gammerman, A. & Shafer, G. (2005). *Algorithmic Learning in a Random World* — conformal prediction.
+3. Hong, T. et al. (2016). *Probabilistic energy forecasting: Global Energy Forecasting Competition 2014*.
+4. scikit-learn `TimeSeriesSplit` documentation.
 
 ---
 
-**Disclaimer:** This model is provided "as is" for demonstration and educational purposes. For production use, additional validation and continuous monitoring are recommended.
+**Primary author:** Pedro Marques
+**Contact:** [github.com/Pedrom2002/energy-forecast-pt/issues](https://github.com/Pedrom2002/energy-forecast-pt/issues)
+**Disclaimer:** Provided "as is" for demonstration and educational purposes. Production deployments should add continuous monitoring and human-in-the-loop validation for critical decisions.

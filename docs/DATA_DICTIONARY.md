@@ -95,11 +95,10 @@ Derived from coefficient of variation of training residuals:
 
 ### Feature Count by Variant
 
-| Variant | Total Features (selected) | Lag Features | Rolling Features |
-|---|---|---|---|
-| **with_lags** (primary) | 52 | 7 | 20 |
-| **no_lags** (fallback) | 45 | 0 | 0 |
-| **advanced** | 50-90 | 7 | 20+ |
+| Variant | Total features | Lag features | Rolling-window features | Authoritative list |
+|---|---|---|---|---|
+| **with_lags** (production, `/predict/sequential`) | **78** | 7 | 20 | `data/models/features/feature_names.txt` |
+| **no_lags** (public demo, `/predict`, `/predict/batch`, `/predict/explain`) | **56** | 0 | 0 | `data/models/features/feature_names_no_lags.txt` |
 
 ### Weather Validation Bounds
 
@@ -156,10 +155,10 @@ data/models/
 
 ```json
 {
-  "best_model": "LightGBM",
+  "best_model": "XGBoost",
   "best_model_key": "lightgbm",
   "model_file": "best_model.pkl",
-  "n_features": 52,
+  "n_features": 78,
   "training_date": "2026-04-10 14:34:54 UTC",
   "pipeline_version": "v7",
   "random_seed": 42,

@@ -1,337 +1,113 @@
-# Energy Forecast PT - Documentation Index
+# Energy Forecast PT — Documentation Index
 
-Complete technical documentation for the Energy Forecast PT project.
+> **Live demo:** https://pedrom02-energy-forecast-pt.hf.space
+> **Source:** https://github.com/Pedrom2002/energy-forecast-pt
+> **Pipeline:** v8 · **Last retrain:** 2026-04-11 UTC
 
 ---
 
-## Documentation
+## Documentation catalog
 
-### Technical Reference
-- **[ML_PIPELINE.md](ML_PIPELINE.md)** - Complete 12-step ML pipeline reference
-- **[DATA_DICTIONARY.md](DATA_DICTIONARY.md)** - All data schemas, features, metadata formats
-- **[MODEL_CARD.md](MODEL_CARD.md)** - Model capabilities, limitations, ethical considerations
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and component design
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Docker + cloud deployment guides (AWS, Azure, GCP)
-- **[MONITORING.md](MONITORING.md)** - Production monitoring and alerting
-- **[SECURITY.md](SECURITY.md)** - Security architecture and threat model
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Branch conventions, PR checklist, development setup
+### Technical reference
+
+| Document | Description |
+|---|---|
+| [ML_PIPELINE.md](ML_PIPELINE.md) | Full 12-step training pipeline reference |
+| [DATA_DICTIONARY.md](DATA_DICTIONARY.md) | Data sources, schemas, feature lists, metadata formats |
+| [MODEL_CARD.md](MODEL_CARD.md) | Model capabilities, metrics, limitations, ethics |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Backend + frontend architecture, routers, pages |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | HuggingFace Spaces, Docker, AWS/Azure/GCP |
+| [MONITORING.md](MONITORING.md) | Coverage tracker, drift endpoints, logging, alerts |
+| [SECURITY.md](SECURITY.md) | Security architecture and threat model |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Branch conventions, PR checklist |
 
 ### Overview
-- **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md)** - Complete technical overview
+
+- [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) — high-level technical summary.
 
 ---
 
-## 📊 Quick Reference
+## Project metrics at a glance
 
-### Project Metrics
+All numbers sourced from `data/models/metadata/training_metadata*.json` (pipeline v8, 2026-04-11, seed 42).
 
-```
-Model Performance (2 variants, pipeline v7 — honest regional data):
-  - Best: LightGBM with_lags — MAPE 1.44%, R² 0.9979, RMSE 22.90 MW
-  - Fallback: LightGBM no_lags — MAPE 4.77%, R² 0.9882, RMSE 54.18 MW
-  - 90% conformal prediction intervals (q90 = 30.16 MW with_lags, 101.63 no_lags)
-  - 61% RMSE improvement over best baseline (Persistence 58.74 MW) — 2.6x better
+| Variant | Best model | MAPE | RMSE (MW) | R² | MASE | Features | Role |
+|---------|------------|------|-----------|------|------|----------|------|
+| no_lags | XGBoost | 4.77% | 53.52 | 0.9885 | 0.048 | 56 | Public HF Space demo (`/predict`, `/predict/batch`) |
+| with_lags | XGBoost | **1.44%** | **22.90** | **0.9979** | 0.022 | 78 | Production (`/predict/sequential`) |
 
-Stack:
-  - ML: LightGBM + CatBoost + XGBoost, Python 3.11+
-  - API: FastAPI + Uvicorn
-  - Frontend: React 19 + TypeScript + Tailwind CSS v4
-  - Features: 52 selected (with_lags) / 45 (no_lags)
-  - Data: 40,075 rows, real regional CP4 (2022-11 to 2023-09, 11 months)
-  - Tests: 654 backend + 81 frontend
-  - Deployment: Docker, AWS/Azure/GCP ready
-```
+**Stack**
+
+- ML: XGBoost + LightGBM + CatBoost (auto-selected via 5-fold TS CV), Optuna 30 trials, split conformal calibration, Python 3.11+.
+- API: FastAPI + Uvicorn, 7 routers (`admin`, `batch`, `explain`, `forecast`, `health`, `monitoring`, `predict`), Prometheus instrumentation, OpenAPI at `/docs`.
+- Frontend: React 19 + TypeScript + Vite + Tailwind CSS v4, 4 pages, `react-i18next` (EN/PT), dark-only.
+- Data: 40,075 rows of real regional CP4 (2022-11-01 → 2023-09-30) + Open-Meteo weather.
+- Tests: 760+ backend (pytest) + frontend (Vitest).
+- Deploy: HuggingFace Space (Docker SDK, port 8000); optional AWS / Azure / GCP scripts in `deploy/`.
 
 ---
 
-## 🎯 Recommended Reading Path
+## Recommended reading order
 
-### For International Readers (English)
-
-```
-1. EXECUTIVE_SUMMARY.md              (~30 min) ⭐ START HERE
-   Complete technical overview in English
-
-2. Root README.md                    (~10 min)
-   Project setup and quick start
-
-3. ARCHITECTURE.md                   (~20 min)
-   System architecture diagrams
-
-4. MODEL_CARD.md                     (~20 min)
-   Model details and ethics
-
-5. DEPLOYMENT.md                     (~30 min)
-   Deployment guides (Docker, AWS, Azure, GCP)
-```
-
-**Total**: ~2 hours for complete understanding
-
-### For Detailed Technical Study
-
-Use the Portuguese docs with translation tools:
-- **PROJECT_OVERVIEW.md** - Full project details
-- **FEATURE_ENGINEERING.md** - All 56-78 features explained
-- **MODELS_AND_METHODOLOGY.md** - ML methodology in depth
-- **API_DOCUMENTATION.md** - Complete API reference
-- **NOTEBOOKS_GUIDE.md** - Development notebooks guide
-
-All code, schemas, and examples are already in English.
+1. [EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY.md) — what the project is and why.
+2. Root [README.md](../README.md) — setup and quick start.
+3. [ARCHITECTURE.md](ARCHITECTURE.md) — backend + frontend architecture.
+4. [MODEL_CARD.md](MODEL_CARD.md) — model details, limitations, ethics.
+5. [DEPLOYMENT.md](DEPLOYMENT.md) — HuggingFace Spaces and cloud targets.
 
 ---
 
-## 📁 Documentation Structure
+## Quick start
 
-```
-docs/
-├── INDEX.md (this file)              # Main navigation
-│
-├── 🇬🇧 English Quick Start
-│   ├── EXECUTIVE_SUMMARY_EN.md       # Complete overview ⭐
-│   └── README_EN.md                  # Navigation guide
-│
-├── 🇵🇹 Portuguese Technical Docs
-│   ├── PROJECT_OVERVIEW.md           # Full project overview
-│   ├── FEATURE_ENGINEERING.md        # Feature engineering details
-│   ├── MODELS_AND_METHODOLOGY.md     # ML models and methods
-│   ├── API_DOCUMENTATION.md          # API complete guide
-│   └── NOTEBOOKS_GUIDE.md            # Jupyter notebooks guide
-│
-├── 📊 ML & Data Science Docs
-│   ├── ML_PIPELINE.md                # Complete ML pipeline reference
-│   └── DATA_DICTIONARY.md            # Data schemas, features, metadata
-│
-└── 📁 Root Level Docs
-    ├── README.md                     # Project quick start
-    ├── ARCHITECTURE.md               # System architecture
-    ├── MODEL_CARD.md                 # Model card (v2.0)
-    ├── DEPLOYMENT.md                 # Deployment guide
-    ├── MONITORING.md                 # Production monitoring
-    └── SECURITY.md                   # Security architecture
-```
-
----
-
-## 🚀 Quick Start (English)
-
-### 1. Read the Overview
-Start with **[EXECUTIVE_SUMMARY.md](EXECUTIVE_SUMMARY_EN.md)** for a complete understanding.
-
-### 2. Setup the Project
 ```bash
-# Clone repository
-git clone https://github.com/your-username/energy-forecast-pt
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-.\venv\Scripts\activate   # Windows
-
-# Install dependencies
+# Install
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
+pip install -r requirements-dev.txt
 
-### 3. Run the API
-```bash
-# Start FastAPI server
+# Run backend
 uvicorn src.api.main:app --reload
+# → http://localhost:8000/docs
 
-# Access
-# API: http://localhost:8000
-# Docs: http://localhost:8000/docs
+# Run frontend (separate terminal)
+cd frontend && npm install && npm run dev
+# → http://localhost:3000
 ```
 
-### 4. Make a Prediction
+**Hit the live demo:**
+
 ```bash
-curl -X POST "http://localhost:8000/predict" \
+curl https://pedrom02-energy-forecast-pt.hf.space/health
+curl -X POST https://pedrom02-energy-forecast-pt.hf.space/predict \
   -H "Content-Type: application/json" \
-  -d '{
-    "timestamp": "2025-01-15T14:00:00",
-    "region": "Lisboa",
-    "temperature": 18.5,
-    "humidity": 65.0,
-    "wind_speed": 12.3,
-    "precipitation": 0.0,
-    "cloud_cover": 40.0,
-    "pressure": 1015.0
-  }'
+  -d '{"timestamp":"2025-01-15T14:00:00","region":"Lisboa",
+       "temperature":18.5,"humidity":65,"wind_speed":12.3,
+       "precipitation":0,"cloud_cover":40,"pressure":1015}'
 ```
 
 ---
 
-## 📖 Document Descriptions
+## Changelog
 
-### EXECUTIVE_SUMMARY.md (English) ⭐
-**30 pages** - Complete technical summary covering:
-- Project overview and results
-- Feature engineering (56-78 features)
-- Model comparison and selection
-- API endpoints and usage
-- Deployment options
-- Technology stack
-
-**Perfect for**: Stakeholders, international teams, quick understanding
-
----
-
-### PROJECT_OVERVIEW.md (Portuguese)
-**~90 pages** - Complete project documentation:
-- Introduction and context
-- Business and technical objectives
-- Technology stack
-- System architecture
-- 4-phase development pipeline
-- Final results and structure
-
-**Perfect for**: Deep project understanding
-
----
-
-### FEATURE_ENGINEERING.md (Portuguese)
-**~100 pages** - Detailed feature engineering:
-- All 56-78 features explained
-- Temporal features (18)
-- Lag features (7)
-- Rolling windows (20)
-- Derived features (10)
-- Interactions (15+)
-- Feature importance and selection
-
-**Perfect for**: Data scientists, ML engineers
-
----
-
-### MODELS_AND_METHODOLOGY.md (Portuguese)
-**~110 pages** - ML models and methodology:
-- 4 models compared (RF, XGBoost, LightGBM, CatBoost)
-- XGBoost deep dive
-- Hyperparameter tuning (Optuna)
-- Validation strategies
-- Ensembling experiments
-- Error analysis
-
-**Perfect for**: ML engineers, researchers
-
----
-
-### API_DOCUMENTATION.md (Portuguese)
-**~80 pages** - Complete API guide:
-- 7 endpoints detailed
-- Request/response schemas
-- Examples (cURL, Python, JavaScript)
-- Error handling
-- Performance metrics
-- Deployment
-
-**Perfect for**: Backend developers, API users
-
----
-
-### NOTEBOOKS_GUIDE.md (Portuguese)
-**~70 pages** - Guide to 11 Jupyter notebooks:
-- Phase 1: Analysis & Baseline (01-04)
-- Phase 2: Optimization (05-06)
-- Phase 3: Advanced Analysis (07-09)
-- Phase 4: Advanced Capabilities (10-11)
-- Recommended workflows
-- Execution tips
-
-**Perfect for**: Data scientists, students
-
----
-
-## 🔗 External Resources
-
-- **Project Repository**: [GitHub URL]
-- **Interactive API Docs**: http://localhost:8000/docs
-- **Model Performance**: MAPE 1.44%, R² 0.9979 (Pipeline v8)
-- **Technology**: Python, XGBoost, FastAPI, Docker
-
----
-
-## 💡 Translation Notes
-
-### For Non-Portuguese Speakers
-
-The detailed technical documentation is in Portuguese, but:
-
-✅ **All code is in English**
-✅ **All API examples are in English**
-✅ **All technical terms use English**
-✅ **EXECUTIVE_SUMMARY.md has everything in English**
-
-**Recommended approach**:
-1. Read **EXECUTIVE_SUMMARY.md** (complete English overview)
-2. Use Google Translate or DeepL for specific sections if needed
-3. Code examples are already in English
-
-### Key Portuguese → English Terms
-
-| Portuguese | English |
-|------------|---------|
-| Previsão | Forecast/Prediction |
-| Consumo energético | Energy consumption |
-| Treinamento | Training |
-| Modelo | Model |
-| Características | Features |
-| Precisão | Accuracy |
-| Erro | Error |
-| Otimização | Optimization |
-| Hiperparâmetros | Hyperparameters |
-
----
-
-## 📞 Support
-
-**Documentation Issues**: Open a GitHub issue
-**API Questions**: Check `/docs` endpoint
-**General Questions**: [Your contact]
-
----
-
-## 📝 Changelog
+### v2.2 (April 2026)
+- Frontend consolidated to 4 pages; Batch merged into Forecast; Explicabilidade embedded as a SHAP panel inside Forecast.
+- Monitoring page simplified to the coverage tracker (drift bar chart and simulator removed; backend drift endpoints retained).
+- Dark-only UI (light-mode tokens kept in theme but no toggle).
+- `react-i18next` English + Portuguese with footer toggle.
+- Live HuggingFace Space deployment documented in DEPLOYMENT.md.
+- Startup coverage seed (168 synthetic observations, ~92 % coverage).
 
 ### v2.1 (April 2026)
-- ✅ Pipeline v8 — honest regional data (e-Redes CP4 direct, no disaggregation)
-- ✅ Dropped static-share disaggregation artefact (see CHANGELOG)
-- ✅ Updated all metrics: MAPE 1.44% (with_lags), 4.77% (no_lags)
-- ✅ Updated MODEL_CARD.md (v3.1, Pipeline v8) with per-region metrics
+- Pipeline v8 — honest regional data, no disaggregation artefact.
+- Metrics refreshed: MAPE 1.44 % (with_lags), 4.77 % (no_lags).
 
 ### v2.0 (March 2026)
-- ✅ ML Pipeline documentation (ML_PIPELINE.md)
-- ✅ Data Dictionary (DATA_DICTIONARY.md)
-- ✅ Updated MODEL_CARD.md (v2.0, Pipeline v6)
-- ✅ Updated ARCHITECTURE.md with new ML components
-- ✅ DVC pipeline documentation
+- ML_PIPELINE.md, DATA_DICTIONARY.md added.
+- DVC pipeline documented.
 
 ### v1.0 (January 2025)
-- ✅ Initial documentation creation
-- ✅ 6 detailed Portuguese documents (500+ pages)
-- ✅ Executive Summary in English (30 pages)
-- ✅ Complete navigation guide
-- ✅ Code examples in English
+- Initial documentation release.
 
 ---
 
-**Last Updated**: April 2026
-**Version**: 2.1
-**Author**: Pedro Marques
-**Project**: Energy Forecast PT
-**Language**: 🇬🇧 English (this index) | 🇵🇹 Portuguese (technical docs)
-
----
-
-## ⭐ Key Highlights
-
-```
-✅ Strong model performance (MAPE 1.44%, 61% RMSE improvement over best baseline)
-✅ Production-ready API (FastAPI)
-✅ Comprehensive documentation
-✅ 5 development notebooks (01-05)
-✅ Docker & CI/CD ready
-✅ Multi-cloud deployment (AWS/Azure/GCP)
-✅ 52 engineered features (with_lags) / 45 (no_lags)
-✅ Complete testing suite
-```
-
-**This project represents a complete, professional ML system from research to deployment.**
+**Author:** Pedro Marques · **License:** MIT
