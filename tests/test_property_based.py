@@ -19,7 +19,7 @@ from pydantic import ValidationError
 from starlette.testclient import TestClient
 
 from src.api.main import app
-from src.api.schemas import VALID_REGIONS, EnergyData
+from src.api.schemas import EnergyData
 from src.features.feature_engineering import FeatureEngineer
 from src.utils.metrics import calculate_metrics
 
@@ -452,9 +452,7 @@ class TestAPIPredictionProperties:
         suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
         deadline=None,
     )
-    def test_valid_payload_returns_200(
-        self, region, temperature, humidity, wind_speed, cloud_cover, pressure
-    ):
+    def test_valid_payload_returns_200(self, region, temperature, humidity, wind_speed, cloud_cover, pressure):
         """Valid payloads always return 200 with expected response fields."""
         payload = {
             "timestamp": "2025-06-15T14:00:00",

@@ -25,11 +25,7 @@ from src.api.main import app
 # Model availability check
 # ---------------------------------------------------------------------------
 
-models_loaded = (
-    hasattr(app.state, "models")
-    and app.state.models
-    and app.state.models.total_models > 0
-)
+models_loaded = hasattr(app.state, "models") and app.state.models and app.state.models.total_models > 0
 
 skip_no_models = pytest.mark.skipif(
     not models_loaded,
@@ -96,30 +92,19 @@ class TestMaxBatchSize:
         resp = client.post("/predict/batch", json=batch)
         elapsed_ms = (time.perf_counter() - t0) * 1000
 
-        assert resp.status_code == 200, (
-            f"Batch 1000 failed with {resp.status_code}: {resp.text[:500]}"
-        )
+        assert resp.status_code == 200, f"Batch 1000 failed with {resp.status_code}: {resp.text[:500]}"
         data = resp.json()
-        assert len(data["predictions"]) == 1000, (
-            f"Expected 1000 predictions, got {len(data['predictions'])}"
-        )
+        assert len(data["predictions"]) == 1000, f"Expected 1000 predictions, got {len(data['predictions'])}"
         # 60 seconds ceiling for max batch on slow machines
-        assert elapsed_ms < 60_000, (
-            f"Max batch took {elapsed_ms:.0f} ms, limit 60 s"
-        )
-        print(
-            f"\n  Max batch (1000 items): {elapsed_ms:.0f} ms "
-            f"({elapsed_ms / 1000:.1f} ms/item)"
-        )
+        assert elapsed_ms < 60_000, f"Max batch took {elapsed_ms:.0f} ms, limit 60 s"
+        print(f"\n  Max batch (1000 items): {elapsed_ms:.0f} ms " f"({elapsed_ms / 1000:.1f} ms/item)")
 
     @skip_no_models
     def test_batch_over_limit_rejected(self, client):
         """Batch with >1000 items must be rejected with 422."""
         batch = [_payload(offset_hours=i) for i in range(1001)]
         resp = client.post("/predict/batch", json=batch)
-        assert resp.status_code == 422, (
-            f"Expected 422 for oversized batch, got {resp.status_code}"
-        )
+        assert resp.status_code == 422, f"Expected 422 for oversized batch, got {resp.status_code}"
 
 
 # =========================================================================
@@ -168,9 +153,7 @@ class TestRapidFire:
         )
 
         assert error_count == 0, f"Got {error_count} server errors in rapid-fire"
-        assert success_count >= 100, (
-            f"Only {success_count}/120 succeeded (rate limiting is OK, but need >= 100)"
-        )
+        assert success_count >= 100, f"Only {success_count}/120 succeeded (rate limiting is OK, but need >= 100)"
 
     def test_rapid_fire_200_health(self, client):
         """Fire 200 GET /health in a tight loop — must all return 200."""
@@ -179,9 +162,7 @@ class TestRapidFire:
         for _ in range(200):
             statuses.append(client.get("/health").status_code)
 
-        assert all(s == 200 for s in statuses), (
-            f"Non-200 health responses: {[s for s in statuses if s != 200]}"
-        )
+        assert all(s == 200 for s in statuses), f"Non-200 health responses: {[s for s in statuses if s != 200]}"
 
 
 # =========================================================================
@@ -204,15 +185,23 @@ class TestLargePayloads:
             {**_payload(), "temperature": -20.0, "humidity": 100.0, "wind_speed": 100.0},
             {**_payload(), "temperature": 50.0, "humidity": 0.0, "pressure": 950.0},
             {**_payload(), "precipitation": 200.0, "cloud_cover": 100.0},
-            {**_payload(), "temperature": 0.0, "humidity": 0.0, "wind_speed": 0.0,
-             "precipitation": 0.0, "cloud_cover": 0.0, "pressure": 1050.0},
+            {
+                **_payload(),
+                "temperature": 0.0,
+                "humidity": 0.0,
+                "wind_speed": 0.0,
+                "precipitation": 0.0,
+                "cloud_cover": 0.0,
+                "pressure": 1050.0,
+            },
         ]
 
         for i, payload in enumerate(extreme_payloads):
             resp = client.post("/predict", json=payload)
-            assert resp.status_code in (200, 422), (
-                f"Extreme payload #{i} returned {resp.status_code}: {resp.text[:300]}"
-            )
+            assert resp.status_code in (
+                200,
+                422,
+            ), f"Extreme payload #{i} returned {resp.status_code}: {resp.text[:300]}"
 
     @skip_no_models
     def test_batch_with_diverse_regions_and_timestamps(self, client):
@@ -225,9 +214,7 @@ class TestLargePayloads:
         assert len(batch) == 100
 
         resp = client.post("/predict/batch", json=batch)
-        assert resp.status_code == 200, (
-            f"Diverse batch failed: {resp.status_code}: {resp.text[:300]}"
-        )
+        assert resp.status_code == 200, f"Diverse batch failed: {resp.status_code}: {resp.text[:300]}"
         assert len(resp.json()["predictions"]) == 100
 
 
@@ -330,9 +317,7 @@ class TestMemoryStability:
             resp = client.post("/predict", json=payload)
             elapsed_ms = (time.perf_counter() - t0) * 1000
             latencies.append(elapsed_ms)
-            assert resp.status_code == 200, (
-                f"Request #{i} failed with {resp.status_code}"
-            )
+            assert resp.status_code == 200, f"Request #{i} failed with {resp.status_code}"
 
         snapshot_after = tracemalloc.take_snapshot()
         tracemalloc.stop()
@@ -363,9 +348,7 @@ class TestMemoryStability:
             f"(first-50={first_50_mean:.0f}ms, last-50={last_50_mean:.0f}ms)"
         )
         # Memory increase should be bounded (< 100 MB for 500 requests)
-        assert total_increase_mb < 100, (
-            f"Memory grew by {total_increase_mb:.1f} MB over {n_requests} requests"
-        )
+        assert total_increase_mb < 100, f"Memory grew by {total_increase_mb:.1f} MB over {n_requests} requests"
 
 
 # =========================================================================
@@ -398,9 +381,7 @@ class TestErrorRecovery:
             payload = bad_payloads[i % len(bad_payloads)]
             resp = client.post("/predict", json=payload)
             bad_statuses.append(resp.status_code)
-            assert resp.status_code == 422, (
-                f"Bad request #{i} returned {resp.status_code}, expected 422"
-            )
+            assert resp.status_code == 422, f"Bad request #{i} returned {resp.status_code}, expected 422"
 
         # Fire good requests immediately after
         good_statuses = []
@@ -417,8 +398,7 @@ class TestErrorRecovery:
         )
 
         assert good_success >= 18, (
-            f"Only {good_success}/20 good requests succeeded after bad ones. "
-            f"Statuses: {good_statuses}"
+            f"Only {good_success}/20 good requests succeeded after bad ones. " f"Statuses: {good_statuses}"
         )
 
     @skip_no_models
@@ -458,9 +438,7 @@ class TestErrorRecovery:
 
         # No 5xx errors anywhere
         all_statuses = [s for _, s in results]
-        assert all(s < 500 for s in all_statuses), (
-            f"Got 5xx errors: {[s for s in all_statuses if s >= 500]}"
-        )
+        assert all(s < 500 for s in all_statuses), f"Got 5xx errors: {[s for s in all_statuses if s >= 500]}"
         assert valid_ok >= 12, f"Only {valid_ok}/15 valid requests succeeded"
 
 
