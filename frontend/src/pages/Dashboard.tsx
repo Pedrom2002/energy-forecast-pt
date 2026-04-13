@@ -9,7 +9,6 @@ import { AnimatedNumber } from '../components/motion/AnimatedNumber';
 import { BentoCard } from '../components/motion/BentoCard';
 import { PORTUGAL_PATH } from '../assets/portugalPath';
 import HeroChart from '../components/HeroChart';
-import LiveLoadChart from '../components/LiveLoadChart';
 import {
   Activity,
   Cpu,
@@ -275,28 +274,6 @@ export default function Dashboard() {
         <HeroChart />
       </section>
 
-      {/* Live national load from ENTSO-E */}
-      <section
-        className="relative overflow-hidden rounded-2xl border border-border
-          bg-gradient-to-br from-emerald-50/30 via-surface to-surface
-          dark:from-emerald-950/20 dark:via-surface dark:to-surface p-4 md:p-6"
-      >
-        <div className="mb-3 flex items-baseline justify-between gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Sistema eléctrico nacional · ao vivo
-            </p>
-            <p className="text-sm text-text-secondary">
-              Carga real Portugal continental · últimas 24 h via ENTSO-E
-            </p>
-          </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-text-muted">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            ENTSO-E
-          </span>
-        </div>
-        <LiveLoadChart />
-      </section>
 
       {/* Coverage alert */}
       {health?.coverage_alert && (
