@@ -1,15 +1,3 @@
----
-title: Energy Forecast PT
-emoji: ⚡
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_port: 8000
-pinned: false
-license: mit
-short_description: Portugal energy forecasting — XGBoost + conformal
----
-
 # Energy Forecast PT
 
 [![CI/CD Pipeline](https://github.com/Pedrom2002/energy-forecast-pt/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Pedrom2002/energy-forecast-pt/actions/workflows/ci-cd.yml)
