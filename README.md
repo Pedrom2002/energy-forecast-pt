@@ -7,7 +7,7 @@ sdk: docker
 app_port: 8000
 pinned: false
 license: mit
-short_description: Portugal energy consumption forecasting — XGBoost + conformal prediction
+short_description: Portugal energy forecasting — XGBoost + conformal
 ---
 
 # Energy Forecast PT
