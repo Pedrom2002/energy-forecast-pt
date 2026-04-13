@@ -403,10 +403,10 @@ export default function Monitoring() {
         >
           {empiricalPct != null ? (
             <div className="space-y-5">
-              <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex items-start gap-2.5 px-3 py-2.5 bg-surface-dim border border-border-subtle border-l-2 border-l-primary-500 rounded-lg text-xs text-text-secondary leading-relaxed">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary-600 dark:text-primary-400" aria-hidden="true" />
                 <p>
-                  <strong>{t('monitoring.demoLabel')}</strong>{' '}
+                  <strong className="text-text-primary font-semibold">{t('monitoring.demoLabel')}</strong>{' '}
                   {t('monitoring.demoCoverageBody', { endpoint: 'POST /model/coverage/record' })}
                 </p>
               </div>
