@@ -5,7 +5,6 @@ import Dashboard from './pages/Dashboard';
 import Predict from './pages/Predict';
 import Forecast from './pages/Forecast';
 import Monitoring from './pages/Monitoring';
-import Explain from './pages/Explain';
 import NotFound from './pages/NotFound';
 import { ToastContainer } from './components/Toast';
 
@@ -21,7 +20,7 @@ export default function App() {
           <Route path="/batch" element={<Navigate to="/forecast" replace />} />
           <Route path="/forecast" element={<Forecast />} />
           <Route path="/monitoring" element={<Monitoring />} />
-          <Route path="/explain" element={<Explain />} />
+          <Route path="/explain" element={<Navigate to="/forecast" replace />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

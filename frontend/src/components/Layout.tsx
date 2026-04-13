@@ -4,7 +4,6 @@ import {
   Zap,
   TrendingUp,
   Activity,
-  Brain,
   Menu,
   X,
   Sun,
@@ -22,7 +21,6 @@ const NAV_ITEMS = [
   { to: '/predict', icon: Zap, label: 'Previsão Pontual' },
   { to: '/forecast', icon: TrendingUp, label: 'Forecast' },
   { to: '/monitoring', icon: Activity, label: 'Monitoring' },
-  { to: '/explain', icon: Brain, label: 'Explicabilidade' },
 ];
 
 export default function Layout() {
