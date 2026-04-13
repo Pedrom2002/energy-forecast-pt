@@ -283,7 +283,18 @@ app.add_middleware(BodySizeLimitMiddleware, max_bytes=_MAX_REQUEST_BODY_BYTES)
 app.add_middleware(PrometheusMetricsMiddleware)
 
 if _PROMETHEUS_AVAILABLE:  # pragma: no cover
-    Instrumentator().instrument(app).expose(app, include_in_schema=False)
+    Instrumentator().instrument(app)
+
+    from fastapi.responses import Response as _MetricsResponse
+    from prometheus_client import CONTENT_TYPE_LATEST as _METRICS_CT
+    from prometheus_client import REGISTRY as _DEFAULT_REGISTRY
+    from prometheus_client import generate_latest as _metrics_generate_latest
+
+    @app.get("/metrics", include_in_schema=False)
+    async def _metrics_endpoint():
+        default_payload = _metrics_generate_latest(_DEFAULT_REGISTRY)
+        custom_payload, _ = prom_metrics.render()
+        return _MetricsResponse(default_payload + custom_payload, media_type=_METRICS_CT)
 
 
 # ── Exception handlers (Prometheus error counter) ─────────────────────────────

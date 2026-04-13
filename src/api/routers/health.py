@@ -17,6 +17,16 @@ from src.api.store import ModelStore
 
 router = APIRouter()
 
+@router.get("/", tags=["core"])
+async def root(request: Request):
+    """API metadata root."""
+    return {
+        "message": "Energy Forecast PT API",
+        "version": request.app.version,
+        "docs": "/docs",
+        "health": "/health",
+    }
+
 
 @router.get("/health", tags=["core"])
 async def health(request: Request):
