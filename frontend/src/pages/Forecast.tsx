@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { api, type EnergyData, type PredictionResponse, REGIONS, type Region } from '../api/client';
 import { Card } from '../components/Card';
 import { ChartSkeleton } from '../components/ChartSkeleton';
@@ -7,7 +7,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ForecastIllustration } from '../components/illustrations/ForecastIllustration';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatMW, formatNumber, formatDateShort, exportCSV } from '../utils/format';
-import { Play, AlertTriangle, Info, Download, HelpCircle } from 'lucide-react';
+import { Play, AlertTriangle, Info, Download, LineChart, Table as TableIcon, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -18,6 +18,8 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
+
+const HISTORY_HOURS = 48;
 
 function generateHistory(region: Region, hours: number) {
   const records = [];
@@ -65,10 +67,13 @@ function generateForecastItems(region: Region, hours: number): EnergyData[] {
   return items;
 }
 
+const ROW_HEIGHT = 40;
+const VISIBLE_ROWS = 15;
+const BUFFER_ROWS = 5;
+
 export default function Forecast() {
-  useDocumentTitle('Forecast');
+  useDocumentTitle('Previsão');
   const [region, setRegion] = useState<Region>('Lisboa');
-  const [historyHours, setHistoryHours] = useState(72);
   const [forecastHours, setForecastHours] = useState(24);
   const [results, setResults] = useState<PredictionResponse[]>([]);
   const [historyData, setHistoryData] = useState<{ timestamp: string; consumption_mw: number }[]>([]);
@@ -78,7 +83,11 @@ export default function Forecast() {
   const [submitting, setSubmitting] = useState(false);
   // Interactive legend state
   const [visibleSeries, setVisibleSeries] = useState({ actual: true, predicted: true, ci: true });
-  const [showTable, setShowTable] = useState(false);
+  const [view, setView] = useState<'chart' | 'table'>('chart');
+  const [sortCol, setSortCol] = useState<'time' | 'prediction' | 'amplitude'>('time');
+  const [sortAsc, setSortAsc] = useState(true);
+  const [scrollTop, setScrollTop] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleForecast = async () => {
     if (submitting) return; // debounce
@@ -86,17 +95,21 @@ export default function Forecast() {
     setLoading(true);
     setError(null);
     try {
-      const history = generateHistory(region, historyHours);
-      const forecast = generateForecastItems(region, forecastHours);
-      const res = await api.predictSequential(history, forecast);
+      // Demo: only weather is synthesised. We deliberately use the no-lags
+      // model because we have NO live consumption feed — synthesising lag
+      // values would produce optically-precise but scientifically dishonest
+      // output. The with-lags model (MAPE 1.44%) is exposed via
+      // /predict/sequential for production deployments with a real feed.
+      const items = generateForecastItems(region, forecastHours);
+      const res = await api.predictBatch(items);
       setResults(res.predictions);
-      setHistoryData(history.map((h) => ({ timestamp: h.timestamp, consumption_mw: h.consumption_mw })));
-      setModelName(res.model_name);
-      toast.success(`Forecast gerado: ${res.predictions.length} previsoes para ${region}`);
+      setHistoryData([]); // no history shown — we don't have it
+      setModelName(res.predictions[0]?.model_name ?? 'XGBoost (no lags)');
+      toast.success(`Previsão gerada: ${res.predictions.length} pontos para ${region}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido';
       setError(msg);
-      toast.error('Falha ao gerar forecast');
+      toast.error('Falha ao gerar previsão');
     } finally {
       setLoading(false);
       setTimeout(() => setSubmitting(false), 1000); // 1s debounce
@@ -144,17 +157,54 @@ export default function Forecast() {
     setVisibleSeries((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const handleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortAsc(!sortAsc);
+    else { setSortCol(col); setSortAsc(col === 'time'); }
+    setScrollTop(0);
+    scrollRef.current?.scrollTo(0, 0);
+  };
+
+  const sortedResults = useMemo(() => {
+    return [...results].sort((a, b) => {
+      let diff: number;
+      if (sortCol === 'time') diff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+      else if (sortCol === 'prediction') diff = a.predicted_consumption_mw - b.predicted_consumption_mw;
+      else diff = (a.confidence_interval_upper - a.confidence_interval_lower) - (b.confidence_interval_upper - b.confidence_interval_lower);
+      return sortAsc ? diff : -diff;
+    });
+  }, [results, sortCol, sortAsc]);
+
+  // Virtualization (when >50 rows)
+  const useVirtualization = sortedResults.length > 50;
+  const totalHeight = useVirtualization ? sortedResults.length * ROW_HEIGHT : 0;
+  const startIdx = useVirtualization ? Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS) : 0;
+  const endIdx = useVirtualization ? Math.min(sortedResults.length, startIdx + VISIBLE_ROWS + BUFFER_ROWS * 2) : sortedResults.length;
+  const visibleRows = sortedResults.slice(startIdx, endIdx);
+  const offsetY = startIdx * ROW_HEIGHT;
+
+  const handleScroll = useCallback(() => {
+    if (scrollRef.current) setScrollTop(scrollRef.current.scrollTop);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && useVirtualization && view === 'table') {
+      el.addEventListener('scroll', handleScroll, { passive: true });
+      return () => el.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll, useVirtualization, view]);
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Forecast Sequencial</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsão</h1>
         <p className="text-sm text-text-secondary mt-1">
           Previsão lag-aware autoregressiva com histórico e intervalos de confiança
         </p>
       </div>
 
       <Card title="Configuração">
-        <form onSubmit={(e) => { e.preventDefault(); handleForecast(); }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <form onSubmit={(e) => { e.preventDefault(); handleForecast(); }} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label htmlFor="fc-region" className="block text-xs font-medium text-text-secondary mb-1.5">Região</label>
             <select
@@ -170,22 +220,13 @@ export default function Forecast() {
             </select>
           </div>
           <ValidatedNumberInput
-            id="fc-history"
-            label="Histórico (horas)"
-            value={historyHours}
-            onChange={setHistoryHours}
-            min={48}
-            max={336}
-            help="Min. 48h (lags)"
-          />
-          <ValidatedNumberInput
             id="fc-forecast"
-            label="Previsão (horas)"
+            label="Horas a prever"
             value={forecastHours}
             onChange={setForecastHours}
             min={1}
             max={168}
-            help="Max. 168h (1 semana)"
+            help="1 a 168 (1 semana)"
           />
           <div>
             <span aria-hidden="true" className="block text-xs font-medium mb-1.5">&nbsp;</span>
@@ -234,7 +275,7 @@ export default function Forecast() {
               </button>
               <button
                 type="button"
-                onClick={() => { setForecastHours(12); setHistoryHours(48); }}
+                onClick={() => { setForecastHours(12); }}
                 className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
               >
                 Reduzir parametros
@@ -253,169 +294,254 @@ export default function Forecast() {
       {loading && <ChartSkeleton height={380} />}
 
       {chartData.length > 0 && !loading && (
-        <div className="animate-fade-in-up shadow-lg rounded-[var(--radius-lg)]">
-        <Card
-          title="Gráfico de Previsão"
-          subtitle={`Modelo: ${modelName} | Região: ${region}`}
-          action={
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowTable(!showTable)}
-                className="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary cursor-pointer
-                  min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
-                aria-label={showTable ? 'Mostrar grafico' : 'Mostrar tabela de dados'}
-              >
-                <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
-                {showTable ? 'Gráfico' : 'Tabela'}
-              </button>
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
-                  min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
-                aria-label="Exportar forecast como CSV"
-              >
-                <Download className="w-3.5 h-3.5" aria-hidden="true" />
-                CSV
-              </button>
-            </div>
-          }
-        >
-          <p className="sr-only">
-            Gráfico de area mostrando {historyData.length} horas de histórico e {results.length} horas de previsão
-            para a região {region}. Previsão media: {results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0} MW.
-          </p>
+        <>
+          {/* View toggle — segmented control */}
+          <div
+            role="radiogroup"
+            aria-label="Modo de visualização"
+            className="inline-flex items-center gap-1 p-1 bg-surface border border-border rounded-lg shadow-xs"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={view === 'chart'}
+              onClick={() => setView('chart')}
+              className={`flex items-center gap-1.5 min-h-[36px] px-3 rounded-md text-xs font-medium cursor-pointer transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
+                ${view === 'chart' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-text-secondary hover:text-text-primary'}`}
+            >
+              <LineChart className="w-3.5 h-3.5" aria-hidden="true" />
+              Chart
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={view === 'table'}
+              onClick={() => setView('table')}
+              className={`flex items-center gap-1.5 min-h-[36px] px-3 rounded-md text-xs font-medium cursor-pointer transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
+                ${view === 'table' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-text-secondary hover:text-text-primary'}`}
+            >
+              <TableIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              Tabela
+            </button>
+          </div>
 
-          {showTable ? (
-            /* Data table alternative — accessibility: data-table */
-            <div className="overflow-x-auto -mx-5 sm:-mx-6 px-5 sm:px-6 max-h-[420px] overflow-y-auto">
-              <table className="w-full text-sm" aria-label="Dados do forecast">
-                <thead className="sticky top-0 bg-surface">
-                  <tr className="border-b border-border">
-                    <th scope="col" className="text-left py-2 px-3 text-xs font-medium text-text-muted">Hora</th>
-                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Consumo Real</th>
-                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Previsão</th>
-                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Inferior</th>
-                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Superior</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {chartData.map((d, i) => (
-                    <tr key={i} className="border-b border-border/30 hover:bg-surface-dim transition-colors">
-                      <td className="py-1.5 px-3 font-mono text-xs text-text-secondary tabular-nums">{d.time}</td>
-                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-energy-green font-medium">{d.actual != null ? formatMW(d.actual) : '—'}</td>
-                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-primary-600 font-medium">{d.predicted != null ? formatMW(d.predicted) : '—'}</td>
-                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-text-muted hidden sm:table-cell">{d.ciLower != null ? formatMW(d.ciLower) : '—'}</td>
-                      <td className="py-1.5 px-3 text-right text-xs tabular-nums text-text-muted hidden sm:table-cell">{d.ciUpper != null ? formatMW(d.ciUpper) : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <>
-              <div className="h-[350px] sm:h-[420px]" role="img" aria-label="Gráfico de previsão de consumo energetico">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#fde68a" stopOpacity={0.45} />
-                        <stop offset="95%" stopColor="#fde68a" stopOpacity={0.08} />
-                      </linearGradient>
-                      <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15} />
-                        <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
-                      </linearGradient>
-                      {/* Pattern for colorblind — rule: pattern-texture */}
-                      <pattern id="ciPattern" patternUnits="userSpaceOnUse" width="6" height="6">
-                        <path d="M0,6 L6,0" stroke="#f97316" strokeWidth="0.5" opacity="0.3" />
-                      </pattern>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.25)" />
-                    <XAxis
-                      dataKey="time"
-                      tick={{ fontSize: 10, fill: '#475569' }}
-                      interval="preserveStartEnd"
-                      tickCount={typeof window !== 'undefined' && window.innerWidth < 640 ? 4 : 8}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 10, fill: '#475569' }}
-                      label={{ value: 'MW', position: 'insideTopLeft', offset: 10, style: { fontSize: 12, fill: 'var(--color-text-secondary)' } }}
-                      width={50}
-                      tickFormatter={(v: number) => formatNumber(v, 0)}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: '8px',
-                        border: '1px solid var(--color-border)',
-                        fontSize: '12px',
-                        boxShadow: '0 4px 6px -1px rgba(0,0,0,.1)',
-                        padding: '8px 12px',
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text-primary)',
-                      }}
-                      formatter={(value: number, name: string) => [
-                        formatMW(value),
-                        name === 'actual' ? 'Consumo Real' : name === 'predicted' ? 'Previsão' : name,
-                      ]}
-                    />
-                    {nowLabel && (
-                      <ReferenceLine x={nowLabel} stroke="var(--color-accent)" strokeDasharray="4 4" label={{ value: 'Agora ➤', position: 'top', fill: 'var(--color-accent)', fontSize: 12, fontWeight: 600 }} />
-                    )}
-                    {visibleSeries.ci && (
-                      <>
-                        <Area type="monotone" dataKey="ciUpper" stroke="none" fill="url(#ciGrad)" name="CI Superior" />
-                        <Area type="monotone" dataKey="ciLower" stroke="none" fill="transparent" name="CI Inferior" />
-                      </>
-                    )}
-                    {visibleSeries.actual && (
-                      <Area type="monotone" dataKey="actual" stroke="#16a34a" fill="url(#actualGrad)" strokeWidth={2} name="actual" dot={false} connectNulls={false} />
-                    )}
-                    {visibleSeries.predicted && (
-                      <Area type="monotone" dataKey="predicted" stroke="#d97706" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+          {view === 'chart' && (
+            <div className="animate-fade-in-up shadow-lg rounded-[var(--radius-lg)]">
+              <Card
+                title="Gráfico de Previsão"
+                subtitle={`Modelo: ${modelName} | Região: ${region}`}
+                action={
+                  <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
+                      min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
+                    aria-label="Exportar forecast como CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                    CSV
+                  </button>
+                }
+              >
+                <p className="sr-only">
+                  Gráfico de area mostrando {historyData.length} horas de histórico e {results.length} horas de previsão
+                  para a região {region}. Previsão media: {results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0} MW.
+                </p>
 
-              {/* Interactive legend — rule: legend-interactive */}
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs font-medium text-text-secondary">
-                <button
-                  type="button"
-                  onClick={() => toggleSeries('actual')}
-                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.actual ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
-                  aria-pressed={visibleSeries.actual}
-                  aria-label="Toggle consumo real"
-                >
-                  <span className="w-4 h-0.5 bg-energy-green rounded" aria-hidden="true" />
-                  Consumo Real
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleSeries('predicted')}
-                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.predicted ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
-                  aria-pressed={visibleSeries.predicted}
-                  aria-label="Toggle previsão"
-                >
-                  <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #d97706' }} aria-hidden="true" />
-                  Previsão
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleSeries('ci')}
-                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.ci ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
-                  aria-pressed={visibleSeries.ci}
-                  aria-label="Toggle intervalo de confianca"
-                >
-                  <span className="w-4 h-3 bg-primary-200 rounded" aria-hidden="true" />
-                  IC 90%
-                </button>
-              </div>
-            </>
+                <div className="h-[350px] sm:h-[420px]" role="img" aria-label="Gráfico de previsão de consumo energetico">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#fde68a" stopOpacity={0.45} />
+                          <stop offset="95%" stopColor="#fde68a" stopOpacity={0.08} />
+                        </linearGradient>
+                        <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15} />
+                          <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+                        </linearGradient>
+                        <pattern id="ciPattern" patternUnits="userSpaceOnUse" width="6" height="6">
+                          <path d="M0,6 L6,0" stroke="#f97316" strokeWidth="0.5" opacity="0.3" />
+                        </pattern>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.25)" />
+                      <XAxis
+                        dataKey="time"
+                        tick={{ fontSize: 10, fill: '#475569' }}
+                        interval="preserveStartEnd"
+                        tickCount={typeof window !== 'undefined' && window.innerWidth < 640 ? 4 : 8}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: '#475569' }}
+                        label={{ value: 'MW', position: 'insideTopLeft', offset: 10, style: { fontSize: 12, fill: 'var(--color-text-secondary)' } }}
+                        width={50}
+                        tickFormatter={(v: number) => formatNumber(v, 0)}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '8px',
+                          border: '1px solid var(--color-border)',
+                          fontSize: '12px',
+                          boxShadow: '0 4px 6px -1px rgba(0,0,0,.1)',
+                          padding: '8px 12px',
+                          backgroundColor: 'var(--color-surface)',
+                          color: 'var(--color-text-primary)',
+                        }}
+                        formatter={(value: number, name: string) => [
+                          formatMW(value),
+                          name === 'actual' ? 'Consumo Real' : name === 'predicted' ? 'Previsão' : name,
+                        ]}
+                      />
+                      {nowLabel && (
+                        <ReferenceLine x={nowLabel} stroke="var(--color-accent)" strokeDasharray="4 4" label={{ value: 'Agora ➤', position: 'top', fill: 'var(--color-accent)', fontSize: 12, fontWeight: 600 }} />
+                      )}
+                      {visibleSeries.ci && (
+                        <>
+                          <Area type="monotone" dataKey="ciUpper" stroke="none" fill="url(#ciGrad)" name="CI Superior" />
+                          <Area type="monotone" dataKey="ciLower" stroke="none" fill="transparent" name="CI Inferior" />
+                        </>
+                      )}
+                      {visibleSeries.actual && (
+                        <Area type="monotone" dataKey="actual" stroke="#16a34a" fill="url(#actualGrad)" strokeWidth={2} name="actual" dot={false} connectNulls={false} />
+                      )}
+                      {visibleSeries.predicted && (
+                        <Area type="monotone" dataKey="predicted" stroke="#d97706" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
+                      )}
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Interactive legend */}
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs font-medium text-text-secondary">
+                  <button
+                    type="button"
+                    onClick={() => toggleSeries('actual')}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.actual ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
+                    aria-pressed={visibleSeries.actual}
+                    aria-label="Toggle consumo real"
+                  >
+                    <span className="w-4 h-0.5 bg-energy-green rounded" aria-hidden="true" />
+                    Consumo Real
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleSeries('predicted')}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.predicted ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
+                    aria-pressed={visibleSeries.predicted}
+                    aria-label="Toggle previsão"
+                  >
+                    <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #d97706' }} aria-hidden="true" />
+                    Previsão
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => toggleSeries('ci')}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.ci ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
+                    aria-pressed={visibleSeries.ci}
+                    aria-label="Toggle intervalo de confianca"
+                  >
+                    <span className="w-4 h-3 bg-primary-200 rounded" aria-hidden="true" />
+                    IC 90%
+                  </button>
+                </div>
+              </Card>
+            </div>
           )}
-        </Card>
-        </div>
+
+          {view === 'table' && (
+            <div className="animate-fade-in-up">
+              <Card
+                title={`Resultados — ${formatNumber(results.length, 0)} previsoes`}
+                subtitle={`Modelo: ${modelName} | Região: ${region}`}
+                action={
+                  <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
+                      min-h-[44px] px-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
+                    aria-label="Exportar resultados como CSV"
+                  >
+                    <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                    Exportar CSV
+                  </button>
+                }
+              >
+                <div
+                  ref={scrollRef}
+                  className="overflow-x-auto -mx-5 sm:-mx-6 px-5 sm:px-6"
+                  style={useVirtualization ? { maxHeight: VISIBLE_ROWS * ROW_HEIGHT + 44, overflowY: 'auto' } : undefined}
+                >
+                  <table className="w-full text-sm" aria-label="Resultados das previsoes">
+                    <thead className="sticky top-0 bg-surface z-10">
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'time' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" onClick={() => handleSort('time')} className="flex items-center gap-1 cursor-pointer hover:text-text-primary transition">
+                            Hora {sortCol === 'time' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                          </button>
+                        </th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'prediction' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" onClick={() => handleSort('prediction')} className="flex items-center gap-1 justify-end cursor-pointer hover:text-text-primary transition ml-auto">
+                            Previsão {sortCol === 'prediction' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                          </button>
+                        </th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Inferior</th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Superior</th>
+                        <th className="text-right py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'amplitude' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" onClick={() => handleSort('amplitude')} className="flex items-center gap-1 justify-end cursor-pointer hover:text-text-primary transition ml-auto">
+                            Amplitude {sortCol === 'amplitude' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                          </button>
+                        </th>
+                        <th className="text-center py-3 px-3 text-xs font-medium text-text-muted hidden md:table-cell">Metodo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {useVirtualization && <tr style={{ height: offsetY }} aria-hidden="true"><td /></tr>}
+                      {visibleRows.map((r, i) => {
+                        const range = r.confidence_interval_upper - r.confidence_interval_lower;
+                        return (
+                          <tr key={startIdx + i} className="border-b border-border/50 hover:bg-surface-dim transition-colors" style={useVirtualization ? { height: ROW_HEIGHT } : undefined}>
+                            <td className="py-2.5 px-3 text-text-secondary font-mono text-xs tabular-nums">
+                              {formatDateShort(r.timestamp)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-semibold text-text-primary tabular-nums">
+                              {formatMW(r.predicted_consumption_mw)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-energy-blue font-mono text-xs tabular-nums hidden sm:table-cell">
+                              {formatMW(r.confidence_interval_lower)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-energy-blue font-mono text-xs tabular-nums hidden sm:table-cell">
+                              {formatMW(r.confidence_interval_upper)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-text-muted font-mono text-xs tabular-nums">
+                              +/-{formatNumber(range / 2)}
+                            </td>
+                            <td className="py-2.5 px-3 text-center hidden md:table-cell">
+                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                                r.ci_method === 'conformal'
+                                  ? 'bg-green-50 text-green-700'
+                                  : 'bg-yellow-50 text-yellow-700'
+                              }`}>
+                                {r.ci_method === 'conformal' ? 'Conformal' : 'Gaussian'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {useVirtualization && <tr style={{ height: Math.max(0, totalHeight - offsetY - visibleRows.length * ROW_HEIGHT) }} aria-hidden="true"><td /></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                {useVirtualization && (
+                  <p className="text-[11px] text-text-muted text-center mt-2">
+                    A mostrar {visibleRows.length} de {formatNumber(sortedResults.length, 0)} resultados (tabela virtualizada)
+                  </p>
+                )}
+              </Card>
+            </div>
+          )}
+        </>
       )}
 
       {chartData.length === 0 && !error && !loading && (
@@ -431,7 +557,7 @@ export default function Forecast() {
   );
 }
 
-/** Validated number input with blur validation — rule: inline-validation */
+/** Validated number input with blur validation */
 function ValidatedNumberInput({ id, label, value, onChange, min, max, help }: {
   id: string; label: string; value: number; onChange: (v: number) => void; min: number; max: number; help: string;
 }) {

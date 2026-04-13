@@ -9,6 +9,7 @@ import { AnimatedNumber } from '../components/motion/AnimatedNumber';
 import { BentoCard } from '../components/motion/BentoCard';
 import { PORTUGAL_PATH } from '../assets/portugalPath';
 import HeroChart from '../components/HeroChart';
+import LiveLoadChart from '../components/LiveLoadChart';
 import {
   Activity,
   Cpu,
@@ -214,7 +215,7 @@ export default function Dashboard() {
             Dashboard
           </h1>
           <p className="mt-2 text-sm md:text-base text-text-secondary max-w-2xl">
-            Energy Forecast Portugal — MAPE 1.44% · RMSE 22.9 MW · 2.6× baseline
+            Previsão de consumo eléctrico em Portugal · 5 regiões · dados e-Redes + Open-Meteo
           </p>
           <div className="mt-3 flex items-center gap-3">
             <span className="relative flex items-center justify-center">
@@ -274,6 +275,29 @@ export default function Dashboard() {
         <HeroChart />
       </section>
 
+      {/* Live national load from ENTSO-E */}
+      <section
+        className="relative overflow-hidden rounded-2xl border border-border
+          bg-gradient-to-br from-emerald-50/30 via-surface to-surface
+          dark:from-emerald-950/20 dark:via-surface dark:to-surface p-4 md:p-6"
+      >
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              Sistema eléctrico nacional · ao vivo
+            </p>
+            <p className="text-sm text-text-secondary">
+              Carga real Portugal continental · últimas 24 h via ENTSO-E
+            </p>
+          </div>
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-text-muted">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            ENTSO-E
+          </span>
+        </div>
+        <LiveLoadChart />
+      </section>
+
       {/* Coverage alert */}
       {health?.coverage_alert && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-4">
@@ -288,58 +312,12 @@ export default function Dashboard() {
       )}
 
       {/* Bento grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 auto-rows-[minmax(140px,auto)]">
-        {/* 1. MAPE big */}
-        <BentoCard size="xl" gradient className="flex flex-col justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Precisão
-            </p>
-            <h3 className="mt-2 text-lg font-semibold">MAPE</h3>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <AnimatedNumber
-              value={1.44}
-              format={(n) => n.toFixed(2)}
-              className="text-6xl font-bold text-primary-500 md:text-8xl"
-            />
-            <span className="text-3xl font-bold text-primary-500 md:text-5xl">%</span>
-          </div>
-          <div>
-            <p className="mb-3 text-sm text-text-secondary">
-              Mean Absolute Percentage Error
-            </p>
-            <span className="inline-flex items-center rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
-              2.6× melhor que persistência
-            </span>
-          </div>
-        </BentoCard>
-
-        {/* 2. RMSE */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 auto-rows-[minmax(140px,auto)]">
+        {/* Models active (live) */}
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              RMSE
-            </p>
-            <Activity className="h-4 w-4 text-primary-500" aria-hidden="true" />
-          </div>
-          <div>
-            <div className="flex items-baseline gap-1">
-              <AnimatedNumber
-                value={22.9}
-                format={(n) => n.toFixed(1)}
-                className="text-3xl font-bold md:text-4xl"
-              />
-              <span className="text-lg font-semibold text-text-secondary">MW</span>
-            </div>
-          </div>
-        </BentoCard>
-
-        {/* 3. Models active (live) */}
-        <BentoCard size="sm" className="flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Modelos
+              Modelos carregados
             </p>
             <Layers className="h-4 w-4 text-primary-500" aria-hidden="true" />
           </div>
@@ -351,43 +329,11 @@ export default function Dashboard() {
                 className="text-3xl font-bold md:text-4xl"
               />
             </div>
-            <p className="mt-1 text-xs text-text-secondary">de 2 ativos</p>
+            <p className="mt-1 text-xs text-text-secondary">no_lags · with_lags</p>
           </div>
         </BentoCard>
 
-        {/* 4. R² */}
-        <BentoCard size="lg" className="flex flex-col justify-between">
-          <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-              Coeficiente R²
-            </p>
-            <TrendingUp className="h-4 w-4 text-primary-500" aria-hidden="true" />
-          </div>
-          <div>
-            <AnimatedNumber
-              value={0.998}
-              format={(n) => n.toFixed(3)}
-              className="text-4xl font-bold md:text-5xl"
-            />
-          </div>
-          <div
-            className="h-2 w-full overflow-hidden rounded-full bg-surface-subtle"
-            role="progressbar"
-            aria-valuenow={99.8}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent"
-              initial={{ width: 0 }}
-              whileInView={{ width: '99.8%' }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
-            />
-          </div>
-        </BentoCard>
-
-        {/* 5. Portugal map */}
+        {/* Portugal map */}
         <BentoCard size="md" className="flex flex-col items-center justify-between">
           <p className="w-full text-xs font-medium uppercase tracking-wide text-text-secondary">
             Cobertura
