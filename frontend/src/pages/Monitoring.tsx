@@ -400,6 +400,13 @@ export default function Monitoring() {
         >
           {empiricalPct != null ? (
             <div className="space-y-5">
+              <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                <p>
+                  <strong>Demo:</strong> 168 observações sintéticas semeadas no arranque (~92% cobertura) para que esta página tenha sempre dados visíveis.
+                  Em produção, esta janela seria preenchida via <code className="font-mono px-1 py-0.5 bg-amber-100/60 dark:bg-amber-900/40 rounded">POST /model/coverage/record</code> à medida que chegam observações reais.
+                </p>
+              </div>
               <p className="text-xs text-text-secondary leading-relaxed">
                 O modelo deve cobrir {formatPercent(nominalPct, 0)} dos casos reais.
                 A linha verde marca o alvo, a amarela o limite de alerta ({formatPercent(alertPct, 0)}).

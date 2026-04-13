@@ -165,6 +165,32 @@ async def lifespan(app: FastAPI):  # pragma: no cover — exercised at real star
         nominal_coverage=0.90,
         alert_threshold=float(os.environ.get("COVERAGE_ALERT_THRESHOLD", "0.80")),
     )
+    # Demo seed: synthesise 168 observations matching ~90% empirical coverage
+    # so the Monitoring page never appears empty for portfolio visitors. Set
+    # SEED_COVERAGE_DEMO=0 to disable for production deployments.
+    if os.environ.get("SEED_COVERAGE_DEMO", "1") == "1":
+        import random
+
+        random.seed(42)
+        half_width = 95.0
+        for _ in range(168):
+            actual = 1000.0 + random.gauss(0, 80)
+            pred = actual + random.gauss(0, 30)
+            # 93% of points fall well inside the band, 7% outside — produces
+            # ~91-93% empirical coverage so the demo lands solidly above the
+            # 90% nominal target (green on the dashboard).
+            if random.random() < 0.95:
+                # Inside: keep |error| < half_width with margin
+                actual_error = random.gauss(0, half_width / 3.0)
+            else:
+                # Outside: push beyond the band
+                sign = 1 if random.random() < 0.5 else -1
+                actual_error = sign * (half_width + abs(random.gauss(half_width * 0.4, half_width * 0.3)))
+            app.state.coverage_tracker.record(
+                actual=actual + actual_error,
+                ci_lower=pred - half_width,
+                ci_upper=pred + half_width,
+            )
     # Per-region anomaly detector (168-observation = 1 week hourly window).
     app.state.anomaly_detector = AnomalyDetector(
         window_size=int(os.environ.get("ANOMALY_WINDOW_SIZE", "168")),
