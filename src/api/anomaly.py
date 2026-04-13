@@ -29,7 +29,7 @@ import collections
 import logging
 import math
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -181,7 +181,7 @@ class AnomalyDetector:
             ``is_anomaly`` flag.
         """
         if timestamp is None:
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
         residual = float(actual) - float(predicted)
 
         with self._lock:

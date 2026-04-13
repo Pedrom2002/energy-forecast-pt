@@ -172,7 +172,7 @@ class TrainingConfig(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
 
     @classmethod
-    def from_yaml(cls, path: str | Path) -> "TrainingConfig":
+    def from_yaml(cls, path: str | Path) -> TrainingConfig:
         """Load and validate a training config from a YAML file.
 
         Args:

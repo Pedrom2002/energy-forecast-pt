@@ -33,20 +33,13 @@ errors.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 try:  # pragma: no cover - exercised by import-time gating
-    from prometheus_client import (
-        CONTENT_TYPE_LATEST,
-        CollectorRegistry,
-        Counter,
-        Gauge,
-        Histogram,
-        generate_latest,
-    )
+    from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, Counter, Gauge, Histogram, generate_latest
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:  # pragma: no cover - import is unlikely to fail
@@ -236,16 +229,13 @@ class MetricsRegistry:
                 # or the "YYYY-MM-DD HH:MM:SS UTC" format used by training
                 # metadata JSON files in this project.
                 cleaned = trained_at.strip()
-                if cleaned.endswith(" UTC"):
-                    cleaned = cleaned[:-4] + "+00:00"
-                else:
-                    cleaned = cleaned.replace("Z", "+00:00")
+                cleaned = cleaned[:-4] + "+00:00" if cleaned.endswith(" UTC") else cleaned.replace("Z", "+00:00")
                 ts = datetime.fromisoformat(cleaned)
             else:
                 ts = trained_at
             if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                ts = ts.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             age_days = (now - ts).total_seconds() / 86_400.0
             self.model_age_days.set(max(0.0, age_days))
         except Exception:

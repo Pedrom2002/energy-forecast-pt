@@ -166,7 +166,7 @@ class DataDriftDetector:
         cls,
         metadata_path: str,
         psi_threshold: float = 0.2,
-    ) -> "DataDriftDetector":
+    ) -> DataDriftDetector:
         """Build a detector from a ``training_metadata.json`` file.
 
         The file must contain a top-level ``feature_stats`` mapping with

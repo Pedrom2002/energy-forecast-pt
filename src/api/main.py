@@ -26,7 +26,7 @@ without also updating the tests.
 
 from __future__ import annotations
 
-import asyncio  # re-exported: tests patch ``src.api.main.asyncio.wait_for``
+import asyncio  # noqa: F401  # re-exported: tests patch ``src.api.main.asyncio.wait_for``
 import logging
 import os
 import time
@@ -37,12 +37,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.api.anomaly import AnomalyDetector
-from src.api.dependencies import (
-    api_key_header,
-    get_model_store,
-    verify_admin_key,
-    verify_api_key,
-)
+from src.api.dependencies import api_key_header, get_model_store, verify_admin_key, verify_api_key
 from src.api.metrics import metrics as prom_metrics
 from src.api.middleware import (
     BodySizeLimitMiddleware,
@@ -179,12 +174,12 @@ async def lifespan(app: FastAPI):  # pragma: no cover — exercised at real star
             # 93% of points fall well inside the band, 7% outside — produces
             # ~91-93% empirical coverage so the demo lands solidly above the
             # 90% nominal target (green on the dashboard).
-            if random.random() < 0.95:
+            if random.random() < 0.95:  # noqa: S311
                 # Inside: keep |error| < half_width with margin
                 actual_error = random.gauss(0, half_width / 3.0)
             else:
                 # Outside: push beyond the band
-                sign = 1 if random.random() < 0.5 else -1
+                sign = 1 if random.random() < 0.5 else -1  # noqa: S311
                 actual_error = sign * (half_width + abs(random.gauss(half_width * 0.4, half_width * 0.3)))
             app.state.coverage_tracker.record(
                 actual=actual + actual_error,

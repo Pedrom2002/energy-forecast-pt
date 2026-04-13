@@ -66,7 +66,9 @@ function json(route: Route, body: unknown, status = 200) {
  * Call once per test, before `page.goto(...)`.
  */
 export async function mockBackend(page: Page): Promise<void> {
-  await page.route('**/api/**', async (route) => {
+  await page.route(
+    (url) => /^\/api(\/|$)/.test(url.pathname),
+    async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/api/, '') || '/';
 
@@ -107,5 +109,6 @@ export async function mockBackend(page: Page): Promise<void> {
     // Fallback so unexpected calls fail loudly rather than hang on the
     // real network.
     return json(route, { detail: { message: `unmocked ${path}` } }, 404);
-  });
+    },
+  );
 }

@@ -24,14 +24,8 @@ import pytest
 from fastapi.testclient import TestClient
 from prometheus_client import Counter, Gauge
 
-from src.api import metrics as metrics_module
 from src.api.main import app
-from src.api.metrics import (
-    CONFORMAL_COVERAGE_RATIO,
-    FEATURE_DRIFT_SCORE,
-    MODEL_LOAD_ERRORS_TOTAL,
-    PROMETHEUS_AVAILABLE,
-)
+from src.api.metrics import CONFORMAL_COVERAGE_RATIO, FEATURE_DRIFT_SCORE, MODEL_LOAD_ERRORS_TOTAL, PROMETHEUS_AVAILABLE
 from src.api.metrics import metrics as prom_metrics
 
 pytestmark = pytest.mark.skipif(

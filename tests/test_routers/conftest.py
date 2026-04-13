@@ -31,13 +31,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
-from src.api.schemas import (
-    BatchPredictionResponse,
-    ExplanationResponse,
-    FeatureContribution,
-    PredictionResponse,
-    SequentialForecastResponse,
-)
+from src.api.schemas import ExplanationResponse, FeatureContribution, PredictionResponse, SequentialForecastResponse
 from src.api.store import ModelStore
 
 # Reuse the parent project conftest (session autouse fixtures, rate-limiter

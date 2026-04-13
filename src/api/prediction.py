@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 # The cache is a module-level singleton; it is only mutated under the
 # normal CPython GIL guarantees (atomic dict insert / lookup) so no explicit
 # lock is required.
-_TREE_EXPLAINER_CACHE: "weakref.WeakValueDictionary[int, Any]" = weakref.WeakValueDictionary()
+_TREE_EXPLAINER_CACHE: weakref.WeakValueDictionary[int, Any] = weakref.WeakValueDictionary()
 
 
 def _get_tree_explainer(model: Any) -> Any | None:

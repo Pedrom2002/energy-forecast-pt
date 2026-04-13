@@ -12,7 +12,7 @@ Covers:
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -92,8 +92,8 @@ class TestAnomalyDetectorBasics:
             sign = 1 if i % 2 == 0 else -1
             detector.record(predicted=1000.0, actual=1000.0 + sign * 5.0, region="Lisboa")
 
-        ts1 = datetime(2026, 4, 1, 12, 0, 0, tzinfo=timezone.utc)
-        ts2 = datetime(2026, 4, 1, 13, 0, 0, tzinfo=timezone.utc)
+        ts1 = datetime(2026, 4, 1, 12, 0, 0, tzinfo=UTC)
+        ts2 = datetime(2026, 4, 1, 13, 0, 0, tzinfo=UTC)
         detector.record(1000.0, 1500.0, "Lisboa", ts1)
         detector.record(1000.0, 600.0, "Lisboa", ts2)
 
