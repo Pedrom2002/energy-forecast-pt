@@ -4,6 +4,7 @@ import { Card } from '../components/Card';
 import { ChartSkeleton } from '../components/ChartSkeleton';
 import { toast } from '../components/Toast';
 import { EmptyState } from '../components/EmptyState';
+import { ExplanationPanel } from '../components/ExplanationPanel';
 import { ForecastIllustration } from '../components/illustrations/ForecastIllustration';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatMW, formatNumber, formatDateShort, exportCSV } from '../utils/format';
@@ -81,6 +82,7 @@ export default function Forecast() {
   const [error, setError] = useState<string | null>(null);
   const [modelName, setModelName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [explainWeather, setExplainWeather] = useState<EnergyData | null>(null);
   // Interactive legend state
   const [visibleSeries, setVisibleSeries] = useState({ actual: true, predicted: true, ci: true });
   const [view, setView] = useState<'chart' | 'table'>('chart');
@@ -94,6 +96,7 @@ export default function Forecast() {
     setSubmitting(true);
     setLoading(true);
     setError(null);
+    setExplainWeather(null);
     try {
       // Demo: only weather is synthesised. We deliberately use the no-lags
       // model because we have NO live consumption feed — synthesising lag
@@ -103,6 +106,7 @@ export default function Forecast() {
       const items = generateForecastItems(region, forecastHours);
       const res = await api.predictBatch(items);
       setResults(res.predictions);
+      setExplainWeather(items[Math.floor(items.length / 2)] ?? null);
       setHistoryData([]); // no history shown — we don't have it
       setModelName(res.predictions[0]?.model_name ?? 'XGBoost (no lags)');
       toast.success(`Previsão gerada: ${res.predictions.length} pontos para ${region}`);
@@ -542,6 +546,12 @@ export default function Forecast() {
             </div>
           )}
         </>
+      )}
+
+      {explainWeather && results.length > 0 && !loading && (
+        <Card title="Explicabilidade" subtitle="Análise SHAP da previsão central">
+          <ExplanationPanel weather={explainWeather} />
+        </Card>
       )}
 
       {chartData.length === 0 && !error && !loading && (
