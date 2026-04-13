@@ -11,6 +11,8 @@
 
 > **Demo model (no_lags):** MAPE 4.77%, RMSE 53.52 MW &nbsp;·&nbsp; **Production model (with_lags):** MAPE 1.44%, RMSE 22.90 MW &nbsp;·&nbsp; **R² 0.998** &nbsp;·&nbsp; **EN / PT i18n** &nbsp;·&nbsp; **760+ tests**
 
+> 📖 **Reviewer / recruiter shortcut →** [**docs/DECISIONS.md**](docs/DECISIONS.md) explains the non-obvious trade-offs: why I threw out a "1.6% MAPE" model for leakage, why the public demo serves the worse model on purpose, what I cut because it wasn't defensible, and the cross-region swap test ([`scripts/verify_no_cross_region_leakage.py`](scripts/verify_no_cross_region_leakage.py)) that empirically falsifies the leakage hypothesis.
+
 Full-stack energy consumption forecasting system for Portugal by region. Gradient-boosted tree models (XGBoost / LightGBM / CatBoost) with a modern React 19 frontend, bilingual (English/Portuguese), dark-only UI, and a one-click HuggingFace Spaces deployment.
 
 The public demo runs the **no_lags** model (MAPE 4.77%) because the Space has no real consumption feed. The **with_lags** model (MAPE 1.44%) is available via `POST /predict/sequential` for integrations that can supply 48 h of consumption history.
@@ -339,7 +341,7 @@ energy-forecast-pt/
 │   ├── DEPLOYMENT.md               # Cloud deployment guides
 │   ├── MONITORING.md               # Production monitoring
 │   ├── SECURITY.md                 # Security architecture
-│   └── CONTRIBUTING.md             # Contribution guidelines
+│   └── DECISIONS.md                # ADRs: trade-offs and reversals
 │
 ├── deploy/
 │   ├── deploy-aws.sh / aws-ecs.yml
@@ -467,7 +469,7 @@ GitHub Actions (`.github/workflows/ci-cd.yml`):
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker + cloud deployment guides |
 | [MONITORING.md](docs/MONITORING.md) | Production monitoring and alerting |
 | [SECURITY.md](docs/SECURITY.md) | Security architecture |
-| [CONTRIBUTING.md](docs/CONTRIBUTING.md) | Branch conventions, PR checklist |
+| [DECISIONS.md](docs/DECISIONS.md) | ADRs explaining trade-offs and reversals (PT) |
 
 ## Troubleshooting
 
