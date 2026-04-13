@@ -3,8 +3,11 @@ import { api, type EnergyData, type PredictionResponse, REGIONS, type Region } f
 import { Card } from '../components/Card';
 import { ChartSkeleton } from '../components/ChartSkeleton';
 import { toast } from '../components/Toast';
+import { EmptyState } from '../components/EmptyState';
+import { ForecastIllustration } from '../components/illustrations/ForecastIllustration';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatMW, formatNumber, formatDateShort, exportCSV } from '../utils/format';
-import { TrendingUp, Play, AlertTriangle, Info, Download, HelpCircle } from 'lucide-react';
+import { Play, AlertTriangle, Info, Download, HelpCircle } from 'lucide-react';
 import {
   AreaChart,
   Area,
@@ -61,6 +64,7 @@ function generateForecastItems(region: Region, hours: number): EnergyData[] {
 }
 
 export default function Forecast() {
+  useDocumentTitle('Forecast');
   const [region, setRegion] = useState<Region>('Lisboa');
   const [historyHours, setHistoryHours] = useState(72);
   const [forecastHours, setForecastHours] = useState(24);
@@ -143,14 +147,14 @@ export default function Forecast() {
       <div>
         <h1 className="text-2xl font-bold text-text-primary tracking-tight">Forecast Sequencial</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Previsao lag-aware autoregressiva com historico e intervalos de confianca
+          Previsão lag-aware autoregressiva com histórico e intervalos de confiança
         </p>
       </div>
 
-      <Card title="Configuracao">
+      <Card title="Configuração">
         <form onSubmit={(e) => { e.preventDefault(); handleForecast(); }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
-            <label htmlFor="fc-region" className="block text-xs font-medium text-text-secondary mb-1.5">Regiao</label>
+            <label htmlFor="fc-region" className="block text-xs font-medium text-text-secondary mb-1.5">Região</label>
             <select
               id="fc-region"
               value={region}
@@ -165,7 +169,7 @@ export default function Forecast() {
           </div>
           <ValidatedNumberInput
             id="fc-history"
-            label="Historico (horas)"
+            label="Histórico (horas)"
             value={historyHours}
             onChange={setHistoryHours}
             min={48}
@@ -174,7 +178,7 @@ export default function Forecast() {
           />
           <ValidatedNumberInput
             id="fc-forecast"
-            label="Previsao (horas)"
+            label="Previsão (horas)"
             value={forecastHours}
             onChange={setForecastHours}
             min={1}
@@ -207,7 +211,7 @@ export default function Forecast() {
 
         <div className="flex items-start gap-2 mt-4 p-3 bg-primary-50 rounded-lg text-xs text-primary-700">
           <Info className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
-          <p>Dados meteorologicos simulados para demonstracao. Em producao, integre com dados reais de estacoes meteorologicas.</p>
+          <p>Dados meteorologicos simulados para demonstracao. Em produção, integre com dados reais de estacoes meteorologicas.</p>
         </div>
       </Card>
 
@@ -246,9 +250,10 @@ export default function Forecast() {
       {loading && <ChartSkeleton height={380} />}
 
       {chartData.length > 0 && !loading && (
+        <div className="animate-fade-in-up shadow-lg rounded-[var(--radius-lg)]">
         <Card
-          title="Grafico de Previsao"
-          subtitle={`Modelo: ${modelName} | Regiao: ${region}`}
+          title="Gráfico de Previsão"
+          subtitle={`Modelo: ${modelName} | Região: ${region}`}
           action={
             <div className="flex items-center gap-2">
               <button
@@ -259,7 +264,7 @@ export default function Forecast() {
                 aria-label={showTable ? 'Mostrar grafico' : 'Mostrar tabela de dados'}
               >
                 <HelpCircle className="w-3.5 h-3.5" aria-hidden="true" />
-                {showTable ? 'Grafico' : 'Tabela'}
+                {showTable ? 'Gráfico' : 'Tabela'}
               </button>
               <button
                 type="button"
@@ -275,8 +280,8 @@ export default function Forecast() {
           }
         >
           <p className="sr-only">
-            Grafico de area mostrando {historyData.length} horas de historico e {results.length} horas de previsao
-            para a regiao {region}. Previsao media: {results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0} MW.
+            Gráfico de area mostrando {historyData.length} horas de histórico e {results.length} horas de previsão
+            para a região {region}. Previsão media: {results.length > 0 ? formatNumber(results.reduce((s, r) => s + r.predicted_consumption_mw, 0) / results.length, 0) : 0} MW.
           </p>
 
           {showTable ? (
@@ -287,7 +292,7 @@ export default function Forecast() {
                   <tr className="border-b border-border">
                     <th scope="col" className="text-left py-2 px-3 text-xs font-medium text-text-muted">Hora</th>
                     <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Consumo Real</th>
-                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Previsao</th>
+                    <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted">Previsão</th>
                     <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Inferior</th>
                     <th scope="col" className="text-right py-2 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Superior</th>
                   </tr>
@@ -307,13 +312,13 @@ export default function Forecast() {
             </div>
           ) : (
             <>
-              <div className="h-[350px] sm:h-[420px]" role="img" aria-label="Grafico de previsao de consumo energetico">
+              <div className="h-[350px] sm:h-[420px]" role="img" aria-label="Gráfico de previsão de consumo energetico">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.12} />
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+                        <stop offset="5%" stopColor="#fde68a" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="#fde68a" stopOpacity={0.08} />
                       </linearGradient>
                       <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15} />
@@ -321,19 +326,19 @@ export default function Forecast() {
                       </linearGradient>
                       {/* Pattern for colorblind — rule: pattern-texture */}
                       <pattern id="ciPattern" patternUnits="userSpaceOnUse" width="6" height="6">
-                        <path d="M0,6 L6,0" stroke="#3b82f6" strokeWidth="0.5" opacity="0.3" />
+                        <path d="M0,6 L6,0" stroke="#f97316" strokeWidth="0.5" opacity="0.3" />
                       </pattern>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.25)" />
                     <XAxis
                       dataKey="time"
-                      tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
+                      tick={{ fontSize: 10, fill: '#475569' }}
                       interval="preserveStartEnd"
                       tickCount={typeof window !== 'undefined' && window.innerWidth < 640 ? 4 : 8}
                     />
                     <YAxis
-                      tick={{ fontSize: 10, fill: 'var(--color-text-muted)' }}
-                      label={{ value: 'MW', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'var(--color-text-muted)' } }}
+                      tick={{ fontSize: 10, fill: '#475569' }}
+                      label={{ value: 'MW', position: 'insideTopLeft', offset: 10, style: { fontSize: 12, fill: 'var(--color-text-secondary)' } }}
                       width={50}
                       tickFormatter={(v: number) => formatNumber(v, 0)}
                     />
@@ -349,11 +354,11 @@ export default function Forecast() {
                       }}
                       formatter={(value: number, name: string) => [
                         formatMW(value),
-                        name === 'actual' ? 'Consumo Real' : name === 'predicted' ? 'Previsao' : name,
+                        name === 'actual' ? 'Consumo Real' : name === 'predicted' ? 'Previsão' : name,
                       ]}
                     />
                     {nowLabel && (
-                      <ReferenceLine x={nowLabel} stroke="var(--color-text-muted)" strokeDasharray="4 4" label={{ value: 'Agora', fill: 'var(--color-text-secondary)', fontSize: 11, fontWeight: 500 }} />
+                      <ReferenceLine x={nowLabel} stroke="var(--color-accent)" strokeDasharray="4 4" label={{ value: 'Agora ➤', position: 'top', fill: 'var(--color-accent)', fontSize: 12, fontWeight: 600 }} />
                     )}
                     {visibleSeries.ci && (
                       <>
@@ -365,18 +370,18 @@ export default function Forecast() {
                       <Area type="monotone" dataKey="actual" stroke="#16a34a" fill="url(#actualGrad)" strokeWidth={2} name="actual" dot={false} connectNulls={false} />
                     )}
                     {visibleSeries.predicted && (
-                      <Area type="monotone" dataKey="predicted" stroke="#2563eb" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
+                      <Area type="monotone" dataKey="predicted" stroke="#d97706" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
                     )}
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
               {/* Interactive legend — rule: legend-interactive */}
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 text-xs text-text-secondary">
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-4 text-xs font-medium text-text-secondary">
                 <button
                   type="button"
                   onClick={() => toggleSeries('actual')}
-                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-opacity ${!visibleSeries.actual ? 'opacity-40 line-through' : ''}`}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.actual ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
                   aria-pressed={visibleSeries.actual}
                   aria-label="Toggle consumo real"
                 >
@@ -386,36 +391,37 @@ export default function Forecast() {
                 <button
                   type="button"
                   onClick={() => toggleSeries('predicted')}
-                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-opacity ${!visibleSeries.predicted ? 'opacity-40 line-through' : ''}`}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.predicted ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
                   aria-pressed={visibleSeries.predicted}
-                  aria-label="Toggle previsao"
+                  aria-label="Toggle previsão"
                 >
-                  <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #2563eb' }} aria-hidden="true" />
-                  Previsao
+                  <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #d97706' }} aria-hidden="true" />
+                  Previsão
                 </button>
                 <button
                   type="button"
                   onClick={() => toggleSeries('ci')}
-                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-opacity ${!visibleSeries.ci ? 'opacity-40 line-through' : ''}`}
+                  className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.ci ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
                   aria-pressed={visibleSeries.ci}
                   aria-label="Toggle intervalo de confianca"
                 >
-                  <span className="w-4 h-3 bg-primary-100 rounded" aria-hidden="true" />
+                  <span className="w-4 h-3 bg-primary-200 rounded" aria-hidden="true" />
                   IC 90%
                 </button>
               </div>
             </>
           )}
         </Card>
+        </div>
       )}
 
       {chartData.length === 0 && !error && !loading && (
-        <div className="bg-surface border border-border rounded-xl p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-4">
-            <TrendingUp className="w-8 h-8 text-primary-300" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-medium text-text-secondary">Nenhum forecast gerado</p>
-          <p className="text-xs text-text-muted mt-1.5 max-w-xs mx-auto">Configure os parametros e execute o forecast sequencial para visualizar as previsoes</p>
+        <div className="bg-surface border border-border rounded-xl">
+          <EmptyState
+            illustration={<ForecastIllustration />}
+            title="Nenhum forecast gerado"
+            description="Configure os parâmetros acima e clique em Executar para gerar previsões sequenciais."
+          />
         </div>
       )}
     </div>

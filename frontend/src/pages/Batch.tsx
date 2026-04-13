@@ -3,7 +3,10 @@ import { api, type EnergyData, type PredictionResponse, REGIONS, type Region } f
 import { Card, CardSkeleton } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatMW, formatNumber, exportCSV, formatDateShort } from '../utils/format';
-import { Layers, Play, Download, MapPin, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { EmptyState } from '../components/EmptyState';
+import { BatchIllustration } from '../components/illustrations/BatchIllustration';
+import { Play, Download, MapPin, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 
 function generateBatchItems(region: Region, startDate: string, hours: number): EnergyData[] {
   const items: EnergyData[] = [];
@@ -30,6 +33,7 @@ const VISIBLE_ROWS = 15;
 const BUFFER_ROWS = 5;
 
 export default function Batch() {
+  useDocumentTitle('Batch');
   const [region, setRegion] = useState<Region>('Lisboa');
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -128,17 +132,17 @@ export default function Batch() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsao em Lote</h1>
+        <h1 className="text-2xl font-bold text-text-primary tracking-tight">Previsão em Lote</h1>
         <p className="text-sm text-text-secondary mt-1">
           Gere previsoes para multiplas horas de uma so vez (ate 1000 itens)
         </p>
       </div>
 
-      <Card title="Configuracao do Lote">
+      <Card title="Configuração do Lote">
         <form onSubmit={(e) => { e.preventDefault(); handleBatch(); }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label htmlFor="batch-region" className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-1.5">
-              <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Regiao
+              <MapPin className="w-3.5 h-3.5" aria-hidden="true" /> Região
             </label>
             <select
               id="batch-region"
@@ -281,7 +285,7 @@ export default function Batch() {
                     </th>
                     <th className="text-right py-3 px-3 text-xs font-medium text-text-muted" aria-sort={sortCol === 'prediction' ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
                       <button type="button" onClick={() => handleSort('prediction')} className="flex items-center gap-1 justify-end cursor-pointer hover:text-text-primary transition ml-auto">
-                        Previsao {sortCol === 'prediction' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                        Previsão {sortCol === 'prediction' && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
                       </button>
                     </th>
                     <th className="text-right py-3 px-3 text-xs font-medium text-text-muted hidden sm:table-cell">CI Inferior</th>
@@ -341,13 +345,11 @@ export default function Batch() {
       )}
 
       {!results.length && !error && !loading && (
-        <div className="bg-surface border border-border rounded-xl p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mx-auto mb-4">
-            <Layers className="w-8 h-8 text-primary-300" aria-hidden="true" />
-          </div>
-          <p className="text-sm font-medium text-text-secondary">Nenhuma previsao gerada</p>
-          <p className="text-xs text-text-muted mt-1.5 max-w-xs mx-auto">Configure os parametros acima e execute o lote para obter previsoes em massa</p>
-        </div>
+        <EmptyState
+          illustration={<BatchIllustration />}
+          title="Nenhuma previsão gerada"
+          description="Configure os parâmetros e clica em Executar para gerar previsões em massa."
+        />
       )}
     </div>
   );

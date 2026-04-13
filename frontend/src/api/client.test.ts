@@ -101,7 +101,7 @@ describe('api client', () => {
 
       expect(mockFetch).toHaveBeenCalledWith('/api/predict/batch', expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ items }),
+        body: JSON.stringify(items),
       }))
     })
   })
