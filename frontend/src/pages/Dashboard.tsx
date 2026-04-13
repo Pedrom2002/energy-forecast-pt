@@ -8,7 +8,6 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { AnimatedNumber } from '../components/motion/AnimatedNumber';
 import { BentoCard } from '../components/motion/BentoCard';
 import { PORTUGAL_PATH } from '../assets/portugalPath';
-import { Sparkline } from '../components/Sparkline';
 import HeroChart from '../components/HeroChart';
 import {
   Activity,
@@ -307,8 +306,6 @@ export default function Dashboard() {
             <span className="text-3xl font-bold text-primary-500 md:text-5xl">%</span>
           </div>
           <div>
-            <Sparkline data={[1.38, 1.52, 1.41, 1.47, 1.42]} height={40} color="primary" filled />
-            <p className="mt-1 mb-3 text-xs text-text-muted">CV 5-fold</p>
             <p className="mb-3 text-sm text-text-secondary">
               Mean Absolute Percentage Error
             </p>
@@ -335,7 +332,6 @@ export default function Dashboard() {
               />
               <span className="text-lg font-semibold text-text-secondary">MW</span>
             </div>
-            <Sparkline data={[24.1, 22.8, 23.5, 22.1, 22.9]} height={28} color="primary" filled className="mt-1" />
           </div>
         </BentoCard>
 
@@ -367,16 +363,12 @@ export default function Dashboard() {
             </p>
             <TrendingUp className="h-4 w-4 text-primary-500" aria-hidden="true" />
           </div>
-          <div className="flex items-end gap-3">
+          <div>
             <AnimatedNumber
               value={0.998}
               format={(n) => n.toFixed(3)}
               className="text-4xl font-bold md:text-5xl"
             />
-            <div className="flex-1 min-w-0">
-              <Sparkline data={[0.987, 0.992, 0.995, 0.996, 0.998]} height={40} color="primary" filled />
-              <p className="text-xs text-text-muted mt-0.5">v4 → v8</p>
-            </div>
           </div>
           <div
             className="h-2 w-full overflow-hidden rounded-full bg-surface-subtle"
