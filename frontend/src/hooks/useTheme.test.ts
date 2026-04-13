@@ -6,7 +6,6 @@ describe('useTheme', () => {
   beforeEach(() => {
     localStorage.clear()
     document.documentElement.classList.remove('light', 'dark')
-    // Default matchMedia to light
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: false,
       media: query,
@@ -19,48 +18,26 @@ describe('useTheme', () => {
     })))
   })
 
-  it('defaults to light theme when no stored preference', () => {
+  it('defaults to dark theme when no stored preference', () => {
     const { result } = renderHook(() => useTheme())
-    expect(result.current.theme).toBe('light')
-    expect(result.current.isDark).toBe(false)
+    expect(result.current.theme).toBe('dark')
+    expect(result.current.isDark).toBe(true)
   })
 
   it('reads stored theme from localStorage', () => {
-    localStorage.setItem('theme', 'dark')
+    localStorage.setItem('theme', 'light')
     const { result } = renderHook(() => useTheme())
-    expect(result.current.theme).toBe('dark')
-    expect(result.current.isDark).toBe(true)
+    expect(result.current.theme).toBe('light')
+    expect(result.current.isDark).toBe(false)
   })
 
-  it('falls back to prefers-color-scheme when no stored theme', () => {
-    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
-      matches: query === '(prefers-color-scheme: dark)',
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })))
-
+  it('ignores invalid stored values and falls back to dark', () => {
+    localStorage.setItem('theme', 'neon')
     const { result } = renderHook(() => useTheme())
     expect(result.current.theme).toBe('dark')
-  })
-
-  it('toggles theme from light to dark', () => {
-    const { result } = renderHook(() => useTheme())
-
-    act(() => {
-      result.current.toggle()
-    })
-
-    expect(result.current.theme).toBe('dark')
-    expect(result.current.isDark).toBe(true)
   })
 
   it('toggles theme from dark to light', () => {
-    localStorage.setItem('theme', 'dark')
     const { result } = renderHook(() => useTheme())
 
     act(() => {
@@ -69,6 +46,18 @@ describe('useTheme', () => {
 
     expect(result.current.theme).toBe('light')
     expect(result.current.isDark).toBe(false)
+  })
+
+  it('toggles theme from light to dark', () => {
+    localStorage.setItem('theme', 'light')
+    const { result } = renderHook(() => useTheme())
+
+    act(() => {
+      result.current.toggle()
+    })
+
+    expect(result.current.theme).toBe('dark')
+    expect(result.current.isDark).toBe(true)
   })
 
   it('persists theme to localStorage on change', () => {
@@ -78,19 +67,19 @@ describe('useTheme', () => {
       result.current.toggle()
     })
 
-    expect(localStorage.getItem('theme')).toBe('dark')
+    expect(localStorage.getItem('theme')).toBe('light')
   })
 
   it('updates document.documentElement classList', () => {
     const { result } = renderHook(() => useTheme())
 
-    expect(document.documentElement.classList.contains('light')).toBe(true)
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
 
     act(() => {
       result.current.toggle()
     })
 
-    expect(document.documentElement.classList.contains('dark')).toBe(true)
-    expect(document.documentElement.classList.contains('light')).toBe(false)
+    expect(document.documentElement.classList.contains('light')).toBe(true)
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
   })
 })

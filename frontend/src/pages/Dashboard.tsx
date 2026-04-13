@@ -8,6 +8,8 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { AnimatedNumber } from '../components/motion/AnimatedNumber';
 import { BentoCard } from '../components/motion/BentoCard';
 import { PORTUGAL_PATH } from '../assets/portugalPath';
+import { Sparkline } from '../components/Sparkline';
+import HeroChart from '../components/HeroChart';
 import {
   Activity,
   Cpu,
@@ -250,6 +252,29 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* Hero live forecast chart — the signature moment */}
+      <section
+        className="relative overflow-hidden rounded-2xl border border-border
+          bg-gradient-to-br from-primary-50/40 via-surface to-surface
+          dark:from-primary-950/30 dark:via-surface dark:to-surface p-4 md:p-6"
+      >
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-600 dark:text-primary-400">
+              Previsão em tempo real · Lisboa
+            </p>
+            <p className="text-sm text-text-secondary">
+              Próximas 24 horas · intervalo de confiança a 90%
+            </p>
+          </div>
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-text-muted">
+            <span className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
+            split conformal
+          </span>
+        </div>
+        <HeroChart />
+      </section>
+
       {/* Coverage alert */}
       {health?.coverage_alert && (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-4">
@@ -282,6 +307,8 @@ export default function Dashboard() {
             <span className="text-3xl font-bold text-primary-500 md:text-5xl">%</span>
           </div>
           <div>
+            <Sparkline data={[1.38, 1.52, 1.41, 1.47, 1.42]} height={40} color="primary" filled />
+            <p className="mt-1 mb-3 text-xs text-text-muted">CV 5-fold</p>
             <p className="mb-3 text-sm text-text-secondary">
               Mean Absolute Percentage Error
             </p>
@@ -299,13 +326,16 @@ export default function Dashboard() {
             </p>
             <Activity className="h-4 w-4 text-primary-500" aria-hidden="true" />
           </div>
-          <div className="flex items-baseline gap-1">
-            <AnimatedNumber
-              value={22.9}
-              format={(n) => n.toFixed(1)}
-              className="text-3xl font-bold md:text-4xl"
-            />
-            <span className="text-lg font-semibold text-text-secondary">MW</span>
+          <div>
+            <div className="flex items-baseline gap-1">
+              <AnimatedNumber
+                value={22.9}
+                format={(n) => n.toFixed(1)}
+                className="text-3xl font-bold md:text-4xl"
+              />
+              <span className="text-lg font-semibold text-text-secondary">MW</span>
+            </div>
+            <Sparkline data={[24.1, 22.8, 23.5, 22.1, 22.9]} height={28} color="primary" filled className="mt-1" />
           </div>
         </BentoCard>
 
@@ -337,12 +367,16 @@ export default function Dashboard() {
             </p>
             <TrendingUp className="h-4 w-4 text-primary-500" aria-hidden="true" />
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-end gap-3">
             <AnimatedNumber
               value={0.998}
               format={(n) => n.toFixed(3)}
               className="text-4xl font-bold md:text-5xl"
             />
+            <div className="flex-1 min-w-0">
+              <Sparkline data={[0.987, 0.992, 0.995, 0.996, 0.998]} height={40} color="primary" filled />
+              <p className="text-xs text-text-muted mt-0.5">v4 → v8</p>
+            </div>
           </div>
           <div
             className="h-2 w-full overflow-hidden rounded-full bg-surface-subtle"

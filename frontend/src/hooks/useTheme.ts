@@ -3,10 +3,13 @@ import { useState, useEffect, useCallback } from 'react';
 type Theme = 'light' | 'dark';
 
 function getInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'light';
+  if (typeof window === 'undefined') return 'dark';
   const stored = localStorage.getItem('theme') as Theme | null;
-  if (stored) return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  if (stored === 'light' || stored === 'dark') return stored;
+  // First-time visitors default to dark: the branded look is richer in dark
+  // mode and matches the portfolio hero styling. Users who toggle to light
+  // get their preference persisted via localStorage.
+  return 'dark';
 }
 
 export function useTheme() {
