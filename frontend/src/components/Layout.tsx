@@ -19,7 +19,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTheme } from '../hooks/useTheme';
 
 const NAV_ITEMS = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/predict', icon: Zap, label: 'Previsão' },
   { to: '/batch', icon: Layers, label: 'Batch' },
   { to: '/forecast', icon: TrendingUp, label: 'Forecast' },
@@ -123,7 +123,7 @@ export default function Layout() {
                 <NavLink
                   key={to}
                   to={to}
-                  end={to === '/dashboard'}
+                  end={to === '/'}
                   onClick={() => setSidebarOpen(false)}
                   className={`relative group flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-sm font-medium
                     transition-colors duration-150

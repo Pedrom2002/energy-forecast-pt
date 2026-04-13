@@ -1,7 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import Landing from './pages/Landing';
 import Dashboard from './pages/Dashboard';
 import Predict from './pages/Predict';
 import Batch from './pages/Batch';
@@ -15,12 +14,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <Routes>
-        {/* Landing page — no sidebar, full-bleed */}
-        <Route path="/" element={<Landing />} />
-
-        {/* App shell with sidebar + top bar */}
+        {/* App shell with sidebar + top bar — Dashboard is the single entry point */}
         <Route element={<Layout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/predict" element={<Predict />} />
           <Route path="/batch" element={<Batch />} />
           <Route path="/forecast" element={<Forecast />} />
