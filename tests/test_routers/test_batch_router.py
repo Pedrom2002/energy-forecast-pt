@@ -23,17 +23,13 @@ class TestBatchRouter:
         assert len(patch_main_predictions["batch"]) == 1
         assert len(patch_main_predictions["batch"][0][0]) == 3
 
-    def test_batch_over_1000_items_returns_400(
-        self, client, predict_payload, fake_model_store
-    ):
+    def test_batch_over_1000_items_returns_400(self, client, predict_payload, fake_model_store):
         """Guardrail: the router enforces a max batch size of 1000."""
         response = client.post("/predict/batch", json=[predict_payload] * 1001)
         assert response.status_code == 400, response.text
         assert response.json()["detail"]["code"] == "BATCH_TOO_LARGE"
 
-    def test_batch_requires_auth_when_api_key_set(
-        self, client, predict_payload, monkeypatch, fake_model_store
-    ):
+    def test_batch_requires_auth_when_api_key_set(self, client, predict_payload, monkeypatch, fake_model_store):
         from src.api import main
 
         monkeypatch.setattr(main, "API_KEY", "router-test-api-key")

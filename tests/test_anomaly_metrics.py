@@ -19,7 +19,8 @@ from fastapi.testclient import TestClient
 
 from src.api.anomaly import AnomalyDetector
 from src.api.main import app
-from src.api.metrics import PROMETHEUS_AVAILABLE, metrics as prom_metrics
+from src.api.metrics import PROMETHEUS_AVAILABLE
+from src.api.metrics import metrics as prom_metrics
 
 client = TestClient(app)
 
@@ -174,8 +175,7 @@ class TestThreadSafety:
 
         summary = detector.summary()
         assert summary["total_observations"] == n_workers * n_per_worker, (
-            f"Lost updates: expected {n_workers * n_per_worker}, "
-            f"got {summary['total_observations']}"
+            f"Lost updates: expected {n_workers * n_per_worker}, " f"got {summary['total_observations']}"
         )
 
     def test_concurrent_multi_region(self):

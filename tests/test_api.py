@@ -25,13 +25,17 @@ def _models_loaded() -> bool:
 class TestInfoEndpoints:
     """Test informational endpoints that always work regardless of model state."""
 
-    def test_root_returns_api_info(self):
+    def test_root_not_served_by_api(self):
+        """GET / is reserved for the React SPA (via StaticFiles when
+        frontend/dist/ exists). Either it 404s (backend-only) or it serves
+        HTML — but it must NOT return the legacy JSON metadata that used to
+        shadow the SPA mount."""
         response = client.get("/")
-        assert response.status_code == 200, f"Expected 200 from GET /, got {response.status_code}: {response.text}"
-        data = response.json()
-        assert data["message"] == "Energy Forecast PT API", f"Unexpected message: {data.get('message')}"
-        assert data["version"] == "1.0.0", f"Unexpected version: {data.get('version')}"
-        assert "docs" in data, f"Missing 'docs' key in root response: {data}"
+        assert response.status_code in (200, 404), response.text
+        if response.status_code == 200:
+            assert "text/html" in response.headers.get(
+                "content-type", ""
+            ), f"Expected HTML when SPA is mounted, got {response.headers.get('content-type')}"
 
     def test_health_returns_status(self):
         response = client.get("/health")

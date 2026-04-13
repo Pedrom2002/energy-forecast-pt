@@ -9,9 +9,7 @@ from __future__ import annotations
 
 
 class TestPredictRouterHappyPath:
-    def test_valid_payload_returns_prediction(
-        self, client, predict_payload, fake_model_store, patch_main_predictions
-    ):
+    def test_valid_payload_returns_prediction(self, client, predict_payload, fake_model_store, patch_main_predictions):
         """With a fake model + patched helper, /predict should return 200 and
         the canned ``PredictionResponse`` serialised to JSON."""
         response = client.post("/predict", json=predict_payload)
@@ -50,9 +48,7 @@ class TestPredictRouterAuth:
         assert response.status_code == 401, response.text
         assert response.json()["detail"]["code"] == "UNAUTHORIZED"
 
-    def test_wrong_api_key_returns_401(
-        self, client, predict_payload, monkeypatch, fake_model_store
-    ):
+    def test_wrong_api_key_returns_401(self, client, predict_payload, monkeypatch, fake_model_store):
         from src.api import main
 
         monkeypatch.setattr(main, "API_KEY", "router-test-api-key")

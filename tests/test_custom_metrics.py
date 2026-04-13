@@ -31,8 +31,8 @@ from src.api.metrics import (
     FEATURE_DRIFT_SCORE,
     MODEL_LOAD_ERRORS_TOTAL,
     PROMETHEUS_AVAILABLE,
-    metrics as prom_metrics,
 )
+from src.api.metrics import metrics as prom_metrics
 
 pytestmark = pytest.mark.skipif(
     not PROMETHEUS_AVAILABLE,
@@ -53,32 +53,32 @@ class TestCustomMetricsSingletons:
     """The three module-level singletons must exist with correct names + types."""
 
     def test_conformal_coverage_ratio_is_labelled_gauge(self):
-        assert isinstance(CONFORMAL_COVERAGE_RATIO, Gauge), (
-            f"conformal_coverage_ratio must be a Gauge, got {type(CONFORMAL_COVERAGE_RATIO).__name__}"
-        )
+        assert isinstance(
+            CONFORMAL_COVERAGE_RATIO, Gauge
+        ), f"conformal_coverage_ratio must be a Gauge, got {type(CONFORMAL_COVERAGE_RATIO).__name__}"
         # prometheus_client stores the base name on ``_name``.
-        assert CONFORMAL_COVERAGE_RATIO._name == "conformal_coverage_ratio", (
-            f"Unexpected metric name: {CONFORMAL_COVERAGE_RATIO._name}"
-        )
-        assert "region" in CONFORMAL_COVERAGE_RATIO._labelnames, (
-            f"conformal_coverage_ratio must carry a 'region' label, got {CONFORMAL_COVERAGE_RATIO._labelnames}"
-        )
+        assert (
+            CONFORMAL_COVERAGE_RATIO._name == "conformal_coverage_ratio"
+        ), f"Unexpected metric name: {CONFORMAL_COVERAGE_RATIO._name}"
+        assert (
+            "region" in CONFORMAL_COVERAGE_RATIO._labelnames
+        ), f"conformal_coverage_ratio must carry a 'region' label, got {CONFORMAL_COVERAGE_RATIO._labelnames}"
 
     def test_feature_drift_score_is_labelled_gauge(self):
-        assert isinstance(FEATURE_DRIFT_SCORE, Gauge), (
-            f"feature_drift_score must be a Gauge, got {type(FEATURE_DRIFT_SCORE).__name__}"
-        )
-        assert FEATURE_DRIFT_SCORE._name == "feature_drift_score", (
-            f"Unexpected metric name: {FEATURE_DRIFT_SCORE._name}"
-        )
-        assert "feature" in FEATURE_DRIFT_SCORE._labelnames, (
-            f"feature_drift_score must carry a 'feature' label, got {FEATURE_DRIFT_SCORE._labelnames}"
-        )
+        assert isinstance(
+            FEATURE_DRIFT_SCORE, Gauge
+        ), f"feature_drift_score must be a Gauge, got {type(FEATURE_DRIFT_SCORE).__name__}"
+        assert (
+            FEATURE_DRIFT_SCORE._name == "feature_drift_score"
+        ), f"Unexpected metric name: {FEATURE_DRIFT_SCORE._name}"
+        assert (
+            "feature" in FEATURE_DRIFT_SCORE._labelnames
+        ), f"feature_drift_score must carry a 'feature' label, got {FEATURE_DRIFT_SCORE._labelnames}"
 
     def test_model_load_errors_total_is_counter(self):
-        assert isinstance(MODEL_LOAD_ERRORS_TOTAL, Counter), (
-            f"model_load_errors_total must be a Counter, got {type(MODEL_LOAD_ERRORS_TOTAL).__name__}"
-        )
+        assert isinstance(
+            MODEL_LOAD_ERRORS_TOTAL, Counter
+        ), f"model_load_errors_total must be a Counter, got {type(MODEL_LOAD_ERRORS_TOTAL).__name__}"
         # prometheus_client strips the ``_total`` suffix from the base name
         # and re-adds it at scrape time, so ``_name`` is either the exposed
         # name or the stripped form depending on the client version.
@@ -128,9 +128,7 @@ class TestFeatureDriftScoreEmission:
         assert "feature_drift_score{" in payload, (
             "feature_drift_score{...} series missing from /metrics scrape:\n" + payload[-2000:]
         )
-        assert feature_name in payload, (
-            f"Expected {feature_name!r} label to appear in /metrics payload"
-        )
+        assert feature_name in payload, f"Expected {feature_name!r} label to appear in /metrics payload"
 
 
 class TestConformalCoverageRatioEmission:
@@ -147,18 +145,16 @@ class TestConformalCoverageRatioEmission:
                 "ci_upper": 1100.0,
             },
         )
-        assert resp.status_code == 200, (
-            f"Expected 200 from /model/coverage/record, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code == 200, f"Expected 200 from /model/coverage/record, got {resp.status_code}: {resp.text}"
         assert resp.json()["recorded"] is True
 
         payload = _scrape_metrics_text()
         assert "conformal_coverage_ratio{" in payload, (
             "conformal_coverage_ratio{...} series missing from /metrics scrape:\n" + payload[-2000:]
         )
-        assert 'region="global"' in payload, (
-            'Expected region="global" label on conformal_coverage_ratio in /metrics payload'
-        )
+        assert (
+            'region="global"' in payload
+        ), 'Expected region="global" label on conformal_coverage_ratio in /metrics payload'
 
 
 class TestModelLoadErrorsTotal:
@@ -184,6 +180,4 @@ class TestModelLoadErrorsTotal:
         with pytest.raises(RuntimeError, match="simulated disk failure"):
             main_mod.reload_models(app.state)
         after = MODEL_LOAD_ERRORS_TOTAL._value.get()
-        assert after == before + 1, (
-            f"Expected model_load_errors_total to increment by 1, before={before} after={after}"
-        )
+        assert after == before + 1, f"Expected model_load_errors_total to increment by 1, before={before} after={after}"

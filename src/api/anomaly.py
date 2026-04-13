@@ -104,9 +104,7 @@ class AnomalyDetector:
 
         # Bounded log of recent anomaly records.  Each entry is a dict with
         # predicted/actual/residual/region/timestamp/z_score keys.
-        self._recent: collections.deque[dict[str, Any]] = collections.deque(
-            maxlen=ANOMALY_LOG_MAXLEN
-        )
+        self._recent: collections.deque[dict[str, Any]] = collections.deque(maxlen=ANOMALY_LOG_MAXLEN)
 
         self._lock = threading.Lock()
 

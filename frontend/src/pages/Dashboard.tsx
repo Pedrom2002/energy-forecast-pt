@@ -11,14 +11,12 @@ import { BentoCard } from '../components/motion/BentoCard';
 import { PORTUGAL_PATH } from '../assets/portugalPath';
 import HeroChart from '../components/HeroChart';
 import {
-  Activity,
   Cpu,
   AlertTriangle,
   CheckCircle,
   RefreshCw,
   Zap,
   Layers,
-  TrendingUp,
   Database,
 } from 'lucide-react';
 

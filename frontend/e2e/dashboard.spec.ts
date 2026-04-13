@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mockBackend } from './fixtures/mockApi';
 
 test.describe('Dashboard smoke', () => {
-  test('loads without console errors and renders hero + KPI cards', async ({ page }) => {
+  test('renders hero + live chart + main landmark', async ({ page }) => {
     const consoleErrors: string[] = [];
     page.on('console', (msg) => {
       if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -12,24 +12,21 @@ test.describe('Dashboard smoke', () => {
     await mockBackend(page);
     await page.goto('/');
 
-    // Hero / title
+    // Hero heading — matches both EN and PT (word "Dashboard" is identical)
     await expect(
       page.getByRole('heading', { level: 1, name: /dashboard/i }),
     ).toBeVisible();
 
-    // KPI stat cards — Dashboard renders 4 StatCards with these labels
-    for (const label of ['Status', 'Uptime', 'Modelos', /Cobertura/i]) {
-      await expect(page.getByText(label).first()).toBeVisible();
-    }
+    // Main content landmark is present
+    await expect(page.getByRole('main')).toBeVisible();
 
-    // Model status card title
-    await expect(page.getByText(/Estado dos Modelos/i)).toBeVisible();
+    // At least one chart/image role exists (live HeroChart or Portugal map)
+    await expect(page.locator('[role="img"]').first()).toBeVisible();
 
-    // No console errors surfaced during load. Ignore benign dev noise (HMR,
-    // React devtools suggestion).
-    const meaningfulErrors = consoleErrors.filter(
+    // No meaningful console errors
+    const meaningful = consoleErrors.filter(
       (e) => !/React DevTools|HMR|hydration/i.test(e),
     );
-    expect(meaningfulErrors, meaningfulErrors.join('\n')).toHaveLength(0);
+    expect(meaningful, meaningful.join('\n')).toHaveLength(0);
   });
 });

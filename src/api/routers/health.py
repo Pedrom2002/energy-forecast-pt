@@ -109,9 +109,7 @@ async def get_limitations(store: ModelStore = Depends(get_model_store)):
         "rate_limit": (
             f"{os.environ.get('RATE_LIMIT_MAX', 60)} requests per " f"{os.environ.get('RATE_LIMIT_WINDOW', 60)}s"
         ),
-        "authentication": (
-            "API key via X-API-Key header" if main.API_KEY else "disabled (set API_KEY env var)"
-        ),
+        "authentication": ("API key via X-API-Key header" if main.API_KEY else "disabled (set API_KEY env var)"),
         "ci_methods_available": [
             (
                 "conformal"

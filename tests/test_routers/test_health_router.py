@@ -11,15 +11,13 @@ from __future__ import annotations
 
 
 class TestHealthRouter:
-    def test_root_returns_api_metadata(self, client):
-        """GET / is the unauthenticated discovery endpoint."""
+    def test_root_not_served_by_api(self, client):
+        """GET / is reserved for the React SPA. It either 404s (no dist) or
+        serves HTML — never the legacy API metadata JSON."""
         response = client.get("/")
-        assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["message"] == "Energy Forecast PT API"
-        assert "version" in body
-        assert body["docs"] == "/docs"
-        assert body["health"] == "/health"
+        assert response.status_code in (200, 404), response.text
+        if response.status_code == 200:
+            assert "text/html" in response.headers.get("content-type", "")
 
     def test_health_reports_core_fields(self, client):
         """GET /health — always 200, reports uptime and model load status."""
@@ -68,10 +66,10 @@ class TestHealthRouter:
         response = client.get("/health")
         assert response.status_code == 200, response.text
 
-    def test_root_does_not_require_auth(self, client, monkeypatch):
-        """Even with ``API_KEY`` set, GET / must remain open."""
+    def test_docs_does_not_require_auth(self, client, monkeypatch):
+        """Even with ``API_KEY`` set, /docs (Swagger UI) must remain open."""
         from src.api import main
 
         monkeypatch.setattr(main, "API_KEY", "should-not-be-checked")
-        response = client.get("/")
+        response = client.get("/docs")
         assert response.status_code == 200, response.text

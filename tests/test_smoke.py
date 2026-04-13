@@ -42,10 +42,13 @@ def _bypass_rate_limit():
 # ── Informational / health endpoints (always 200) ────────────────────────────
 
 
-def test_root_returns_200() -> None:
-    """`GET /` must always return 200 regardless of model state."""
+def test_root_not_served_by_api() -> None:
+    """`GET /` is reserved for the React SPA. Either it 404s (no dist) or it
+    serves HTML — never the legacy API metadata JSON."""
     response = client.get("/")
-    assert response.status_code == 200, f"Expected 200 from GET /, got {response.status_code}: {response.text}"
+    assert response.status_code in (200, 404), response.text
+    if response.status_code == 200:
+        assert "text/html" in response.headers.get("content-type", "")
 
 
 def test_health_returns_200() -> None:

@@ -21,32 +21,6 @@ import {
   ReferenceLine,
 } from 'recharts';
 
-const HISTORY_HOURS = 48;
-
-function generateHistory(region: Region, hours: number) {
-  const records = [];
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  for (let i = hours; i > 0; i--) {
-    const d = new Date(now.getTime() - i * 3600000);
-    const hour = d.getHours();
-    // Realistic Portuguese consumption pattern: peak around 20h, trough around 5h.
-    const baseConsumption = 1500 + 500 * Math.sin(((hour - 14) / 24) * Math.PI * 2);
-    records.push({
-      timestamp: d.toISOString().slice(0, 19),
-      region,
-      // Temperature peak around 15h, min around 5h.
-      temperature: +(15 + 8 * Math.sin(((hour - 9) / 24) * Math.PI * 2) + (Math.random() - 0.5) * 2).toFixed(1),
-      humidity: +(65 + 15 * Math.cos(((hour - 9) / 24) * Math.PI * 2)).toFixed(1),
-      wind_speed: +(10 + Math.random() * 8).toFixed(1),
-      precipitation: +(Math.random() < 0.1 ? Math.random() * 3 : 0).toFixed(1),
-      cloud_cover: +(40 + Math.random() * 30).toFixed(1),
-      pressure: +(1010 + Math.random() * 8).toFixed(1),
-      consumption_mw: +(baseConsumption + (Math.random() - 0.5) * 200).toFixed(1),
-    });
-  }
-  return records;
-}
 
 function generateForecastItems(region: Region, hours: number): EnergyData[] {
   const items: EnergyData[] = [];
@@ -399,9 +373,9 @@ export default function Forecast() {
                           backgroundColor: 'var(--color-surface)',
                           color: 'var(--color-text-primary)',
                         }}
-                        formatter={(value: number, name: string) => [
-                          formatMW(value),
-                          name === 'actual' ? t('forecast.actualConsumption') : name === 'predicted' ? t('forecast.predictionSeries') : name,
+                        formatter={(value, name) => [
+                          typeof value === 'number' ? formatMW(value) : String(value),
+                          name === 'actual' ? t('forecast.actualConsumption') : name === 'predicted' ? t('forecast.predictionSeries') : String(name),
                         ]}
                       />
                       {nowLabel && (

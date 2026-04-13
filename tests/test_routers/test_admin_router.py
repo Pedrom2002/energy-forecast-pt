@@ -4,9 +4,7 @@ from __future__ import annotations
 
 
 class TestAdminRouter:
-    def test_reload_with_admin_key_succeeds(
-        self, client, monkeypatch, admin_headers, admin_key_value
-    ):
+    def test_reload_with_admin_key_succeeds(self, client, monkeypatch, admin_headers, admin_key_value):
         """When ``ADMIN_API_KEY`` is set and provided, reload should return 200
         and the fake result payload."""
         from src.api import main

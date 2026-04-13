@@ -110,6 +110,7 @@ def _get_tree_explainer(model: Any) -> Any | None:
         logger.debug("TreeExplainer for %s does not support weak refs — caching disabled", type(model).__name__)
     return explainer
 
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 Z_SCORE_90 = 1.645  # z-score for a one-sided 90 % normal CI
@@ -744,11 +745,7 @@ def _explain_prediction(
             )
             df_features = pd.DataFrame()
 
-        if (
-            feature_names
-            and not df_features.empty
-            and all(f in df_features.columns for f in feature_names)
-        ):
+        if feature_names and not df_features.empty and all(f in df_features.columns for f in feature_names):
             X = df_features[feature_names].values
             feature_values = X[0].tolist()
         else:

@@ -45,8 +45,7 @@ async def predict_sequential(
             detail={
                 "code": "MIXED_REGIONS",
                 "message": (
-                    "All records in history and forecast must share the same region. "
-                    f"Found: {sorted(regions)}"
+                    "All records in history and forecast must share the same region. " f"Found: {sorted(regions)}"
                 ),
             },
         )

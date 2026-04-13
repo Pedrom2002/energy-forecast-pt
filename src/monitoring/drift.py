@@ -183,10 +183,7 @@ class DataDriftDetector:
 
         feature_stats = metadata.get("feature_stats")
         if not isinstance(feature_stats, dict) or not feature_stats:
-            raise ValueError(
-                f"Metadata file {metadata_path} does not contain a non-empty "
-                "'feature_stats' field"
-            )
+            raise ValueError(f"Metadata file {metadata_path} does not contain a non-empty " "'feature_stats' field")
 
         return cls(reference_stats=feature_stats, psi_threshold=psi_threshold)
 

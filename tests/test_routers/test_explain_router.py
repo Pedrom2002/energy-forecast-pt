@@ -23,9 +23,7 @@ class TestExplainRouter:
         # Patched helper was called once with top_n=5.
         assert patch_main_predictions["explain"][0][1] == 5
 
-    def test_explain_requires_auth_when_api_key_set(
-        self, client, predict_payload, monkeypatch, fake_model_store
-    ):
+    def test_explain_requires_auth_when_api_key_set(self, client, predict_payload, monkeypatch, fake_model_store):
         from src.api import main
 
         monkeypatch.setattr(main, "API_KEY", "router-test-api-key")

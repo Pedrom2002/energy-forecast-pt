@@ -1,33 +1,30 @@
 import { test, expect } from '@playwright/test';
 import { mockBackend } from './fixtures/mockApi';
 
+// 4 main routes (Batch + Explain were merged/embedded into Forecast).
+// Labels are matched case-insensitively to support both EN (default) and PT.
 const ROUTES: { path: string; label: RegExp }[] = [
-  { path: '/', label: /Dashboard/i },
-  { path: '/predict', label: /Previsao/i },
-  { path: '/batch', label: /Batch/i },
-  { path: '/forecast', label: /Forecast/i },
-  { path: '/monitoring', label: /Monitoring/i },
-  { path: '/explain', label: /Explicabilidade/i },
+  { path: '/', label: /dashboard/i },
+  { path: '/predict', label: /(single prediction|previs[aã]o pontual)/i },
+  { path: '/forecast', label: /forecast/i },
+  { path: '/monitoring', label: /(monitoring|monitoriza[cç][aã]o)/i },
 ];
 
 test.describe('Sidebar navigation smoke', () => {
-  test('navigates through all six main routes without errors', async ({ page }) => {
+  test('navigates through all four main routes without errors', async ({ page }) => {
     const pageErrors: string[] = [];
     page.on('pageerror', (err) => pageErrors.push(err.message));
 
     await mockBackend(page);
     await page.goto('/');
 
-    // Confirm the nav landmark is present.
-    const nav = page.getByRole('navigation', { name: /Navegacao principal/i });
+    // Any <nav> landmark on the page is fine.
+    const nav = page.getByRole('navigation').first();
     await expect(nav).toBeVisible();
 
     for (const { path, label } of ROUTES) {
-      // Click the matching NavLink inside the sidebar.
       await nav.getByRole('link', { name: label }).first().click();
-      await expect(page).toHaveURL(new RegExp(`${path === '/' ? '/$' : path}$`));
-      // Wait until a page has rendered something (main landmark is always
-      // present; we just ensure no pageerror has fired).
+      await expect(page).toHaveURL(new RegExp(`${path === '/' ? '/$' : path + '$'}`));
       await expect(page.getByRole('main')).toBeVisible();
     }
 

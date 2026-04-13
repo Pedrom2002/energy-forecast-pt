@@ -823,9 +823,7 @@ class FeatureEngineer:
         # rows share the same date (works for single-row inference too).
         bridge_lookup = _compute_bridge_day_lookup(all_holidays, years_expanded)
         unique_dates = dates.drop_duplicates()
-        bridge_records = [
-            (d, *bridge_lookup.get(d, (0, 0, 0))) for d in unique_dates
-        ]
+        bridge_records = [(d, *bridge_lookup.get(d, (0, 0, 0))) for d in unique_dates]
         bridge_df = pd.DataFrame(
             bridge_records,
             columns=[
@@ -838,12 +836,8 @@ class FeatureEngineer:
         dates_series = dates.rename("_bridge_date").reset_index(drop=True)
         merged = dates_series.to_frame().merge(bridge_df, on="_bridge_date", how="left")
         df["is_bridge_day"] = merged["is_bridge_day"].fillna(0).astype(int).to_numpy()
-        df["is_extended_weekend"] = (
-            merged["is_extended_weekend"].fillna(0).astype(int).to_numpy()
-        )
-        df["days_in_holiday_window"] = (
-            merged["days_in_holiday_window"].fillna(0).astype(int).to_numpy()
-        )
+        df["is_extended_weekend"] = merged["is_extended_weekend"].fillna(0).astype(int).to_numpy()
+        df["days_in_holiday_window"] = merged["days_in_holiday_window"].fillna(0).astype(int).to_numpy()
 
         return df
 
@@ -1097,9 +1091,7 @@ class FeatureEngineer:
             T = df["temperature"]
             RH = df["humidity"].clip(lower=1.0, upper=100.0)
             _gamma = np.log(RH / 100.0) + (MAGNUS_B * T) / (MAGNUS_C + T)
-            df["dew_point"] = (MAGNUS_C * _gamma / (MAGNUS_B - _gamma)).clip(
-                lower=DEW_POINT_LOWER_BOUND, upper=T
-            )
+            df["dew_point"] = (MAGNUS_C * _gamma / (MAGNUS_B - _gamma)).clip(lower=DEW_POINT_LOWER_BOUND, upper=T)
         if "wind_direction" not in df.columns:
             df["wind_direction"] = 180.0
         if "solar_radiation" not in df.columns:

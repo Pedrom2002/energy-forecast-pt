@@ -57,9 +57,7 @@ async def predict_batch(
             timeout=batch_timeout,
         )
     except TimeoutError:
-        main.logger.error(
-            "Batch prediction timed out after %.1fs for %d items", batch_timeout, len(data_list)
-        )
+        main.logger.error("Batch prediction timed out after %.1fs for %d items", batch_timeout, len(data_list))
         raise HTTPException(
             status_code=504,
             detail={

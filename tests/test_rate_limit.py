@@ -239,10 +239,10 @@ class TestRateLimitHTTP:
         response = client.get("/health")
         assert response.status_code == 200
 
-    def test_root_endpoint_not_rate_limited(self):
-        """Root endpoint is always accessible regardless of rate limit state."""
+    def test_docs_endpoint_not_rate_limited(self):
+        """/docs (Swagger UI) is always accessible regardless of rate limit state."""
         client = TestClient(app)
-        response = client.get("/")
+        response = client.get("/docs")
         assert response.status_code == 200
 
     def test_retry_after_header_present_on_429(self):

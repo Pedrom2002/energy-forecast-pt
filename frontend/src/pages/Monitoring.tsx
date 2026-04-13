@@ -17,20 +17,8 @@ import {
   Shield,
   Info,
   XCircle,
-  Zap,
-  ChevronDown,
   Sparkles,
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
 
 // ----- Helpers ---------------------------------------------------------------
 
@@ -49,89 +37,28 @@ function getNumber(obj: AnyRecord | null, ...keys: string[]): number | null {
   return null;
 }
 
-interface FeatureStats {
-  mean: number;
-  std: number;
-  min?: number;
-  max?: number;
-  p1?: number;
-  p99?: number;
-  [k: string]: number | undefined;
-}
-
-/** Defensive extraction of feature stats. Accepts
- *   - { feature_stats: { f: { mean, std, ... } } }
- *   - { f: { mean, std, ... } }  (flat)
- *   - skips non-object / non-stat entries.
- */
-function extractFeatureStats(drift: AnyRecord | null): Record<string, FeatureStats> {
-  if (!drift) return {};
-  const source =
-    (drift.feature_stats && typeof drift.feature_stats === 'object'
-      ? (drift.feature_stats as AnyRecord)
-      : drift);
-  const out: Record<string, FeatureStats> = {};
-  for (const [k, v] of Object.entries(source)) {
-    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
-    const rec = v as AnyRecord;
-    if (isFiniteNumber(rec.mean) && isFiniteNumber(rec.std)) {
-      const stats: FeatureStats = { mean: rec.mean, std: rec.std };
-      for (const s of ['min', 'max', 'p1', 'p99', 'p50', 'median'] as const) {
-        if (isFiniteNumber(rec[s])) stats[s] = rec[s] as number;
-      }
-      out[k] = stats;
-    }
-  }
-  return out;
-}
-
-function featureRange(s: FeatureStats): number {
-  if (isFiniteNumber(s.p99) && isFiniteNumber(s.p1)) return s.p99 - s.p1;
-  if (isFiniteNumber(s.max) && isFiniteNumber(s.min)) return s.max - s.min;
-  return Math.abs(s.std);
-}
-
 // ----- Component -------------------------------------------------------------
-
-interface DriftCheckEntry {
-  z?: number;
-  z_score?: number;
-  zscore?: number;
-  value?: number;
-  mean?: number;
-  std?: number;
-  [k: string]: unknown;
-}
 
 export default function Monitoring() {
   const { t } = useTranslation();
   useDocumentTitle(t('monitoring.title'));
   const [coverage, setCoverage] = useState<AnyRecord | null>(null);
-  const [drift, setDrift] = useState<AnyRecord | null>(null);
   const [metrics, setMetrics] = useState<AnyRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [expandedFeature, setExpandedFeature] = useState<string | null>(null);
-
-  // Simulator state
-  const [simLoading, setSimLoading] = useState(false);
-  const [simResult, setSimResult] = useState<AnyRecord | null>(null);
-  const [simError, setSimError] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [cov, dr, met] = await Promise.allSettled([
+      const [cov, met] = await Promise.allSettled([
         api.modelCoverage(),
-        api.modelDrift(),
         api.metricsSummary(),
       ]);
       if (cov.status === 'fulfilled') setCoverage(cov.value as AnyRecord);
-      if (dr.status === 'fulfilled') setDrift(dr.value as AnyRecord);
       if (met.status === 'fulfilled') setMetrics(met.value as AnyRecord);
-      if (cov.status === 'rejected' && dr.status === 'rejected') {
+      if (cov.status === 'rejected') {
         setError(t('monitoring.errorLoad'));
       } else {
         setLastUpdated(new Date());
@@ -148,16 +75,6 @@ export default function Monitoring() {
   }, []);
 
   // Derived values
-  const featureStats = useMemo(() => extractFeatureStats(drift), [drift]);
-  const featureList = useMemo(() => Object.entries(featureStats), [featureStats]);
-
-  const topFeatures = useMemo(() => {
-    return [...featureList]
-      .sort((a, b) => featureRange(b[1]) - featureRange(a[1]))
-      .slice(0, 12)
-      .map(([name, s]) => ({ name, range: featureRange(s), std: s.std }));
-  }, [featureList]);
-
   const empiricalRaw = getNumber(coverage, 'empirical_coverage', 'coverage', 'empirical');
   const nominalRaw =
     getNumber(coverage, 'nominal_coverage', 'target_coverage', 'nominal') ?? 0.9;
@@ -201,52 +118,6 @@ export default function Monitoring() {
     }
     return out.slice(0, 4);
   }, [metrics]);
-
-  // Drift simulator
-  const runSimulation = async () => {
-    const entries = Object.entries(featureStats);
-    if (entries.length === 0) return;
-    // Pick up to 20 features; perturb within ±1.5 sigma mostly, some features ±3 sigma
-    const features: Record<string, number> = {};
-    entries.slice(0, 20).forEach(([name, s], i) => {
-      const magnitude = i % 7 === 0 ? 3 : Math.random() * 1.5;
-      const sign = Math.random() < 0.5 ? -1 : 1;
-      features[name] = s.mean + sign * magnitude * Math.abs(s.std || 1);
-    });
-    setSimLoading(true);
-    setSimError(null);
-    setSimResult(null);
-    try {
-      const res = await api.driftCheck(features);
-      setSimResult(res as AnyRecord);
-    } catch (err) {
-      setSimError(err instanceof Error ? err.message : t('monitoring.simError'));
-    } finally {
-      setSimLoading(false);
-    }
-  };
-
-  // Parse sim response defensively into [name, z][]
-  const simEntries: [string, number][] = useMemo(() => {
-    if (!simResult) return [];
-    const src =
-      (simResult.feature_checks && typeof simResult.feature_checks === 'object'
-        ? (simResult.feature_checks as AnyRecord)
-        : simResult.z_scores && typeof simResult.z_scores === 'object'
-          ? (simResult.z_scores as AnyRecord)
-          : simResult);
-    const out: [string, number][] = [];
-    for (const [k, v] of Object.entries(src)) {
-      if (isFiniteNumber(v)) {
-        out.push([k, v]);
-      } else if (v && typeof v === 'object') {
-        const rec = v as DriftCheckEntry;
-        const z = rec.z ?? rec.z_score ?? rec.zscore;
-        if (isFiniteNumber(z)) out.push([k, z]);
-      }
-    }
-    return out.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-  }, [simResult]);
 
   // ---- Rendering ----
 

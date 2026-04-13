@@ -120,9 +120,7 @@ class TestRegionCoverage:
     def test_no_overlapping_ranges(self):
         """Each CP4 must map to exactly one region (ranges should not overlap)."""
         for code in range(1000, 9000):
-            matches = [
-                region for start, end, region in CP4_RANGES if start <= code <= end
-            ]
+            matches = [region for start, end, region in CP4_RANGES if start <= code <= end]
             assert len(matches) == 1, f"CP {code} matches {len(matches)} ranges"
 
     def test_madeira_acores_excluded(self):

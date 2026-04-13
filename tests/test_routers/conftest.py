@@ -177,10 +177,7 @@ def patch_main_predictions(monkeypatch):
 
     def fake_sequential(request, store):
         calls["sequential"].append(request)
-        predictions = [
-            _fake_prediction_response(timestamp=str(f.timestamp), region=f.region)
-            for f in request.forecast
-        ]
+        predictions = [_fake_prediction_response(timestamp=str(f.timestamp), region=f.region) for f in request.forecast]
         return SequentialForecastResponse(
             predictions=predictions,
             total_predictions=len(predictions),

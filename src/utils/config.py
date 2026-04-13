@@ -80,9 +80,7 @@ class DataConfig(BaseModel):
     train_frac: float = 0.70
     val_frac: float = 0.15
     test_frac: float = 0.15
-    exclude_columns: list[str] = Field(
-        default_factory=lambda: ["timestamp", "region", "year"]
-    )
+    exclude_columns: list[str] = Field(default_factory=lambda: ["timestamp", "region", "year"])
 
     @field_validator("train_frac", "val_frac", "test_frac")
     @classmethod
@@ -166,9 +164,7 @@ class TrainingConfig(BaseModel):
 
     general: GeneralConfig = Field(default_factory=GeneralConfig)
     data: DataConfig = Field(default_factory=DataConfig)
-    feature_selection: FeatureSelectionConfig = Field(
-        default_factory=FeatureSelectionConfig
-    )
+    feature_selection: FeatureSelectionConfig = Field(default_factory=FeatureSelectionConfig)
     cv: CVConfig = Field(default_factory=CVConfig)
     optuna: OptunaConfig = Field(default_factory=OptunaConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)

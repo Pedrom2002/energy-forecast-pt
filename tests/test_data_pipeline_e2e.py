@@ -28,7 +28,6 @@ sys.path.insert(0, str(PIPELINE_DIR))
 import build_dataset_real_regional as pipeline  # noqa: E402
 from cp4_to_nuts2 import cp4_to_region  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Synthetic data helpers
 # ---------------------------------------------------------------------------
@@ -124,9 +123,7 @@ class TestEndToEnd:
         for ts in timestamps:
             for _region, cps in cps_by_region.items():
                 for cp in cps:
-                    consumption_rows.append(
-                        {"datahora": ts, "codigo_postal": cp, "consumo": 1500.0}
-                    )
+                    consumption_rows.append({"datahora": ts, "codigo_postal": cp, "consumo": 1500.0})
 
         weather_rows = []
         for ts in timestamps:
@@ -177,10 +174,7 @@ class TestEndToEnd:
         }
         ts = pd.Timestamp("2023-03-15 12:00", tz="UTC")
 
-        consumption_rows = [
-            {"datahora": ts, "codigo_postal": cp, "consumo": 2000.0}
-            for cp in region_cps.values()
-        ]
+        consumption_rows = [{"datahora": ts, "codigo_postal": cp, "consumo": 2000.0} for cp in region_cps.values()]
         weather_rows = [_make_weather_row(ts, region) for region in region_cps]
 
         _write_synthetic_inputs(raw_dir, consumption_rows, weather_rows)
@@ -208,11 +202,11 @@ class TestAnomalyFilter:
         # 6 rows: 1 negative, 1 zero, 1 normal, 1 at threshold (dropped),
         # 1 just under threshold (kept), 1 absurd.
         consumption_rows = [
-            {"datahora": ts, "codigo_postal": "4000", "consumo": -50.0},      # drop
-            {"datahora": ts, "codigo_postal": "4100", "consumo": 0.0},        # keep
-            {"datahora": ts, "codigo_postal": "4200", "consumo": 1500.0},     # keep
+            {"datahora": ts, "codigo_postal": "4000", "consumo": -50.0},  # drop
+            {"datahora": ts, "codigo_postal": "4100", "consumo": 0.0},  # keep
+            {"datahora": ts, "codigo_postal": "4200", "consumo": 1500.0},  # keep
             {"datahora": ts, "codigo_postal": "4300", "consumo": 100_000.0},  # drop (>=100k)
-            {"datahora": ts, "codigo_postal": "4400", "consumo": 99_000.0},   # keep
+            {"datahora": ts, "codigo_postal": "4400", "consumo": 99_000.0},  # keep
             {"datahora": ts, "codigo_postal": "4500", "consumo": 5_000_000.0},  # drop
         ]
         weather_rows = [_make_weather_row(ts, "Norte")]
@@ -332,9 +326,7 @@ class TestWeatherJoin:
 # ---------------------------------------------------------------------------
 
 
-REAL_PROCESSED_PATH = (
-    Path(__file__).resolve().parent.parent / "data" / "processed" / "processed_data.parquet"
-)
+REAL_PROCESSED_PATH = Path(__file__).resolve().parent.parent / "data" / "processed" / "processed_data.parquet"
 
 
 @pytest.mark.skipif(

@@ -100,9 +100,7 @@ def test_no_drift_on_identical_distribution(reference_stats, on_distribution_bat
 
     assert set(report.keys()) == set(reference_stats.keys())
     for feature, entry in report.items():
-        assert entry["drift_detected"] is False, (
-            f"Feature {feature} unexpectedly flagged: PSI={entry['psi']:.4f}"
-        )
+        assert entry["drift_detected"] is False, f"Feature {feature} unexpectedly flagged: PSI={entry['psi']:.4f}"
         assert entry["severity"] in {"none", "low"}
         assert entry["psi"] < 0.2
         assert np.isfinite(entry["psi"])
@@ -117,8 +115,7 @@ def test_drift_detected_on_shifted_distribution(reference_stats, shifted_batch):
 
     for feature, entry in report.items():
         assert entry["drift_detected"] is True, (
-            f"Feature {feature} not flagged despite large shift "
-            f"(PSI={entry['psi']:.4f})"
+            f"Feature {feature} not flagged despite large shift " f"(PSI={entry['psi']:.4f})"
         )
         assert entry["severity"] == "high"
         assert entry["psi"] >= 0.2

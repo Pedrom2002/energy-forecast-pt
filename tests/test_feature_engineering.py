@@ -233,9 +233,7 @@ class TestBridgeDayFeatures:
         assert (result["is_extended_weekend"] == 1).all()
         assert (result["days_in_holiday_window"] == 4).all()
         # Only the 5 Monday rows (one per region) should be bridge days.
-        monday_mask = pd.to_datetime(result["timestamp"]).dt.normalize() == pd.Timestamp(
-            "2018-04-30"
-        )
+        monday_mask = pd.to_datetime(result["timestamp"]).dt.normalize() == pd.Timestamp("2018-04-30")
         assert result.loc[monday_mask, "is_bridge_day"].sum() == len(regions)
         assert result.loc[~monday_mask, "is_bridge_day"].sum() == 0
 
