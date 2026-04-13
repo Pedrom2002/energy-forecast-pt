@@ -114,11 +114,20 @@ export default function Landing() {
   useDocumentTitle('Início');
 
   return (
-    <div className="min-h-screen bg-background text-text-primary">
+    <div className="relative min-h-screen overflow-hidden bg-background text-text-primary">
+      {/* Decorative page-level background blobs (always visible, layered) */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -top-40 left-1/4 h-[600px] w-[600px] rounded-full bg-primary-200/30 blur-3xl dark:bg-primary-600/20" />
+        <div className="absolute top-[40vh] -right-40 h-[500px] w-[500px] rounded-full bg-accent/10 blur-3xl dark:bg-accent/20" />
+        <div className="absolute top-[90vh] left-1/3 h-[500px] w-[500px] rounded-full bg-primary-100/40 blur-3xl dark:bg-primary-800/30" />
+        <div className="absolute top-[140vh] -left-20 h-[500px] w-[500px] rounded-full bg-accent/10 blur-3xl dark:bg-primary-700/20" />
+        <div className="absolute top-[200vh] right-1/3 h-[500px] w-[500px] rounded-full bg-primary-200/20 blur-3xl dark:bg-primary-700/20" />
+      </div>
+
       {/* ── Section 1: Hero ─────────────────────────────────────────── */}
       <section
         aria-label="Introdução"
-        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-primary-50/40 via-background to-accent-50/20 px-4 md:px-6"
+        className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-primary-50/60 via-background to-accent-50/40 px-4 md:px-6 dark:from-primary-950/30 dark:to-background"
       >
         <div
           aria-hidden="true"

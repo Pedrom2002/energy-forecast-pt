@@ -38,8 +38,7 @@ export function StaggerGroup({
     <motion.div
       className={className}
       initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: '-40px' }}
+      animate="visible"
       transition={{ staggerChildren: stagger, delayChildren: delay }}
     >
       {children}
