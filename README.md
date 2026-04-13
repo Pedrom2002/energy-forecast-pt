@@ -11,7 +11,7 @@
 
 > **Demo model (no_lags):** MAPE 4.77%, RMSE 53.52 MW &nbsp;·&nbsp; **Production model (with_lags):** MAPE 1.44%, RMSE 22.90 MW &nbsp;·&nbsp; **R² 0.998** &nbsp;·&nbsp; **EN / PT i18n** &nbsp;·&nbsp; **760+ tests**
 
-> 📖 **Reviewer / recruiter shortcut →** [**docs/DECISIONS.md**](docs/DECISIONS.md) explains the non-obvious trade-offs: why I threw out a "1.6% MAPE" model for leakage, why the public demo serves the worse model on purpose, what I cut because it wasn't defensible, and the cross-region swap test ([`scripts/verify_no_cross_region_leakage.py`](scripts/verify_no_cross_region_leakage.py)) that empirically falsifies the leakage hypothesis.
+> 📖 **Reviewer / recruiter shortcut →** [**docs/DECISIONS.md**](docs/DECISIONS.md) explains the non-obvious trade-offs: why I threw out a "1.6% MAPE" model for leakage, why the public demo serves the worse model on purpose, what I cut because it wasn't defensible, and the cross-region swap test ([`scripts/verify_no_cross_region_leakage.py`](scripts/verify_no_cross_region_leakage.py)) that empirically falsifies the leakage hypothesis in the new model.
 
 Full-stack energy consumption forecasting system for Portugal by region. Gradient-boosted tree models (XGBoost / LightGBM / CatBoost) with a modern React 19 frontend, bilingual (English/Portuguese), dark-only UI, and a one-click HuggingFace Spaces deployment.
 
