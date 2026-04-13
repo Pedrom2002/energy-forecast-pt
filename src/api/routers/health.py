@@ -44,10 +44,20 @@ async def health(request: Request):
             "model_no_lags_loaded": False,
             "model_advanced_loaded": False,
             "total_models": 0,
+            "models_loaded": {},
             "rmse_calibrated": False,
             "rmse_calibrated_models": [],
             "coverage_alert": coverage_alert,
         }
+
+    models_loaded = {}
+    if store.model_with_lags is not None:
+        models_loaded["with_lags"] = True
+    if store.model_no_lags is not None:
+        models_loaded["no_lags"] = True
+    if store.model_advanced is not None:
+        models_loaded["advanced"] = True
+
     return {
         "status": "healthy" if store.has_any_model else "degraded",
         "version": app.version,
@@ -56,6 +66,7 @@ async def health(request: Request):
         "model_no_lags_loaded": store.model_no_lags is not None,
         "model_advanced_loaded": store.model_advanced is not None,
         "total_models": store.total_models,
+        "models_loaded": models_loaded,
         "rmse_calibrated": store.all_rmse_calibrated,
         "rmse_calibrated_models": sorted(store.rmse_from_metadata),
         "coverage_alert": coverage_alert,
