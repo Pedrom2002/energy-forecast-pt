@@ -185,7 +185,8 @@ export default function Forecast() {
             max={168}
             help="Max. 168h (1 semana)"
           />
-          <div className="flex items-end">
+          <div>
+            <span aria-hidden="true" className="block text-xs font-medium mb-1.5">&nbsp;</span>
             <button
               type="submit"
               disabled={loading || submitting}

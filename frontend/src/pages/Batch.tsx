@@ -182,7 +182,8 @@ export default function Batch() {
             />
             <p id="batch-hours-help" className="text-[11px] text-text-muted mt-1">1 a 168 (1 semana)</p>
           </div>
-          <div className="flex items-end">
+          <div>
+            <span aria-hidden="true" className="block text-xs font-medium mb-1.5">&nbsp;</span>
             <button
               type="submit"
               disabled={loading || submitting}
