@@ -95,17 +95,12 @@ export default function Layout() {
           flex flex-col
         `}
       >
-        {/* Logo — branded gradient */}
-        <div className="h-16 flex items-center gap-3 px-6 border-b border-border relative overflow-hidden">
-          <div
-            className="absolute -left-4 -top-4 w-24 h-24 rounded-full bg-primary-400/20 blur-2xl pointer-events-none"
-            aria-hidden="true"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary-600/5 via-primary-400/3 to-transparent" aria-hidden="true" />
-          <div className="relative w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center shadow-md" aria-hidden="true">
+        {/* Logo */}
+        <div className="h-16 flex items-center gap-3 px-6 border-b border-border">
+          <div className="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center shadow-sm" aria-hidden="true">
             <Zap className="w-5 h-5 text-white" />
           </div>
-          <div className="relative">
+          <div>
             <span className="text-sm font-bold text-text-primary tracking-tight">Energy Forecast</span>
             <p className="text-[11px] font-medium text-primary-500">Portugal</p>
           </div>
