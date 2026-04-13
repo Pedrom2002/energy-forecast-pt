@@ -39,12 +39,14 @@ interface RegionDot {
 }
 
 // Coordinates in the 12969 × 26674 viewBox of the continental Portugal path.
+// Approximate centroids of the 5 NUTS-II regions (lat/lon mapped linearly onto
+// the viewBox: lat 37-42°N, lon -9.5/-6.5°W).
 const REGIONS: RegionDot[] = [
-  { id: 'norte', label: 'Norte', cx: 6500, cy: 2800 },
-  { id: 'centro', label: 'Centro', cx: 6200, cy: 8800 },
-  { id: 'lisboa', label: 'Lisboa', cx: 2400, cy: 13500 },
-  { id: 'alentejo', label: 'Alentejo', cx: 7200, cy: 17500 },
-  { id: 'algarve', label: 'Algarve', cx: 5600, cy: 24000 },
+  { id: 'norte', label: 'Norte', cx: 6200, cy: 4500 },
+  { id: 'centro', label: 'Centro', cx: 6400, cy: 10500 },
+  { id: 'lisboa', label: 'Lisboa', cx: 1100, cy: 17200 },
+  { id: 'alentejo', label: 'Alentejo', cx: 7400, cy: 19800 },
+  { id: 'algarve', label: 'Algarve', cx: 6000, cy: 25600 },
 ];
 
 interface TechPill {
