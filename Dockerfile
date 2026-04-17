@@ -11,7 +11,10 @@
 # ----------------------------------------------------------------------------
 # Stage 1: frontend
 # ----------------------------------------------------------------------------
-FROM node:20-slim AS frontend
+# Pinned to minor for reproducibility; Dependabot docker ecosystem bumps
+# this monthly. Moving to SHA pin is left as a follow-up once CI has a
+# docker-compose-based integration test that catches tag drift.
+FROM node:20.19-slim AS frontend
 
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
@@ -23,7 +26,7 @@ RUN npx vite build
 # ----------------------------------------------------------------------------
 # Stage 2: builder
 # ----------------------------------------------------------------------------
-FROM python:3.11-slim AS builder
+FROM python:3.11.11-slim AS builder
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -58,7 +61,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ----------------------------------------------------------------------------
 # Stage 2: runtime
 # ----------------------------------------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.11.11-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

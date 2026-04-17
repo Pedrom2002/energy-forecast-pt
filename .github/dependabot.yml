@@ -40,3 +40,11 @@ updates:
     groups:
       actions-minor-patch:
         update-types: [minor, patch]
+
+  # Base images for the Dockerfile — keeps node:20.19-slim and
+  # python:3.11.11-slim current. Monthly cadence matches github-actions.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
