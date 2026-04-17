@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { api, type HealthResponse } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useHealth, useMetricsSummary, useModelInfo, queryKeys } from '../api/hooks';
 import { Card, CardSkeleton } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatKey, formatUptime, formatNumber } from '../utils/format';
@@ -20,8 +21,6 @@ import {
   Database,
   Radio,
 } from 'lucide-react';
-
-const POLL_INTERVAL_MS = 30_000;
 
 interface RegionDot {
   id: string;
@@ -96,48 +95,41 @@ export default function Dashboard() {
   useDocumentTitle(t('dashboard.title'));
   const formatRelative = useFormatRelative();
 
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [modelInfo, setModelInfo] = useState<Record<string, unknown> | null>(null);
-  const [metrics, setMetrics] = useState<Record<string, unknown> | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const healthQ = useHealth();
+  const modelInfoQ = useModelInfo();
+  const metricsQ = useMetricsSummary();
+
+  const health = healthQ.data ?? null;
+  const modelInfo = modelInfoQ.data ?? null;
+  const metrics = metricsQ.data ?? null;
+  const loading = healthQ.isLoading || modelInfoQ.isLoading || metricsQ.isLoading;
+  const error = healthQ.error
+    ? healthQ.error.message || t('dashboard.connectApiError')
+    : null;
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [now, setNow] = useState<Date>(new Date());
   const isInitial = useRef(true);
 
-  const load = async (silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    try {
-      const [h, m, met] = await Promise.allSettled([
-        api.health(),
-        api.modelInfo(),
-        api.metricsSummary(),
-      ]);
-      if (h.status === 'fulfilled') setHealth(h.value);
-      if (m.status === 'fulfilled') setModelInfo(m.value);
-      if (met.status === 'fulfilled') setMetrics(met.value);
-      if (h.status === 'rejected') {
-        setError(h.reason?.message || t('dashboard.connectApiError'));
-      } else {
-        setLastUpdated(new Date());
-        if (!silent && !isInitial.current) toast.success(t('dashboard.dataUpdated'));
-      }
-    } finally {
-      if (!silent) setLoading(false);
+  useEffect(() => {
+    if (healthQ.dataUpdatedAt > 0) {
+      setLastUpdated(new Date(healthQ.dataUpdatedAt));
+      if (!isInitial.current) toast.success(t('dashboard.dataUpdated'));
       isInitial.current = false;
     }
+  }, [healthQ.dataUpdatedAt, t]);
+
+  const load = async () => {
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: queryKeys.health }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.modelInfo }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.metricsSummary }),
+    ]);
   };
 
   useEffect(() => {
-    load();
-    const poll = setInterval(() => load(true), POLL_INTERVAL_MS);
     const tick = setInterval(() => setNow(new Date()), 1000);
-    return () => {
-      clearInterval(poll);
-      clearInterval(tick);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => clearInterval(tick);
   }, []);
 
   if (loading) {
@@ -425,7 +417,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <LocalEmptyState icon={<Zap className="w-9 h-9" />} message={t('dashboard.modelInfoEmpty')} hint={t('dashboard.modelInfoHint')} />
+              <LocalEmptyState icon={<Zap className="w-9 h-9" aria-hidden="true" />} message={t('dashboard.modelInfoEmpty')} hint={t('dashboard.modelInfoHint')} />
             )}
           </Card>
         </div>

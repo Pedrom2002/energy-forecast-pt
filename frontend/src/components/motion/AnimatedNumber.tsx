@@ -1,5 +1,5 @@
 import { motion, useSpring, useTransform, useReducedMotion } from 'motion/react';
-import { useEffect } from 'react';
+import { memo, useEffect } from 'react';
 
 export interface AnimatedNumberProps {
   value: number;
@@ -8,7 +8,7 @@ export interface AnimatedNumberProps {
   className?: string;
 }
 
-export function AnimatedNumber({
+function AnimatedNumberImpl({
   value,
   format = (n) => Math.round(n).toString(),
   className,
@@ -31,3 +31,11 @@ export function AnimatedNumber({
 
   return <motion.span className={className}>{display}</motion.span>;
 }
+
+export const AnimatedNumber = memo(
+  AnimatedNumberImpl,
+  (prev, next) =>
+    prev.value === next.value &&
+    prev.className === next.className &&
+    prev.format === next.format,
+);

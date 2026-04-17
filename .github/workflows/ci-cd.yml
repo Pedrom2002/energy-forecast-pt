@@ -7,10 +7,11 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# Workflow-level default is minimal — each job below explicitly opts into
+# the extra scopes it needs (least-privilege, per GitHub Actions security
+# hardening guide).
 permissions:
   contents: read
-  packages: write
-  security-events: write
 
 env:
   DOCKER_IMAGE: energy-forecast-api
@@ -21,6 +22,8 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -63,6 +66,8 @@ jobs:
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -92,6 +97,8 @@ jobs:
   security:
     name: Security Audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -113,6 +120,8 @@ jobs:
     name: Frontend Tests & Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -140,6 +149,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [frontend-test]
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -177,6 +188,11 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     env:
       IMAGE_NAME: ${{ github.event.repository.name }}
+    # Needs: write packages for GHCR push, write security-events for Trivy SARIF upload.
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     steps:
       - uses: actions/checkout@v5
 
@@ -252,6 +268,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, lint, security]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -346,6 +364,9 @@ jobs:
     needs: [build]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     environment: staging
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v5
 
@@ -380,6 +401,9 @@ jobs:
     needs: [deploy]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     environment: production  # requires manual approval gate in GitHub Environments
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v5
 

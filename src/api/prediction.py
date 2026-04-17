@@ -33,6 +33,8 @@ import os
 import weakref
 from typing import Any
 
+from src.api.types import Predictor
+
 import numpy as np
 import pandas as pd
 
@@ -65,7 +67,7 @@ logger = logging.getLogger(__name__)
 _TREE_EXPLAINER_CACHE: weakref.WeakValueDictionary[int, Any] = weakref.WeakValueDictionary()
 
 
-def _get_tree_explainer(model: Any) -> Any | None:
+def _get_tree_explainer(model: Predictor) -> Any | None:
     """Return a cached :class:`shap.TreeExplainer` for *model*, or ``None``.
 
     The explainer is created lazily on first use and cached by ``id(model)``.

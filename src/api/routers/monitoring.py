@@ -261,6 +261,7 @@ async def metrics_summary(
             "max_request_body_bytes": main._MAX_REQUEST_BODY_BYTES,
             "prediction_timeout_seconds": main.PREDICTION_TIMEOUT_SECONDS,
             "log_level": main._LOG_LEVEL,
+            "structured_logs": main._STRUCTURED_LOGS,
             "trust_proxy": os.environ.get("TRUST_PROXY", "1") == "1",
             "auth_enabled": main.API_KEY is not None,
         },

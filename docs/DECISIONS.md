@@ -105,6 +105,29 @@ I could have rebased and presented it all as one clean commit. I didn't. Those 7
 
 ---
 
+## CVE-2025-69872 — pip-audit ignore list
+
+The `security` job in [`ci-cd.yml`](../.github/workflows/ci-cd.yml) runs `pip-audit --strict --ignore-vuln CVE-2025-69872`. The ignore is deliberate; documenting it here so nobody inherits the flag without understanding why.
+
+- **Why it's there.** At the time the flag was added, the vulnerable package had no fix version on PyPI. Blocking CI on an unfixable advisory was worse than continuing to ship with the flag set.
+- **Why I accept the risk.** The affected code path is not reachable from any of the public routers in `src/api/routers/`. The Trivy SBOM uploaded by the `build` job is the audit trail for that claim.
+- **Exit criteria.** Drop the `--ignore-vuln` flag as soon as (a) the upstream dep ships a fix, or (b) an SBOM update shows the vulnerable symbol becoming reachable from an endpoint handler.
+- **Rejected alternatives.** Vendoring a patched copy of the dep — too much maintenance drag for a single-author archived project. Pinning to an older major — would drag in older transitives with their own CVEs.
+
+If this doc and the flag disagree, the flag is wrong; remove it.
+
+---
+
+## GitHub Actions pinning policy
+
+Pinning is at tag level today (`actions/checkout@v5`, not full SHA). Weaker than SHA-pin against a tag-hijack, but stronger than floating `@main`. Rationale:
+
+- **SHA-pin every action** would require a manual re-pin every release. Dependabot is now configured (see [`dependabot.yml`](../.github/dependabot.yml)) to watch the `github-actions` ecosystem monthly. When a batch lands I review and can promote any critical actions to SHA-pin in the same PR.
+- **Per-job `permissions:`** blocks are the higher-value hardening and are now in place across [`ci-cd.yml`](../.github/workflows/ci-cd.yml). Workflow default is `contents: read`; jobs opt in to `packages: write` / `security-events: write` only where they actually need it.
+- **Exit criteria for full SHA-pin.** Promote to SHA-pin for any action that handles secrets in a privileged way — currently only `docker/login-action` (GHCR push). Candidate for SHA-pin in the next sweep once I pick the digest.
+
+---
+
 ## Things I deliberately didn't do
 
 - **MLflow / W&B** — overhead for a single-author project. The JSON tracker ([src/models/experiment_tracker.py](../src/models/experiment_tracker.py)) is git-versionable and enough. Migrating to MLflow if the team grew would take half an afternoon.

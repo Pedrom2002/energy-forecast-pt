@@ -81,7 +81,7 @@ export function ToastContainer() {
             className="shrink-0 p-1 rounded hover:bg-white/10 transition cursor-pointer"
             aria-label={t('toast.closeAria')}
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       ))}

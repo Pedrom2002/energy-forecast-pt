@@ -245,7 +245,8 @@ def main() -> None:
     off = (matched_matrix.values.sum(axis=1) - diag) / (len(regions) - 1)
     overall_ratio = float(np.mean(off) / np.mean(diag))
 
-    if overall_ratio < 1.5:
+    leakage_detected = overall_ratio < 1.5
+    if leakage_detected:
         print(
             f"\n  Scale-matched swap ratio = {overall_ratio:.2f}x.\n"
             "  Rescaled donor lags reproduce target's predictions almost\n"
@@ -260,6 +261,24 @@ def main() -> None:
             "  learning region-specific dynamics, not just a shared shape\n"
             "  rescaled per region. No v6-style leakage."
         )
+
+    # Machine-readable report for DVC / CI gating.
+    report = {
+        "baseline_mape": float(base_mape),
+        "expected_mape": float(expected_mape),
+        "overall_swap_ratio": overall_ratio,
+        "leakage_detected": bool(leakage_detected),
+        "threshold": 1.5,
+        "regions": regions,
+    }
+    report_path = ROOT / "outputs" / "leakage_report.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"\n  Report written: {report_path.relative_to(ROOT)}")
+
+    # Non-zero exit when leakage detected so DVC/CI fail fast.
+    if leakage_detected:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

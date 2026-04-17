@@ -403,11 +403,41 @@ def optuna_tune(
 
 
 def compute_conformal_q90(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    """Compute the conformal quantile of absolute residuals.
+    """Compute the split-conformal quantile of absolute residuals.
 
-    The quantile level is ``(1 - CONFORMAL_ALPHA) * 100``. With the default
-    ``alpha=0.1`` this is the 90th percentile ("q90"). The function name is
-    retained for backwards compatibility with callers/metadata fields.
+    This is a textbook **split-conformal** implementation (Vovk 2005; Angelopoulos
+    & Bates 2023):
+
+    1. Partition data into training and calibration halves (done upstream in
+       ``_train_variant``: ``X_val, y_val`` are a held-out slice never seen
+       during fitting or Optuna tuning).
+    2. Fit the point-estimate model on the training split.
+    3. Score residuals ``|y_cal - f̂(x_cal)|`` on the calibration split.
+    4. Take the ``(1 - alpha)`` empirical quantile ``q̂``.
+    5. Prediction intervals are ``[f̂(x) - q̂, f̂(x) + q̂]``.
+
+    This gives a **marginal, distribution-free** coverage guarantee of at
+    least ``1 - alpha`` under exchangeability. With ``alpha=0.1`` we get a
+    nominal 90% coverage interval; the empirical coverage is tracked in prod
+    via ``src.api.coverage.CoverageTracker`` and exposed at
+    ``/model/coverage``.
+
+    Why split-conformal and not CV+/Jackknife+:
+    - Cheaper: one extra fit avoids the O(n) refits CV+ needs.
+    - Simpler to audit: the calibration set is an explicit, inspectable slice.
+    - CV+ would give tighter intervals at higher compute cost, but with 40k
+      samples and ~8 features we already have plenty of calibration data
+      (see ``scripts/retrain.py`` split sizes) — the marginal tightness gain
+      isn't worth the retrain budget.
+
+    Args:
+        y_true: Ground-truth values on the held-out calibration slice.
+        y_pred: Point predictions from the fitted model on the same slice.
+
+    Returns:
+        The ``(1 - alpha)`` empirical quantile of absolute residuals (in MW),
+        persisted to model metadata as ``conformal_q90`` and consumed by the
+        API in ``src.api.prediction`` when building CI bounds.
     """
     residuals = np.abs(y_true - y_pred)
     quantile_level = (1.0 - CONFORMAL_ALPHA) * 100.0

@@ -172,12 +172,19 @@ class PredictionResponse(BaseModel):
     confidence_interval_upper: float
     model_name: str
     confidence_level: float = Field(default=0.90, description="Confidence level for the interval")
-    ci_method: str = Field(
+    ci_method: Literal["conformal", "gaussian_z_rmse"] = Field(
         default="gaussian_z_rmse",
         description=(
-            "CI method: 'conformal' (calibrated, distribution-free coverage guarantee) "
-            "or 'gaussian_z_rmse' (assumes Normal residuals, fallback when conformal data absent)"
+            "Which method produced the confidence interval on this response.\n\n"
+            "- **conformal** — split-conformal empirical quantile of absolute "
+            "residuals on a held-out calibration slice. Distribution-free; "
+            "nominal 90% marginal coverage guarantee under exchangeability. "
+            "Used when `conformal_q90` is present in the model metadata.\n"
+            "- **gaussian_z_rmse** — symmetric ±(Z₀.₉₅ × RMSE) band assuming "
+            "Normal residuals. Fallback path when conformal calibration data "
+            "is absent (e.g. older checkpoints)."
         ),
+        examples=["conformal"],
     )
     ci_lower_clipped: bool = Field(
         default=False,

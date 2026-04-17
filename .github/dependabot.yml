@@ -1,0 +1,50 @@
+# Dependabot configuration — security-first.
+#
+# The project is archived (README: "project archived as complete"), so we
+# don't want routine minor-version PR noise. But we do want visibility when
+# dependencies grow CVEs; GitHub auto-creates security-update PRs even when
+# `open-pull-requests-limit: 0` is set, and that's the mode used below.
+#
+# Exception: github-actions uses schedule.interval: monthly with a small
+# open limit. Keeping actions current is a security concern in its own
+# right (tag-hijack, supply-chain) and the noise is tolerable (< 5 PRs /
+# month across ~10 actions).
+
+version: 2
+updates:
+  # Python deps (requirements.txt + requirements-dev.txt + pyproject.toml).
+  # open-pull-requests-limit: 0 means Dependabot won't file regular update
+  # PRs but WILL still file security-advisory PRs when GitHub's CVE feed
+  # flags a transitive vuln.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 0
+
+  # Node deps (frontend/package.json). Same posture as Python.
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 0
+
+  # GitHub Actions pinning — monthly small-batch PRs to bump tag pins and
+  # (via the PR content) regenerate SHA pins when we opt into SHA pinning
+  # per action. Low noise; important for supply-chain hygiene.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
+
+  # Base images for the Dockerfile — keeps node:20.19-slim and
+  # python:3.11.11-slim current. Monthly cadence matches github-actions.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3

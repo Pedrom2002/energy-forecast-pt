@@ -79,7 +79,7 @@ export default function Layout() {
               flex items-center justify-center shadow-[0_0_12px_rgba(34,211,238,0.35)]"
             aria-hidden="true"
           >
-            <Zap className="w-[18px] h-[18px] text-[#05080f]" strokeWidth={2.5} />
+            <Zap className="w-[18px] h-[18px] text-[#05080f]" strokeWidth={2.5} aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <span className="font-display text-sm font-semibold tracking-tight block leading-tight">
@@ -165,9 +165,9 @@ export default function Layout() {
           <div className="flex items-center justify-between">
             <LanguageToggle />
             <div className="flex items-center gap-0.5" role="group" aria-label={t('layout.externalLinks')}>
-              <IconLink href="https://github.com/Pedrom2002/energy-forecast-pt" label="GitHub"><Github className="w-4 h-4" /></IconLink>
-              <IconLink href="https://www.linkedin.com/in/pedro-marques-056baa366/" label="LinkedIn"><Linkedin className="w-4 h-4" /></IconLink>
-              <IconLink href="/docs" label={t('layout.apiDocs')}><BookOpen className="w-4 h-4" /></IconLink>
+              <IconLink href="https://github.com/Pedrom2002/energy-forecast-pt" label="GitHub"><Github className="w-4 h-4" aria-hidden="true" /></IconLink>
+              <IconLink href="https://www.linkedin.com/in/pedro-marques-056baa366/" label="LinkedIn"><Linkedin className="w-4 h-4" aria-hidden="true" /></IconLink>
+              <IconLink href="/docs" label={t('layout.apiDocs')}><BookOpen className="w-4 h-4" aria-hidden="true" /></IconLink>
             </div>
           </div>
         </div>

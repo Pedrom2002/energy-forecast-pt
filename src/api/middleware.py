@@ -233,6 +233,14 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def _record_redis_failure(self) -> None:
         self._cb_failures += 1
+        # Surface every Redis failure to Prometheus so operators can alert
+        # on the rate of failures even before the circuit breaker opens.
+        try:
+            from src.api.metrics import metrics as prom_metrics
+
+            prom_metrics.rate_limiter_redis_failures_total.inc()
+        except Exception:  # pragma: no cover — metrics init fail shouldn't break RL
+            pass
         if self._cb_failures >= self.CB_THRESHOLD:
             if not self._cb_open:
                 logger.warning(

@@ -155,6 +155,12 @@ class MetricsRegistry:
                 "Total number of model load failures (startup or reload).",
                 registry=self.registry,
             )
+            self.rate_limiter_redis_failures_total = Counter(
+                "rate_limiter_redis_failures_total",
+                "Total Redis operation failures in the rate limiter (triggers "
+                "circuit breaker + fallback to in-memory store).",
+                registry=self.registry,
+            )
         else:  # pragma: no cover - import-time fallback
             self.registry = CollectorRegistry()
             self.predictions_total = _NoopMetric()
@@ -166,6 +172,7 @@ class MetricsRegistry:
             self.conformal_coverage_ratio = _NoopMetric()
             self.feature_drift_score = _NoopMetric()
             self.model_load_errors_total = _NoopMetric()
+            self.rate_limiter_redis_failures_total = _NoopMetric()
 
     # ------------------------------------------------------------------
     # Convenience helpers used from the FastAPI app.

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../api/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { useMetricsSummary, useModelCoverage, queryKeys } from '../api/hooks';
 import { formatLocale } from '../i18n';
 import { Card, CardSkeleton } from '../components/Card';
 import { toast } from '../components/Toast';
@@ -42,37 +43,31 @@ function getNumber(obj: AnyRecord | null, ...keys: string[]): number | null {
 export default function Monitoring() {
   const { t } = useTranslation();
   useDocumentTitle(t('monitoring.title'));
-  const [coverage, setCoverage] = useState<AnyRecord | null>(null);
-  const [metrics, setMetrics] = useState<AnyRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const queryClient = useQueryClient();
+  const coverageQ = useModelCoverage();
+  const metricsQ = useMetricsSummary();
 
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [cov, met] = await Promise.allSettled([
-        api.modelCoverage(),
-        api.metricsSummary(),
-      ]);
-      if (cov.status === 'fulfilled') setCoverage(cov.value as AnyRecord);
-      if (met.status === 'fulfilled') setMetrics(met.value as AnyRecord);
-      if (cov.status === 'rejected') {
-        setError(t('monitoring.errorLoad'));
-      } else {
-        setLastUpdated(new Date());
-        toast.success(t('monitoring.toastUpdated'));
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const coverage = (coverageQ.data ?? null) as unknown as AnyRecord | null;
+  const metrics = (metricsQ.data ?? null) as unknown as AnyRecord | null;
+  const loading = coverageQ.isLoading || metricsQ.isLoading;
+  const error = coverageQ.error ? t('monitoring.errorLoad') : null;
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const isInitial = useRef(true);
 
   useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (coverageQ.dataUpdatedAt > 0) {
+      setLastUpdated(new Date(coverageQ.dataUpdatedAt));
+      if (!isInitial.current) toast.success(t('monitoring.toastUpdated'));
+      isInitial.current = false;
+    }
+  }, [coverageQ.dataUpdatedAt, t]);
+
+  const load = async () => {
+    await Promise.allSettled([
+      queryClient.invalidateQueries({ queryKey: queryKeys.modelCoverage }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.metricsSummary }),
+    ]);
+  };
 
   // Derived values
   const empiricalRaw = getNumber(coverage, 'empirical_coverage', 'coverage', 'empirical');
