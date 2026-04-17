@@ -49,3 +49,11 @@ repos:
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
+
+  # Secondary secret-scan: detect-secrets uses heuristics, gitleaks uses a
+  # different ruleset (regex + entropy). Running both is cheap and catches
+  # more patterns (AWS keys, GitHub tokens, JWT-shaped strings, etc.).
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks

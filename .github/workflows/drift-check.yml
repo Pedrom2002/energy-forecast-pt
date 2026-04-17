@@ -1,0 +1,81 @@
+name: Drift Check (scheduled)
+
+# Weekly probe of the live API's empirical CI coverage. Exists because the
+# README promises drift monitoring but previously had no automation wired
+# up — the backend tracks it, but nobody was watching. Monday 02:00 UTC is
+# low-traffic, so the alert lands early-week when we have time to react.
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"  # every Monday 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Override API_URL (defaults to vars.DRIFT_API_URL)"
+        required: false
+
+permissions:
+  contents: read
+  issues: write  # needed to open the alert issue on failure
+
+jobs:
+  check-coverage:
+    name: Hit /model/coverage and open issue on alert
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: |
+            scripts/check_drift.py
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Run drift check
+        id: drift
+        env:
+          API_URL: ${{ github.event.inputs.api_url || vars.DRIFT_API_URL || 'https://pedrom02-energy-forecast-pt.hf.space/api' }}
+          API_KEY: ${{ secrets.DRIFT_API_KEY }}
+          COVERAGE_MIN: ${{ vars.COVERAGE_MIN || '0.80' }}
+        run: |
+          set +e
+          python scripts/check_drift.py | tee drift-output.txt
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Open issue on drift
+        if: steps.drift.outputs.exit_code == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('drift-output.txt', 'utf8');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[drift] empirical CI coverage below floor — ${new Date().toISOString().slice(0, 10)}`,
+              labels: ['drift', 'monitoring'],
+              body: [
+                '⚠️ Scheduled drift check detected empirical coverage below the configured floor.',
+                '',
+                '```',
+                body,
+                '```',
+                '',
+                'Next step: run `POST /admin/reload-models` after retraining, or open a PR that recalibrates the conformal quantile.',
+              ].join('\n'),
+            });
+
+      - name: Fail job on drift
+        if: steps.drift.outputs.exit_code == '2'
+        run: |
+          echo "Drift detected — see issue opened above."
+          exit 2
+
+      - name: Fail job on transport error
+        if: steps.drift.outputs.exit_code == '1'
+        run: |
+          echo "API unreachable — check the Space status."
+          exit 1
