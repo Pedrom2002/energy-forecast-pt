@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, type EnergyData, type PredictionResponse, REGIONS, type Region } from '../api/client';
+import { type EnergyData, type PredictionResponse, REGIONS, type Region } from '../api/client';
+import { useBatchMutation } from '../api/hooks';
 import { Card } from '../components/Card';
 import { ChartSkeleton } from '../components/ChartSkeleton';
 import { toast } from '../components/Toast';
@@ -54,8 +55,6 @@ export default function Forecast() {
   const [forecastHours, setForecastHours] = useState(24);
   const [results, setResults] = useState<PredictionResponse[]>([]);
   const [historyData, setHistoryData] = useState<{ timestamp: string; consumption_mw: number }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [modelName, setModelName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [explainWeather, setExplainWeather] = useState<EnergyData | null>(null);
@@ -67,33 +66,40 @@ export default function Forecast() {
   const [scrollTop, setScrollTop] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleForecast = async () => {
-    if (submitting) return; // debounce
-    setSubmitting(true);
-    setLoading(true);
-    setError(null);
-    setExplainWeather(null);
-    try {
-      // Demo: only weather is synthesised. We deliberately use the no-lags
-      // model because we have NO live consumption feed — synthesising lag
-      // values would produce optically-precise but scientifically dishonest
-      // output. The with-lags model (MAPE 1.44%) is exposed via
-      // /predict/sequential for production deployments with a real feed.
-      const items = generateForecastItems(region, forecastHours);
-      const res = await api.predictBatch(items);
+  const batchMutation = useBatchMutation({
+    onSuccess: (res, items) => {
       setResults(res.predictions);
       setExplainWeather(items[Math.floor(items.length / 2)] ?? null);
       setHistoryData([]); // no history shown — we don't have it
       setModelName(res.predictions[0]?.model_name ?? 'XGBoost (no lags)');
-      toast.success(t('forecast.forecastGenerated', { count: res.predictions.length, region }));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : t('common.unknownError');
-      setError(msg);
+      toast.success(
+        t('forecast.forecastGenerated', { count: res.predictions.length, region }),
+      );
+    },
+    onError: () => {
       toast.error(t('forecast.forecastFailed'));
-    } finally {
-      setLoading(false);
-      setTimeout(() => setSubmitting(false), 1000); // 1s debounce
-    }
+    },
+  });
+  const loading = batchMutation.isPending;
+  const error = batchMutation.error
+    ? batchMutation.error.message || t('common.unknownError')
+    : null;
+
+  const handleForecast = () => {
+    if (submitting) return; // debounce
+    setSubmitting(true);
+    setExplainWeather(null);
+    // Demo: only weather is synthesised. We deliberately use the no-lags
+    // model because we have NO live consumption feed — synthesising lag
+    // values would produce optically-precise but scientifically dishonest
+    // output. The with-lags model (MAPE 1.44%) is exposed via
+    // /predict/sequential for production deployments with a real feed.
+    const items = generateForecastItems(region, forecastHours);
+    batchMutation.mutate(items, {
+      onSettled: () => {
+        setTimeout(() => setSubmitting(false), 1000); // 1s debounce
+      },
+    });
   };
 
   const handleExportCSV = () => {

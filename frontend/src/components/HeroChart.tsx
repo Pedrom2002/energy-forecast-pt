@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -114,7 +114,7 @@ function OfflineState() {
   );
 }
 
-export default function HeroChart() {
+function HeroChartImpl() {
   const [data, setData] = useState<ChartPoint[] | null>(null);
   const [error, setError] = useState<boolean>(false);
   const { t } = useTranslation();
@@ -246,3 +246,5 @@ export default function HeroChart() {
     </div>
   );
 }
+
+export default memo(HeroChartImpl);

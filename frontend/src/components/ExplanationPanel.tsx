@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, type EnergyData, type ExplanationResponse } from '../api/client';
+import { type EnergyData } from '../api/client';
+import { useExplainMutation } from '../api/hooks';
 import { CardSkeleton } from './Card';
 import { formatMW, formatPercent } from '../utils/format';
 import { FadeInView } from './motion';
@@ -33,36 +34,31 @@ interface Props {
 export function ExplanationPanel({ weather }: Props) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const [result, setResult] = useState<ExplanationResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showTable, setShowTable] = useState(false);
   const [sortCol, setSortCol] = useState<SortCol>('rank');
   const [sortAsc, setSortAsc] = useState(true);
 
-  const fetchExplanation = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.predictExplain(weather, 10);
-      setResult(res);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.unknownError'));
-    } finally {
-      setLoading(false);
-    }
-  }, [weather]);
+  const explainMutation = useExplainMutation();
+  const result = explainMutation.data ?? null;
+  const loading = explainMutation.isPending;
+  const error = explainMutation.error
+    ? explainMutation.error.message || t('common.unknownError')
+    : null;
+
+  const fetchExplanation = useCallback(() => {
+    explainMutation.mutate({ data: weather, topN: 10 });
+  }, [weather, explainMutation]);
 
   const handleToggle = () => {
     const next = !expanded;
     setExpanded(next);
     if (next && !result && !loading && !error) {
-      void fetchExplanation();
+      fetchExplanation();
     }
   };
 
   const handleRetry = () => {
-    void fetchExplanation();
+    fetchExplanation();
   };
 
   const chartData =

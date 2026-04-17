@@ -84,16 +84,106 @@ export interface HealthResponse {
   [key: string]: unknown;
 }
 
-export interface ModelInfoResponse {
+export interface ModelVariantInfo {
+  model_type?: string;
+  features_count?: number;
+  mae?: number;
+  rmse?: number;
+  mape?: number;
+  r2?: number;
+  mase?: number;
+  trained_at?: string;
+  conformal_q90?: number;
   [key: string]: unknown;
+}
+
+export interface ModelInfoResponse {
+  status: string;
+  models_available: {
+    with_lags?: ModelVariantInfo;
+    no_lags?: ModelVariantInfo;
+    advanced?: ModelVariantInfo;
+  };
+  model_checksums?: Record<string, string>;
+}
+
+export interface FeatureStat {
+  mean?: number;
+  std?: number;
+  min?: number;
+  max?: number;
+  q25?: number;
+  q50?: number;
+  q75?: number;
+}
+
+export type DriftResponse =
+  | {
+      available: false;
+      message: string;
+      guidance: { how_to_generate: string; alert_threshold: string };
+    }
+  | {
+      available: true;
+      source_model: string | null;
+      feature_count: number;
+      feature_stats: Record<string, FeatureStat>;
+      usage_note: string;
+    };
+
+export type DriftLevel = "normal" | "elevated" | "alert";
+
+export interface FeatureDriftScore {
+  z_score: number | null;
+  live_mean?: number;
+  training_mean?: number;
+  training_std?: number;
+  drift_level?: DriftLevel;
+  note?: string;
 }
 
 export interface DriftCheckResponse {
-  [key: string]: unknown;
+  source_model: string | null;
+  features_checked: number;
+  alerts: string[];
+  alert_count: number;
+  drift_scores: Record<string, FeatureDriftScore>;
+  thresholds: { normal: string; elevated: string; alert: string };
 }
 
-export interface CoverageResponse {
-  [key: string]: unknown;
+export interface CoverageSummary {
+  coverage: number | null;
+  n_observations: number;
+  alert: boolean;
+  alert_threshold: number;
+  nominal_coverage: number;
+  window_size: number;
+}
+
+export type CoverageResponse =
+  | { available: false; message: string }
+  | ({ available: true } & CoverageSummary);
+
+export interface MetricsSummaryResponse {
+  uptime_seconds: number | null;
+  api_version: string;
+  models: {
+    total_loaded: number;
+    with_lags: boolean;
+    no_lags: boolean;
+    advanced: boolean;
+    rmse_calibrated: boolean;
+  };
+  coverage: CoverageResponse;
+  config: {
+    rate_limit_max: number;
+    rate_limit_window_seconds: number;
+    max_request_body_bytes: number;
+    prediction_timeout_seconds: number;
+    log_level: string;
+    trust_proxy: boolean;
+    auth_enabled: boolean;
+  };
 }
 
 export type Region = 'Alentejo' | 'Algarve' | 'Centro' | 'Lisboa' | 'Norte';
@@ -105,9 +195,9 @@ export const api = {
   regions: () => request<{ regions: string[] }>('/regions'),
   limitations: () => request<Record<string, unknown>>('/limitations'),
   modelInfo: () => request<ModelInfoResponse>('/model/info'),
-  modelDrift: () => request<Record<string, unknown>>('/model/drift'),
+  modelDrift: () => request<DriftResponse>('/model/drift'),
   modelCoverage: () => request<CoverageResponse>('/model/coverage'),
-  metricsSummary: () => request<Record<string, unknown>>('/metrics/summary'),
+  metricsSummary: () => request<MetricsSummaryResponse>('/metrics/summary'),
 
   predict: (data: EnergyData) =>
     request<PredictionResponse>('/predict', {

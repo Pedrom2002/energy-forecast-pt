@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, type EnergyData, type PredictionResponse } from '../api/client';
+import { type EnergyData } from '../api/client';
+import { usePredictMutation } from '../api/hooks';
 import { Card } from '../components/Card';
 import { toast } from '../components/Toast';
 import { formatMW, formatDateTime } from '../utils/format';
@@ -27,22 +28,24 @@ export default function Predict() {
     cloud_cover: 40.0,
     pressure: 1015.0,
   });
-  const [result, setResult] = useState<PredictionResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const predictMutation = usePredictMutation({
+    onSuccess: (res) => {
+      toast.success(
+        t('predict.toastSuccess', {
+          value: formatMW(res.predicted_consumption_mw),
+          region: res.region,
+        }),
+      );
+    },
+  });
+  const result = predictMutation.data ?? null;
+  const loading = predictMutation.isPending;
+  const error = predictMutation.error
+    ? predictMutation.error.message || t('common.unknownError')
+    : null;
 
-  const handlePredict = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.predict(data);
-      setResult(res);
-      toast.success(t('predict.toastSuccess', { value: formatMW(res.predicted_consumption_mw), region: res.region }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('common.unknownError'));
-    } finally {
-      setLoading(false);
-    }
+  const handlePredict = () => {
+    predictMutation.mutate(data);
   };
 
   return (
