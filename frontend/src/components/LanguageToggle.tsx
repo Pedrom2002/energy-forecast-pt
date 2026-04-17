@@ -18,11 +18,11 @@ export default function LanguageToggle() {
         aria-pressed={active}
         aria-label={fullLabel}
         title={fullLabel}
-        className={`min-w-[36px] min-h-[36px] px-2 rounded-md text-xs font-semibold cursor-pointer transition-colors
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
+        className={`min-w-[32px] min-h-[32px] px-2 rounded-md text-[11px] font-mono font-semibold uppercase tracking-wider cursor-pointer transition-colors
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-1 focus-visible:ring-offset-[#05080f]
           ${active
-            ? 'bg-primary-600 text-white'
-            : 'text-text-secondary hover:text-primary-600 hover:bg-surface-bright'
+            ? 'bg-primary-500/15 text-primary-300 ring-1 ring-primary-400/30'
+            : 'text-text-muted hover:text-text-primary hover:bg-white/[0.05]'
           }`}
       >
         {label}
@@ -32,7 +32,7 @@ export default function LanguageToggle() {
 
   return (
     <div
-      className="inline-flex items-center gap-1 min-h-[44px] px-1.5 rounded-lg border border-border bg-surface"
+      className="inline-flex items-center gap-0.5 h-9 px-1 rounded-lg border border-border bg-surface-dim"
       role="group"
       aria-label={t('lang.switchAria')}
     >

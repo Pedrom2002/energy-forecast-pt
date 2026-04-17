@@ -18,6 +18,7 @@ import {
   Zap,
   Layers,
   Database,
+  Radio,
 } from 'lucide-react';
 
 const POLL_INTERVAL_MS = 30_000;
@@ -48,15 +49,15 @@ function PortugalMap({ ariaLabel }: { ariaLabel: string }) {
     >
       <defs>
         <linearGradient id="pt-fill" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--color-primary-400, #fbbf24)" />
-          <stop offset="100%" stopColor="var(--color-primary-600, #d97706)" />
+          <stop offset="0%" stopColor="#0891b2" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.25" />
         </linearGradient>
       </defs>
       <path
         d={PORTUGAL_PATH}
         fill="url(#pt-fill)"
-        stroke="#b45309"
-        strokeOpacity={0.45}
+        stroke="#67e8f9"
+        strokeOpacity={0.7}
         strokeWidth={40}
         strokeLinejoin="round"
       />
@@ -66,18 +67,12 @@ function PortugalMap({ ariaLabel }: { ariaLabel: string }) {
             cx={r.cx}
             cy={r.cy}
             r={650}
-            className="fill-white/70"
-            animate={{ scale: [1, 1.9, 1], opacity: [0.55, 0, 0.55] }}
+            fill="#22d3ee"
+            animate={{ scale: [1, 2.2, 1], opacity: [0.6, 0, 0.6] }}
             transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
             style={{ transformOrigin: `${r.cx}px ${r.cy}px` }}
           />
-          <circle
-            cx={r.cx}
-            cy={r.cy}
-            r={240}
-            className="fill-white stroke-primary-900"
-            strokeWidth={80}
-          />
+          <circle cx={r.cx} cy={r.cy} r={240} fill="#22d3ee" stroke="#f0f6fc" strokeWidth={60} />
         </g>
       ))}
     </svg>
@@ -148,9 +143,9 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="space-y-6" aria-busy="true">
-        <div className="h-28 bg-surface-bright rounded-2xl skeleton-shimmer" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 stagger-children">
-          {[1, 2, 3, 4].map((i) => <CardSkeleton key={i} lines={2} />)}
+        <div className="h-28 glass-card skeleton-shimmer" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
+          {[1, 2, 3].map((i) => <CardSkeleton key={i} lines={2} />)}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
           <CardSkeleton lines={4} />
@@ -163,31 +158,38 @@ export default function Dashboard() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
-        <div className="bg-surface border border-border rounded-2xl p-8 sm:p-10 text-center max-w-md shadow-lg">
-          <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle className="w-8 h-8 text-red-500" aria-hidden="true" />
+        <div className="glass-card p-8 sm:p-10 text-center max-w-md">
+          <div
+            className="w-14 h-14 rounded-xl bg-rose-500/10 ring-1 ring-rose-500/30
+              flex items-center justify-center mx-auto mb-5"
+          >
+            <AlertTriangle className="w-7 h-7 text-energy-red" aria-hidden="true" />
           </div>
-          <h1 className="text-xl font-bold text-text-primary">{t('dashboard.apiUnavailable')}</h1>
+          <h1 className="font-display text-xl font-semibold text-text-primary tracking-tight">
+            {t('dashboard.apiUnavailable')}
+          </h1>
           <p className="text-sm text-text-secondary mt-2">{error}</p>
           <p className="text-xs text-text-muted mt-3">
             {t('dashboard.ensureApiRunning')}{' '}
-            <code className="bg-surface-bright px-2 py-0.5 rounded-md text-xs font-mono text-primary-600">localhost:8000</code>
+            <code
+              className="font-mono bg-surface-dim border border-border px-2 py-0.5 rounded
+                text-xs text-primary-300"
+            >
+              localhost:8000
+            </code>
           </p>
           <button
             type="button"
             onClick={() => load()}
-            className="mt-6 inline-flex items-center gap-2 text-sm font-medium bg-primary-600 hover:bg-primary-700
-              text-white px-5 min-h-[44px] rounded-lg transition-colors shadow-sm cursor-pointer
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
-              active:scale-[0.98]"
+            className="mt-6 inline-flex items-center gap-2 text-sm font-medium
+              bg-primary-500 hover:bg-primary-400 text-[#05080f] px-5 min-h-[44px] rounded-lg
+              transition-colors cursor-pointer shadow-[0_0_18px_rgba(34,211,238,0.35)]
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2
+              focus-visible:ring-offset-[#05080f] active:scale-[0.98]"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
             {t('common.retry')}
           </button>
-          <div className="flex justify-center gap-4 mt-3">
-            <a href="/predict" className="text-xs text-text-muted hover:text-primary-600 underline transition-colors">{t('dashboard.goToPredict')}</a>
-            <a href="/monitoring" className="text-xs text-text-muted hover:text-primary-600 underline transition-colors">{t('dashboard.seeMonitoring')}</a>
-          </div>
         </div>
       </div>
     );
@@ -198,11 +200,11 @@ export default function Dashboard() {
   const totalModels = Object.keys(modelsLoadedMap).length;
 
   const isHealthy = health?.status === 'healthy';
-  const statusDot = isHealthy
-    ? 'bg-green-500'
+  const statusTone = isHealthy
+    ? 'bg-energy-green'
     : health?.status
-      ? 'bg-amber-500'
-      : 'bg-red-500';
+      ? 'bg-energy-yellow'
+      : 'bg-energy-red';
   const statusLabel = isHealthy
     ? t('dashboard.statusHealthy')
     : health?.status
@@ -211,152 +213,169 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Compact hero */}
-      <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-text-primary leading-tight">
-            {t('dashboard.title')}
-          </h1>
-          <p className="mt-2 text-sm md:text-base text-text-secondary max-w-2xl">
-            {t('dashboard.subtitle')}
-          </p>
-          <div className="mt-3 flex items-center gap-3">
-            <span className="relative flex items-center justify-center">
-              <span className={`absolute inline-flex h-3 w-3 rounded-full ${statusDot} opacity-75 animate-pulse-glow`} />
-              <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${statusDot}`} />
-            </span>
-            <span className="text-sm font-medium text-text-primary">{statusLabel}</span>
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider
-              px-2 py-0.5 rounded-full bg-primary-100 text-primary-700
-              dark:bg-primary-900/40 dark:text-primary-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-500 animate-pulse" />
-              {t('common.live')}
-            </span>
+      {/* ─── Hero band ─── */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-grid px-5 sm:px-8 py-6 sm:py-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0
+            bg-[radial-gradient(ellipse_80%_50%_at_20%_0%,rgba(34,211,238,0.12),transparent_60%),radial-gradient(ellipse_60%_40%_at_90%_30%,rgba(245,158,11,0.06),transparent_60%)]"
+        />
+        <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary-400/25 bg-primary-500/10
+                  px-2.5 py-1 text-[10px] font-mono font-semibold uppercase tracking-[0.14em] text-primary-300"
+              >
+                <Radio className="w-3 h-3" aria-hidden="true" />
+                {t('common.live')}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="relative flex items-center justify-center">
+                  <span className={`absolute inline-flex h-2.5 w-2.5 rounded-full ${statusTone} opacity-70 animate-ping`} />
+                  <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${statusTone}`} />
+                </span>
+                <span className="text-[11px] font-mono font-medium uppercase tracking-wider text-text-secondary">
+                  {statusLabel}
+                </span>
+              </span>
+            </div>
+            <h1 className="font-display text-3xl sm:text-4xl md:text-5xl font-semibold text-text-primary tracking-tight leading-[1.05]">
+              {t('dashboard.title')}{' '}
+              <span className="text-gradient-signal">PT</span>
+            </h1>
+            <p className="mt-3 text-sm sm:text-base text-text-secondary max-w-2xl leading-relaxed">
+              {t('dashboard.subtitle')}
+            </p>
           </div>
-        </div>
 
-        <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => load()}
-            className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center gap-2 text-sm font-medium
-              text-text-secondary hover:text-text-primary bg-transparent hover:bg-surface-bright
-              border border-border hover:border-primary-300 dark:hover:border-primary-700
-              rounded-lg px-4 cursor-pointer transition-colors
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-            aria-label={t('dashboard.updateData')}
-          >
-            <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span className="hidden sm:inline">{t('common.refresh')}</span>
-          </button>
-          <p className="text-xs text-text-muted tabular-nums">
-            {t('common.updated', { when: formatRelative(lastUpdated, now) })}
-          </p>
+          <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => load()}
+              className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center gap-2 text-sm font-medium
+                text-text-secondary hover:text-text-primary hover:bg-white/[0.04]
+                border border-border hover:border-border-strong
+                rounded-lg px-4 cursor-pointer transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+              aria-label={t('dashboard.updateData')}
+            >
+              <RefreshCw className="w-4 h-4" aria-hidden="true" />
+              <span className="hidden sm:inline">{t('common.refresh')}</span>
+            </button>
+            <p className="text-[11px] text-text-muted font-mono tabular-nums">
+              {t('common.updated', { when: formatRelative(lastUpdated, now) })}
+            </p>
+          </div>
         </div>
       </section>
 
-      {/* Hero live forecast chart — the signature moment */}
-      <section
-        className="relative overflow-hidden rounded-2xl border border-border
-          bg-gradient-to-br from-primary-50/40 via-surface to-surface
-          dark:from-primary-950/30 dark:via-surface dark:to-surface p-4 md:p-6"
-      >
-        <div className="mb-3 flex items-baseline justify-between gap-4">
+      {/* ─── Signature hero chart ─── */}
+      <section className="glass-card-emphasis p-4 md:p-6 overflow-hidden">
+        <div className="mb-4 flex items-baseline justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-600 dark:text-primary-400">
+            <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.14em] text-primary-300">
               {t('dashboard.heroTitle')}
             </p>
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-text-secondary mt-1">
               {t('dashboard.heroSubtitle')}
             </p>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-text-muted">
-            <span className="h-2 w-2 rounded-full bg-primary-500 animate-pulse" />
+          <span
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-dim
+              px-2 py-1 text-[10px] font-mono text-text-muted uppercase tracking-wider"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-primary-400 animate-pulse" />
             {t('dashboard.splitConformal')}
           </span>
         </div>
         <HeroChart />
       </section>
 
-
       {/* Coverage alert */}
       {health?.coverage_alert && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-4">
-          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+        <div
+          className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-4"
+          role="alert"
+        >
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div>
-            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{t('dashboard.coverageAlertTitle')}</p>
-            <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1">
-              {t('dashboard.coverageAlertBody')}
-            </p>
+            <p className="text-sm font-medium text-amber-200">{t('dashboard.coverageAlertTitle')}</p>
+            <p className="text-xs text-amber-200/70 mt-1">{t('dashboard.coverageAlertBody')}</p>
           </div>
         </div>
       )}
 
-      {/* Bento grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 auto-rows-[minmax(140px,auto)]">
-        {/* Models active (live) */}
+      {/* ─── Bento KPIs ─── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 auto-rows-[minmax(150px,auto)]">
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+            <p className="text-[10px] font-mono font-medium uppercase tracking-[0.12em] text-text-muted">
               {t('dashboard.modelsLoaded')}
             </p>
-            <Layers className="h-4 w-4 text-primary-500" aria-hidden="true" />
+            <div className="w-8 h-8 rounded-lg bg-primary-500/10 ring-1 ring-primary-400/20 flex items-center justify-center">
+              <Layers className="h-4 w-4 text-primary-400" aria-hidden="true" />
+            </div>
           </div>
           <div>
-            <div className="flex items-baseline gap-2">
-              <AnimatedNumber
-                value={(typeof health?.total_models === 'number' ? health.total_models : totalModels) || 0}
-                format={(n) => Math.round(n).toString()}
-                className="text-3xl font-bold md:text-4xl"
-              />
-            </div>
-            <p className="mt-1 text-xs text-text-secondary">no_lags · with_lags</p>
+            <AnimatedNumber
+              value={(typeof health?.total_models === 'number' ? health.total_models : totalModels) || 0}
+              format={(n) => Math.round(n).toString()}
+              className="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-none text-text-primary"
+            />
+            <p className="mt-2 text-xs font-mono text-text-muted tracking-wider">no_lags · with_lags</p>
           </div>
         </BentoCard>
 
-        {/* Portugal map */}
-        <BentoCard size="md" className="flex flex-col items-center justify-between">
-          <p className="w-full text-xs font-medium uppercase tracking-wide text-text-secondary">
+        <BentoCard size="sm" className="flex flex-col items-center justify-between" gradient>
+          <p className="w-full text-[10px] font-mono font-medium uppercase tracking-[0.12em] text-text-muted">
             {t('dashboard.coverage')}
           </p>
-          <div className="flex flex-1 items-center justify-center py-4">
+          <div className="flex flex-1 items-center justify-center py-2">
             <PortugalMap ariaLabel={t('dashboard.mapLabel')} />
           </div>
           <div className="w-full text-center">
-            <p className="text-2xl font-bold">
+            <p className="font-display text-3xl font-semibold tracking-tight leading-none text-text-primary">
               <AnimatedNumber value={5} format={(n) => Math.round(n).toString()} />{' '}
-              <span className="text-sm font-medium text-text-secondary">{t('dashboard.regions')}</span>
+              <span className="text-sm font-normal text-text-secondary font-sans">{t('dashboard.regions')}</span>
             </p>
           </div>
         </BentoCard>
 
-        {/* 6. Samples */}
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+            <p className="text-[10px] font-mono font-medium uppercase tracking-[0.12em] text-text-muted">
               {t('dashboard.samples')}
             </p>
-            <Database className="h-4 w-4 text-primary-500" aria-hidden="true" />
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 ring-1 ring-amber-400/20 flex items-center justify-center">
+              <Database className="h-4 w-4 text-accent-400" aria-hidden="true" />
+            </div>
           </div>
           <div>
-            <p className="text-3xl font-bold md:text-4xl tabular-nums">
+            <p className="font-display text-4xl md:text-5xl font-semibold tracking-tight leading-none text-text-primary tabular-nums">
               {formatNumber(40075, 0)}
             </p>
-            <p className="mt-1 text-xs text-text-secondary">e-Redes + Open-Meteo</p>
+            <p className="mt-2 text-xs font-mono text-text-muted tracking-wider">e-Redes · Open-Meteo</p>
           </div>
         </BentoCard>
       </div>
 
-      {/* Live operational section */}
+      {/* ─── Operational state ─── */}
       <section className="space-y-4">
-        <p className="text-xs font-medium uppercase tracking-[0.15em] text-text-secondary">
-          {t('dashboard.operationalState')}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-[10px] font-mono font-semibold uppercase tracking-[0.14em] text-text-muted">
+            {t('dashboard.operationalState')}
+          </p>
+          <div className="flex-1 hairline" aria-hidden="true" />
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 stagger-children">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 stagger-children">
           <Card title={t('dashboard.modelsState')} subtitle={t('dashboard.modelsStateSubtitle')}>
-            <div className="mb-3 flex items-center justify-between text-xs text-text-muted">
-              <span>{t('dashboard.uptime')}: <span className="font-mono text-text-primary">{uptime}</span></span>
+            <div className="mb-4 flex items-center justify-between text-[11px] font-mono text-text-muted uppercase tracking-wider">
+              <span>
+                {t('dashboard.uptime')}:{' '}
+                <span className="text-text-primary">{uptime}</span>
+              </span>
               <span>v{health?.version || '?'}</span>
             </div>
             <div className="space-y-1">
@@ -364,23 +383,24 @@ export default function Dashboard() {
                 Object.entries(health.models_loaded).map(([name, loaded]) => (
                   <div
                     key={name}
-                    className="flex items-center justify-between py-3 px-2 rounded-lg hover:bg-surface-dim transition-colors border-b border-border/50 last:border-0"
+                    className="flex items-center justify-between py-3 px-3 rounded-lg
+                      hover:bg-white/[0.03] transition-colors border-b border-border-subtle last:border-0"
                   >
                     <div className="flex items-center gap-2.5">
                       <Cpu className="w-4 h-4 text-text-muted" aria-hidden="true" />
-                      <span className="text-sm font-medium text-text-primary">{name}</span>
+                      <span className="text-sm font-mono font-medium text-text-primary">{name}</span>
                     </div>
                     <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
-                        loaded
-                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                          : 'bg-red-50 text-red-700'
-                      }`}
+                      className={`inline-flex items-center gap-1.5 text-[11px] font-mono font-medium px-2.5 py-1 rounded-full uppercase tracking-wider
+                        ${loaded
+                          ? 'bg-emerald-500/10 text-energy-green ring-1 ring-emerald-400/20'
+                          : 'bg-rose-500/10 text-energy-red ring-1 ring-rose-400/20'
+                        }`}
                     >
                       {loaded ? (
-                        <><CheckCircle className="w-3.5 h-3.5" aria-hidden="true" /> {t('dashboard.modelLoaded')}</>
+                        <><CheckCircle className="w-3 h-3" aria-hidden="true" /> {t('dashboard.modelLoaded')}</>
                       ) : (
-                        <><AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" /> {t('dashboard.modelMissing')}</>
+                        <><AlertTriangle className="w-3 h-3" aria-hidden="true" /> {t('dashboard.modelMissing')}</>
                       )}
                     </span>
                   </div>
@@ -390,18 +410,22 @@ export default function Dashboard() {
 
           <Card title={t('dashboard.modelInfo')} subtitle={t('dashboard.modelInfoSubtitle')}>
             {modelInfo ? (
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 font-mono text-xs">
                 {Object.entries(modelInfo).slice(0, 12).map(([key, value]) => (
-                  <div key={key} className="flex justify-between py-2 px-2 rounded-lg hover:bg-surface-dim transition-colors border-b border-border/30 last:border-0 gap-4">
-                    <span className="text-sm text-text-secondary truncate">{formatKey(key)}</span>
-                    <span className="text-text-primary font-mono text-xs truncate max-w-[200px] tabular-nums font-medium">
+                  <div
+                    key={key}
+                    className="flex justify-between gap-4 py-2 px-3 rounded-lg
+                      hover:bg-white/[0.03] transition-colors border-b border-border-subtle/60 last:border-0"
+                  >
+                    <span className="text-text-secondary truncate uppercase tracking-wider">{formatKey(key)}</span>
+                    <span className="text-text-primary truncate max-w-[220px] tabular-nums">
                       {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <LocalEmptyState icon={<Zap className="w-10 h-10" />} message={t('dashboard.modelInfoEmpty')} hint={t('dashboard.modelInfoHint')} />
+              <LocalEmptyState icon={<Zap className="w-9 h-9" />} message={t('dashboard.modelInfoEmpty')} hint={t('dashboard.modelInfoHint')} />
             )}
           </Card>
         </div>
@@ -410,9 +434,15 @@ export default function Dashboard() {
           <Card title={t('dashboard.opMetrics')} subtitle={t('dashboard.opMetricsSubtitle')}>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 stagger-children">
               {Object.entries(metrics).map(([key, value]) => (
-                <div key={key} className="p-3.5 bg-surface-dim rounded-lg hover:bg-surface-bright transition-colors">
-                  <p className="text-xs text-text-muted truncate">{formatKey(key)}</p>
-                  <p className="text-sm font-semibold text-text-primary mt-1 truncate tabular-nums">
+                <div
+                  key={key}
+                  className="rounded-lg border border-border-subtle bg-surface-dim p-3.5
+                    hover:border-border-strong transition-colors"
+                >
+                  <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-text-muted truncate">
+                    {formatKey(key)}
+                  </p>
+                  <p className="text-sm font-mono font-semibold text-text-primary mt-1.5 truncate tabular-nums">
                     {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                   </p>
                 </div>
@@ -428,7 +458,10 @@ export default function Dashboard() {
 function LocalEmptyState({ icon, message, hint }: { icon: React.ReactNode; message: string; hint?: string }) {
   return (
     <div className="text-center py-8">
-      <div className="w-14 h-14 rounded-2xl bg-surface-dim flex items-center justify-center mx-auto mb-3 text-text-muted">
+      <div
+        className="w-14 h-14 rounded-xl bg-surface-dim ring-1 ring-border
+          flex items-center justify-center mx-auto mb-3 text-text-muted"
+      >
         {icon}
       </div>
       <p className="text-sm font-medium text-text-secondary">{message}</p>

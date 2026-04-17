@@ -7,22 +7,37 @@ interface CardProps {
   children: ReactNode;
   className?: string;
   action?: ReactNode;
+  /**
+   * Visual emphasis level. `default` is the standard glass surface;
+   * `emphasis` adds a subtle cyan inner glow for hero cards.
+   */
+  variant?: 'default' | 'emphasis';
 }
 
-export function Card({ title, subtitle, children, className = '', action }: CardProps) {
+export function Card({
+  title,
+  subtitle,
+  children,
+  className = '',
+  action,
+  variant = 'default',
+}: CardProps) {
+  const base = variant === 'emphasis' ? 'glass-card-emphasis' : 'glass-card';
   return (
-    <section
-      className={`bg-surface rounded-xl border border-border shadow-sm
-        hover:shadow-md transition-shadow duration-200 ${className}`}
-      aria-label={title}
-    >
+    <section className={`${base} ${className}`} aria-label={title}>
       {(title || action) && (
-        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-border">
-          <div>
-            {title && <h2 className="text-sm font-semibold text-text-primary">{title}</h2>}
-            {subtitle && <p className="text-xs text-text-muted mt-0.5">{subtitle}</p>}
+        <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-border-subtle">
+          <div className="min-w-0">
+            {title && (
+              <h2 className="font-display text-[15px] font-semibold text-text-primary tracking-tight leading-tight truncate">
+                {title}
+              </h2>
+            )}
+            {subtitle && (
+              <p className="text-xs text-text-muted mt-0.5 truncate">{subtitle}</p>
+            )}
           </div>
-          {action}
+          {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
       <div className="p-5 sm:p-6">{children}</div>
@@ -35,36 +50,43 @@ interface StatCardProps {
   value: string | number;
   icon: ReactNode;
   trend?: string;
-  color?: string;
+  /**
+   * Accent color for the icon glow. Defaults to primary (cyan).
+   */
+  color?: 'primary' | 'green' | 'yellow' | 'red' | 'amber';
 }
 
 export function StatCard({ label, value, icon, trend, color = 'primary' }: StatCardProps) {
-  const colorMap: Record<string, string> = {
-    primary: 'bg-primary-50 text-primary-600',
-    green: 'bg-green-50 text-green-600',
-    yellow: 'bg-yellow-50 text-yellow-600',
-    red: 'bg-red-50 text-red-600',
-    blue: 'bg-blue-50 text-blue-600',
+  const accentMap: Record<string, string> = {
+    primary: 'text-primary-400 bg-primary-500/10 ring-primary-400/20',
+    green: 'text-energy-green bg-emerald-500/10 ring-emerald-400/20',
+    yellow: 'text-energy-yellow bg-yellow-500/10 ring-yellow-400/20',
+    red: 'text-energy-red bg-rose-500/10 ring-rose-400/20',
+    amber: 'text-accent-400 bg-amber-500/10 ring-amber-400/20',
   };
 
   return (
     <div
-      className="bg-surface rounded-xl border border-border shadow-sm p-5
-        hover:shadow-md hover:border-primary-200 transition-all duration-200
-        group"
+      className="glass-card p-5 group"
       role="status"
       aria-label={`${label}: ${value}`}
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium text-text-muted uppercase tracking-wider">{label}</p>
-          <p className="text-2xl font-bold text-text-primary mt-1 tabular-nums">{value}</p>
-          {trend && <p className="text-xs text-text-muted mt-1.5">{trend}</p>}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-mono font-medium text-text-muted uppercase tracking-[0.12em]">
+            {label}
+          </p>
+          <p className="font-display text-3xl font-semibold text-text-primary mt-2 tabular-nums tracking-tight leading-none">
+            {value}
+          </p>
+          {trend && (
+            <p className="text-xs text-text-secondary mt-2 font-mono">{trend}</p>
+          )}
         </div>
         <div
-          className={`w-10 h-10 rounded-lg flex items-center justify-center
-            transition-transform duration-200 group-hover:scale-105
-            ${colorMap[color] || colorMap.primary}`}
+          className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0
+            transition-transform duration-200 group-hover:scale-105 ring-1
+            ${accentMap[color] || accentMap.primary}`}
           aria-hidden="true"
         >
           {icon}
@@ -79,7 +101,7 @@ export function CardSkeleton({ lines = 3 }: { lines?: number }) {
   const { t } = useTranslation();
   return (
     <div
-      className="bg-surface rounded-xl border border-border shadow-sm p-6"
+      className="glass-card p-6"
       aria-busy="true"
       aria-label={t('common.loading')}
     >

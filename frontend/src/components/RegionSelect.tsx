@@ -25,8 +25,8 @@ export default function RegionSelect({ value, onChange, className = '', id = 're
         value={value}
         onChange={(e) => onChange(e.target.value as Region)}
         aria-label={label ? undefined : t('predict.form.regionAria')}
-        className={`block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm text-text-primary shadow-xs cursor-pointer
-          focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition ${className}`}
+        className={`block w-full rounded-lg border border-border bg-surface-dim px-3 min-h-[44px] text-sm text-text-primary cursor-pointer
+          hover:border-border-strong focus-visible:border-primary-400 focus-visible:ring-2 focus-visible:ring-primary-100 focus-visible:outline-none transition ${className}`}
       >
         {REGIONS.map((r) => (
           <option key={r} value={r}>

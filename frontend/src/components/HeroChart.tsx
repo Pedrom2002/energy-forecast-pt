@@ -80,12 +80,15 @@ function HeroTooltip({
   const point = payload[0]?.payload;
   if (!point) return null;
   return (
-    <div className="rounded-md border border-amber-200/40 bg-white/95 px-2.5 py-1.5 text-xs text-slate-700 shadow-md backdrop-blur dark:border-amber-500/30 dark:bg-slate-900/95 dark:text-slate-200">
-      <div className="font-medium">
-        {point.hour.toString().padStart(2, '0')}h00 · {point.predicted} MW
+    <div
+      className="rounded-lg border border-primary-400/30 bg-[#0b1020]/95 px-3 py-2 text-xs
+        text-text-primary shadow-lg backdrop-blur-xl font-mono tabular-nums"
+    >
+      <div className="font-semibold">
+        {point.hour.toString().padStart(2, '0')}:00 · {point.predicted} MW
       </div>
-      <div className="text-[10px] text-slate-500 dark:text-slate-400">
-        CI {point.lower} – {point.upper}
+      <div className="text-[10px] text-primary-300 mt-0.5 uppercase tracking-wider">
+        CI {point.lower} — {point.upper}
       </div>
     </div>
   );
@@ -94,7 +97,7 @@ function HeroTooltip({
 function Skeleton() {
   return (
     <div
-      className="h-48 md:h-56 w-full animate-pulse rounded-lg bg-gradient-to-b from-amber-100/40 to-amber-50/10 dark:from-amber-500/10 dark:to-amber-500/5"
+      className="h-48 md:h-56 w-full rounded-lg bg-surface-dim skeleton-shimmer"
       aria-hidden
     />
   );
@@ -103,8 +106,10 @@ function Skeleton() {
 function OfflineState() {
   const { t } = useTranslation();
   return (
-    <div className="h-48 md:h-56 w-full flex items-center justify-center rounded-lg border border-dashed border-slate-200/60 dark:border-slate-700/60">
-      <span className="text-xs text-slate-400 dark:text-slate-500">{t('hero.offline')}</span>
+    <div className="h-48 md:h-56 w-full flex items-center justify-center rounded-lg border border-dashed border-border">
+      <span className="text-xs font-mono uppercase tracking-wider text-text-muted">
+        {t('hero.offline')}
+      </span>
     </div>
   );
 }
@@ -147,16 +152,20 @@ export default function HeroChart() {
         <AreaChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 4 }}>
           <defs>
             <linearGradient id="heroBand" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.18} />
-              <stop offset="100%" stopColor="#f59e0b" stopOpacity={0.06} />
+              <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.04} />
+            </linearGradient>
+            <linearGradient id="heroLine" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#22d3ee" />
+              <stop offset="100%" stopColor="#fbbf24" />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="rgba(100,116,139,0.1)" vertical={false} />
+          <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} />
           <XAxis
             dataKey="hourLabel"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: 'rgba(100,116,139,0.7)', fontSize: 11 }}
+            tick={{ fill: '#6b7a92', fontSize: 10, fontFamily: 'JetBrains Mono, monospace' }}
             interval={3}
           />
           <YAxis
@@ -168,7 +177,7 @@ export default function HeroChart() {
           />
           <Tooltip
             content={<HeroTooltip />}
-            cursor={{ stroke: 'rgba(245,158,11,0.35)', strokeWidth: 1 }}
+            cursor={{ stroke: 'rgba(34,211,238,0.4)', strokeWidth: 1, strokeDasharray: '3 3' }}
           />
           {/* Invisible baseline to stack the delta on top of */}
           <Area
@@ -195,7 +204,7 @@ export default function HeroChart() {
           <Area
             type="monotone"
             dataKey="predicted"
-            stroke="#f59e0b"
+            stroke="url(#heroLine)"
             strokeWidth={2.5}
             fill="transparent"
             dot={(props: { cx?: number; cy?: number; index?: number }) => {
@@ -207,26 +216,28 @@ export default function HeroChart() {
               ) {
                 return <g />;
               }
+              const color = index === 0 ? '#22d3ee' : '#fbbf24';
               return (
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={3.5}
-                  fill="#f59e0b"
-                  stroke="#fff"
-                  strokeWidth={1.5}
+                  r={4}
+                  fill={color}
+                  stroke="#05080f"
+                  strokeWidth={2}
                 />
               );
             }}
-            activeDot={{ r: 4, fill: '#f59e0b', stroke: '#fff', strokeWidth: 1.5 }}
+            activeDot={{ r: 4, fill: '#22d3ee', stroke: '#05080f', strokeWidth: 2 }}
             isAnimationActive
           />
           <text
             x="100%"
             y={12}
             textAnchor="end"
-            className="fill-slate-400 dark:fill-slate-500"
+            fill="#6b7a92"
             fontSize={10}
+            fontFamily="JetBrains Mono, monospace"
           >
             MW
           </text>
