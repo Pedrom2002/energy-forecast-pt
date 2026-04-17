@@ -7,6 +7,10 @@ export interface BentoCardProps {
   children: ReactNode;
   className?: string;
   size?: BentoSize;
+  /**
+   * If true, overlays a subtle cyan glow gradient on the card background.
+   * Use sparingly — reserve for hero/emphasis tiles.
+   */
   gradient?: boolean;
 }
 
@@ -19,8 +23,7 @@ const sizeClasses: Record<BentoSize, string> = {
   tall: 'col-span-1 row-span-3',
 };
 
-const baseClasses =
-  'relative overflow-hidden rounded-2xl p-6 bg-surface dark:bg-surface-subtle border border-border hover:border-primary-300 dark:hover:border-primary-700 transition-all duration-300';
+const baseClasses = 'glass-card relative overflow-hidden p-5 sm:p-6';
 
 export function BentoCard({
   children,
@@ -36,10 +39,11 @@ export function BentoCard({
       {gradient && (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary-50/60 via-transparent to-transparent"
+          className="pointer-events-none absolute inset-0
+            bg-[radial-gradient(ellipse_100%_60%_at_0%_0%,rgba(34,211,238,0.08),transparent_60%)]"
         />
       )}
-      <div className="relative">{children}</div>
+      <div className="relative h-full">{children}</div>
     </>
   );
 
@@ -50,7 +54,7 @@ export function BentoCard({
   return (
     <motion.div
       className={mergedClass}
-      whileHover={{ y: -3, transition: { type: 'spring', stiffness: 300 } }}
+      whileHover={{ y: -2, transition: { type: 'spring', stiffness: 320, damping: 22 } }}
     >
       {content}
     </motion.div>

@@ -139,7 +139,7 @@ export default function Monitoring() {
       {/* Hero */}
       <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-text-primary leading-tight">
+          <h1 className="font-display text-3xl md:text-4xl font-semibold text-text-primary tracking-tight leading-tight">
             {t('monitoring.title')}
           </h1>
           <p className="mt-2 text-sm md:text-base text-text-secondary max-w-2xl">
@@ -151,16 +151,16 @@ export default function Monitoring() {
             type="button"
             onClick={load}
             className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center gap-2 text-sm font-medium
-              text-text-secondary hover:text-text-primary bg-transparent hover:bg-surface-bright
-              border border-border hover:border-primary-300 dark:hover:border-primary-700
+              text-text-secondary hover:text-text-primary hover:bg-white/[0.04]
+              border border-border hover:border-border-strong
               rounded-lg px-4 cursor-pointer transition-colors
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
             aria-label={t('monitoring.refreshAria')}
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
             <span className="hidden sm:inline">{t('common.refresh')}</span>
           </button>
-          <p className="text-xs text-text-muted tabular-nums">
+          <p className="text-[11px] text-text-muted font-mono tabular-nums">
             {t('monitoring.lastCheck', { when: lastUpdatedLabel })}
           </p>
         </div>
@@ -168,16 +168,16 @@ export default function Monitoring() {
 
       {error && (
         <div
-          className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800/50 p-4 animate-fade-in-up"
+          className="flex items-start gap-3 rounded-xl border border-amber-500/25 bg-amber-500/[0.05] p-4 animate-fade-in-up"
           role="alert"
         >
-          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" aria-hidden="true" />
+          <AlertTriangle className="w-5 h-5 text-accent-400 shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{t('monitoring.limitedData')}</p>
-            <p className="text-xs text-amber-800 dark:text-amber-300/80 mt-1">{error}</p>
-            <p className="text-xs text-amber-800/80 dark:text-amber-300/70 mt-2">
+            <p className="text-sm font-medium text-amber-200">{t('monitoring.limitedData')}</p>
+            <p className="text-xs text-amber-200/80 mt-1">{error}</p>
+            <p className="text-xs text-amber-200/70 mt-2">
               {t('monitoring.apiHint')}{' '}
-              <code className="bg-amber-100/60 dark:bg-amber-900/40 px-1.5 py-0.5 rounded text-[11px] font-mono">
+              <code className="bg-surface-dim border border-border px-1.5 py-0.5 rounded text-[11px] font-mono text-primary-300">
                 localhost:8000
               </code>
               {' '}{t('monitoring.andModel')}
@@ -190,7 +190,7 @@ export default function Monitoring() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 stagger-children">
         <BentoCard size="sm" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
+            <p className="text-[10px] font-mono font-medium uppercase tracking-[0.12em] text-text-muted">
               {t('monitoring.empiricalCoverage')}
             </p>
             {coverageStatus === 'ok' && <CheckCircle className="w-4 h-4 text-energy-green" aria-hidden="true" />}
@@ -229,7 +229,7 @@ export default function Monitoring() {
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
               {t('monitoring.observations')}
             </p>
-            <Activity className="w-4 h-4 text-primary-500" aria-hidden="true" />
+            <Activity className="w-4 h-4 text-primary-400" aria-hidden="true" />
           </div>
           <div>
             <AnimatedNumber
@@ -246,17 +246,17 @@ export default function Monitoring() {
             <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
               {t('monitoring.driftState')}
             </p>
-            <Sparkles className="w-4 h-4 text-primary-500" aria-hidden="true" />
+            <Sparkles className="w-4 h-4 text-primary-400" aria-hidden="true" />
           </div>
           <div>
             <span
-              className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-full ${
+              className={`inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider px-2.5 py-1.5 rounded-full ring-1 ${
                 driftAlert
-                  ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                  : 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                  ? 'bg-rose-500/10 text-energy-red ring-rose-400/25'
+                  : 'bg-emerald-500/10 text-energy-green ring-emerald-400/25'
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${driftAlert ? 'bg-red-500' : 'bg-green-500'} animate-pulse`} />
+              <span className={`w-2 h-2 rounded-full ${driftAlert ? 'bg-energy-red' : 'bg-energy-green'} animate-pulse`} />
               {driftAlert ? t('monitoring.driftDetected') : t('monitoring.stable')}
             </span>
             <p className="mt-2 text-xs text-text-secondary">
@@ -274,8 +274,8 @@ export default function Monitoring() {
         >
           {empiricalPct != null ? (
             <div className="space-y-5">
-              <div className="flex items-start gap-2.5 px-3 py-2.5 bg-surface-dim border border-border-subtle border-l-2 border-l-primary-500 rounded-lg text-xs text-text-secondary leading-relaxed">
-                <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary-600 dark:text-primary-400" aria-hidden="true" />
+              <div className="flex items-start gap-2.5 px-3 py-2.5 bg-primary-500/[0.05] border border-primary-400/20 border-l-2 border-l-primary-400 rounded-lg text-xs text-text-secondary leading-relaxed">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-primary-300" aria-hidden="true" />
                 <p>
                   <strong className="text-text-primary font-semibold">{t('monitoring.demoLabel')}</strong>{' '}
                   {t('monitoring.demoCoverageBody', { endpoint: 'POST /model/coverage/record' })}

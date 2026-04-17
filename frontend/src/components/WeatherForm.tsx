@@ -48,8 +48,8 @@ function InputField({
         max={max}
         step={step}
         aria-describedby={`${id}-range`}
-        className="block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm text-text-primary shadow-xs
-          focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition tabular-nums"
+        className="block w-full rounded-lg border border-border bg-surface-dim px-3 min-h-[44px] text-sm text-text-primary
+          hover:border-border-strong focus-visible:border-primary-400 focus-visible:ring-2 focus-visible:ring-primary-100 focus-visible:outline-none transition font-mono tabular-nums"
       />
       <span id={`${id}-range`} className="sr-only">{t('predict.form.rangeSr', { min, max, unit })}</span>
     </div>
@@ -75,8 +75,8 @@ export default function WeatherForm({ data, onChange, showTimestamp = true, idPr
             type="datetime-local"
             value={data.timestamp.slice(0, 16)}
             onChange={(e) => update('timestamp', e.target.value + ':00')}
-            className="block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm text-text-primary shadow-xs cursor-pointer
-              focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition"
+            className="block w-full rounded-lg border border-border bg-surface-dim px-3 min-h-[44px] text-sm text-text-primary cursor-pointer
+              hover:border-border-strong focus-visible:border-primary-400 focus-visible:ring-2 focus-visible:ring-primary-100 focus-visible:outline-none transition font-mono"
           />
         </div>
       )}

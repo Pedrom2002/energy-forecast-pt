@@ -177,8 +177,10 @@ export default function Forecast() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text-primary tracking-tight">{t('forecast.title')}</h1>
-        <p className="text-sm text-text-secondary mt-1">
+        <h1 className="font-display text-2xl sm:text-3xl font-semibold text-text-primary tracking-tight">
+          {t('forecast.title')}
+        </h1>
+        <p className="text-sm text-text-secondary mt-1.5">
           {t('forecast.subtitle')}
         </p>
       </div>
@@ -191,8 +193,8 @@ export default function Forecast() {
               id="fc-region"
               value={region}
               onChange={(e) => setRegion(e.target.value as Region)}
-              className="block w-full rounded-lg border border-border bg-surface px-3 min-h-[44px] text-sm shadow-xs cursor-pointer
-                focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-200 focus-visible:outline-none transition"
+              className="block w-full rounded-lg border border-border bg-surface-dim px-3 min-h-[44px] text-sm cursor-pointer
+                hover:border-border-strong focus-visible:border-primary-400 focus-visible:ring-2 focus-visible:ring-primary-100 focus-visible:outline-none transition"
             >
               {REGIONS.map((r) => (
                 <option key={r} value={r}>{r}</option>
@@ -213,10 +215,11 @@ export default function Forecast() {
             <button
               type="submit"
               disabled={loading || submitting}
-              className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed
-                text-white font-medium min-h-[44px] px-4 rounded-lg transition-all duration-200 shadow-sm cursor-pointer
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2
-                active:scale-[0.97]"
+              className="w-full flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-400 disabled:bg-primary-500/40 disabled:cursor-not-allowed
+                text-[#05080f] font-semibold min-h-[44px] px-4 rounded-lg transition-all duration-200 cursor-pointer
+                shadow-[0_0_18px_rgba(34,211,238,0.3)] hover:shadow-[0_0_24px_rgba(34,211,238,0.45)]
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#05080f]
+                active:scale-[0.98]"
               aria-busy={loading}
             >
               {loading ? (
@@ -233,36 +236,36 @@ export default function Forecast() {
           </div>
         </form>
 
-        <div className="flex items-center gap-2.5 mt-4 px-3 py-2.5 bg-primary-50 dark:bg-primary-900/20 rounded-lg text-xs text-primary-700 dark:text-primary-300 leading-relaxed">
+        <div className="flex items-center gap-2.5 mt-4 px-3 py-2.5 rounded-lg border border-primary-400/20 bg-primary-500/[0.06] text-xs text-primary-300 leading-relaxed">
           <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
           <p>{t('forecast.demoInfo')}</p>
         </div>
       </Card>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
-          <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
+        <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.05] p-4 flex items-start gap-3 animate-fade-in-up" role="alert">
+          <AlertTriangle className="w-5 h-5 text-energy-red shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-800 dark:text-red-200">{t('forecast.errorTitle')}</p>
-            <p className="text-sm text-red-600 dark:text-red-300 mt-0.5">{error}</p>
-            <div className="flex gap-3 mt-3">
+            <p className="text-sm font-medium text-rose-200">{t('forecast.errorTitle')}</p>
+            <p className="text-sm text-rose-300/80 mt-0.5">{error}</p>
+            <div className="flex gap-3 mt-3 flex-wrap">
               <button
                 type="button"
                 onClick={handleForecast}
-                className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
+                className="text-xs font-medium text-rose-200 hover:text-white underline cursor-pointer"
               >
                 {t('common.retry')}
               </button>
               <button
                 type="button"
                 onClick={() => { setForecastHours(12); }}
-                className="text-xs font-medium text-red-700 hover:text-red-900 underline cursor-pointer"
+                className="text-xs font-medium text-rose-200 hover:text-white underline cursor-pointer"
               >
                 {t('forecast.reduceParams')}
               </button>
               <a
                 href="/monitoring"
-                className="text-xs font-medium text-red-700 hover:text-red-900 underline"
+                className="text-xs font-medium text-rose-200 hover:text-white underline"
               >
                 {t('forecast.seeApiStatus')}
               </a>
@@ -279,16 +282,16 @@ export default function Forecast() {
           <div
             role="radiogroup"
             aria-label={t('forecast.viewMode')}
-            className="inline-flex items-center gap-1 p-1 bg-surface border border-border rounded-lg shadow-xs"
+            className="inline-flex items-center gap-1 p-1 rounded-lg border border-border bg-surface-dim"
           >
             <button
               type="button"
               role="radio"
               aria-checked={view === 'chart'}
               onClick={() => setView('chart')}
-              className={`flex items-center gap-1.5 min-h-[36px] px-3 rounded-md text-xs font-medium cursor-pointer transition-colors
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
-                ${view === 'chart' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`flex items-center gap-1.5 min-h-[36px] px-3 rounded-md text-xs font-mono font-medium uppercase tracking-wider cursor-pointer transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400
+                ${view === 'chart' ? 'bg-primary-500/15 text-primary-300 ring-1 ring-primary-400/25' : 'text-text-muted hover:text-text-primary'}`}
             >
               <LineChart className="w-3.5 h-3.5" aria-hidden="true" />
               {t('forecast.chart')}
@@ -298,9 +301,9 @@ export default function Forecast() {
               role="radio"
               aria-checked={view === 'table'}
               onClick={() => setView('table')}
-              className={`flex items-center gap-1.5 min-h-[36px] px-3 rounded-md text-xs font-medium cursor-pointer transition-colors
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
-                ${view === 'table' ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'text-text-secondary hover:text-text-primary'}`}
+              className={`flex items-center gap-1.5 min-h-[36px] px-3 rounded-md text-xs font-mono font-medium uppercase tracking-wider cursor-pointer transition-colors
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400
+                ${view === 'table' ? 'bg-primary-500/15 text-primary-300 ring-1 ring-primary-400/25' : 'text-text-muted hover:text-text-primary'}`}
             >
               <TableIcon className="w-3.5 h-3.5" aria-hidden="true" />
               {t('forecast.table')}
@@ -316,7 +319,7 @@ export default function Forecast() {
                   <button
                     type="button"
                     onClick={handleExportCSV}
-                    className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
+                    className="flex items-center gap-1.5 text-xs font-mono font-medium uppercase tracking-wider text-primary-300 hover:text-primary-200 hover:bg-primary-500/10 cursor-pointer
                       min-h-[36px] px-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
                     aria-label={t('forecast.exportCsvAria')}
                   >
@@ -339,39 +342,42 @@ export default function Forecast() {
                     <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="ciGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#fde68a" stopOpacity={0.45} />
-                          <stop offset="95%" stopColor="#fde68a" stopOpacity={0.08} />
+                          <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.04} />
                         </linearGradient>
                         <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#16a34a" stopOpacity={0.15} />
-                          <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                         </linearGradient>
-                        <pattern id="ciPattern" patternUnits="userSpaceOnUse" width="6" height="6">
-                          <path d="M0,6 L6,0" stroke="#f97316" strokeWidth="0.5" opacity="0.3" />
-                        </pattern>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,116,139,0.25)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                       <XAxis
                         dataKey="time"
-                        tick={{ fontSize: 10, fill: '#475569' }}
+                        tick={{ fontSize: 10, fill: '#6b7a92', fontFamily: 'JetBrains Mono, monospace' }}
                         interval="preserveStartEnd"
                         tickCount={typeof window !== 'undefined' && window.innerWidth < 640 ? 4 : 8}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                        tickLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                       />
                       <YAxis
-                        tick={{ fontSize: 10, fill: '#475569' }}
-                        label={{ value: 'MW', position: 'insideTopLeft', offset: 10, style: { fontSize: 12, fill: 'var(--color-text-secondary)' } }}
+                        tick={{ fontSize: 10, fill: '#6b7a92', fontFamily: 'JetBrains Mono, monospace' }}
+                        label={{ value: 'MW', position: 'insideTopLeft', offset: 10, style: { fontSize: 10, fill: '#6b7a92', fontFamily: 'JetBrains Mono, monospace' } }}
                         width={50}
                         tickFormatter={(v: number) => formatNumber(v, 0)}
+                        axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                        tickLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                       />
                       <Tooltip
                         contentStyle={{
                           borderRadius: '8px',
-                          border: '1px solid var(--color-border)',
+                          border: '1px solid rgba(34,211,238,0.25)',
                           fontSize: '12px',
-                          boxShadow: '0 4px 6px -1px rgba(0,0,0,.1)',
+                          fontFamily: 'JetBrains Mono, monospace',
+                          boxShadow: '0 8px 24px -8px rgba(0,0,0,0.6)',
                           padding: '8px 12px',
-                          backgroundColor: 'var(--color-surface)',
-                          color: 'var(--color-text-primary)',
+                          backgroundColor: 'rgba(11,16,32,0.95)',
+                          color: '#f0f6fc',
+                          backdropFilter: 'blur(12px)',
                         }}
                         formatter={(value, name) => [
                           typeof value === 'number' ? formatMW(value) : String(value),
@@ -379,7 +385,7 @@ export default function Forecast() {
                         ]}
                       />
                       {nowLabel && (
-                        <ReferenceLine x={nowLabel} stroke="var(--color-accent)" strokeDasharray="4 4" label={{ value: `${t('forecast.now')} ➤`, position: 'top', fill: 'var(--color-accent)', fontSize: 12, fontWeight: 600 }} />
+                        <ReferenceLine x={nowLabel} stroke="#fbbf24" strokeDasharray="4 4" label={{ value: `${t('forecast.now')} ➤`, position: 'top', fill: '#fbbf24', fontSize: 11, fontWeight: 600, fontFamily: 'JetBrains Mono, monospace' }} />
                       )}
                       {visibleSeries.ci && (
                         <>
@@ -388,10 +394,10 @@ export default function Forecast() {
                         </>
                       )}
                       {visibleSeries.actual && (
-                        <Area type="monotone" dataKey="actual" stroke="#16a34a" fill="url(#actualGrad)" strokeWidth={2} name="actual" dot={false} connectNulls={false} />
+                        <Area type="monotone" dataKey="actual" stroke="#10b981" fill="url(#actualGrad)" strokeWidth={2} name="actual" dot={false} connectNulls={false} />
                       )}
                       {visibleSeries.predicted && (
-                        <Area type="monotone" dataKey="predicted" stroke="#d97706" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
+                        <Area type="monotone" dataKey="predicted" stroke="#fbbf24" fill="none" strokeWidth={2} strokeDasharray="6 3" name="predicted" dot={false} connectNulls={false} />
                       )}
                     </AreaChart>
                   </ResponsiveContainer>
@@ -402,7 +408,7 @@ export default function Forecast() {
                   <button
                     type="button"
                     onClick={() => toggleSeries('actual')}
-                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.actual ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.actual ? 'bg-primary-500/10 text-primary-300 ring-1 ring-primary-400/20' : 'opacity-40 line-through'}`}
                     aria-pressed={visibleSeries.actual}
                     aria-label={t('forecast.toggleActual')}
                   >
@@ -412,21 +418,21 @@ export default function Forecast() {
                   <button
                     type="button"
                     onClick={() => toggleSeries('predicted')}
-                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.predicted ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.predicted ? 'bg-amber-500/10 text-accent-400 ring-1 ring-amber-400/20' : 'opacity-40 line-through'}`}
                     aria-pressed={visibleSeries.predicted}
                     aria-label={t('forecast.togglePredicted')}
                   >
-                    <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #d97706' }} aria-hidden="true" />
+                    <span className="w-4 h-0.5 rounded" style={{ borderTop: '2px dashed #fbbf24' }} aria-hidden="true" />
                     {t('forecast.predictionSeries')}
                   </button>
                   <button
                     type="button"
                     onClick={() => toggleSeries('ci')}
-                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.ci ? 'bg-primary-50 text-primary-700' : 'opacity-40 line-through'}`}
+                    className={`flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-all ${visibleSeries.ci ? 'bg-primary-500/10 text-primary-300 ring-1 ring-primary-400/20' : 'opacity-40 line-through'}`}
                     aria-pressed={visibleSeries.ci}
                     aria-label={t('forecast.toggleCi')}
                   >
-                    <span className="w-4 h-3 bg-primary-200 rounded" aria-hidden="true" />
+                    <span className="w-4 h-3 rounded bg-gradient-to-b from-primary-400/50 to-primary-500/10" aria-hidden="true" />
                     {t('forecast.ci90')}
                   </button>
                 </div>
@@ -443,7 +449,7 @@ export default function Forecast() {
                   <button
                     type="button"
                     onClick={handleExportCSV}
-                    className="flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-800 hover:bg-primary-50 cursor-pointer
+                    className="flex items-center gap-1.5 text-xs font-mono font-medium uppercase tracking-wider text-primary-300 hover:text-primary-200 hover:bg-primary-500/10 cursor-pointer
                       min-h-[44px] px-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 transition-colors"
                     aria-label={t('forecast.exportCsvAria')}
                   >
@@ -502,10 +508,10 @@ export default function Forecast() {
                               +/-{formatNumber(range / 2)}
                             </td>
                             <td className="py-2.5 px-3 text-center hidden md:table-cell">
-                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                              <span className={`text-[10px] font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ring-1 ${
                                 r.ci_method === 'conformal'
-                                  ? 'bg-green-50 text-green-700'
-                                  : 'bg-yellow-50 text-yellow-700'
+                                  ? 'bg-emerald-500/10 text-energy-green ring-emerald-400/20'
+                                  : 'bg-yellow-500/10 text-energy-yellow ring-yellow-400/20'
                               }`}>
                                 {r.ci_method === 'conformal' ? t('forecast.methodConformal') : t('forecast.methodGaussian')}
                               </span>
@@ -535,7 +541,7 @@ export default function Forecast() {
       )}
 
       {chartData.length === 0 && !error && !loading && (
-        <div className="bg-surface border border-border rounded-xl">
+        <div className="glass-card">
           <EmptyState
             illustration={<ForecastIllustration />}
             title={t('forecast.emptyTitle')}
@@ -584,9 +590,11 @@ function ValidatedNumberInput({ id, label, value, onChange, min, max, help }: {
         max={max}
         aria-describedby={`${id}-help`}
         aria-invalid={!!error}
-        className={`block w-full rounded-lg border bg-surface px-3 min-h-[44px] text-sm shadow-xs tabular-nums
+        className={`block w-full rounded-lg border bg-surface-dim px-3 min-h-[44px] text-sm tabular-nums
           focus-visible:ring-2 focus-visible:outline-none transition
-          ${error ? 'border-energy-red focus-visible:border-energy-red focus-visible:ring-red-200' : 'border-border focus-visible:border-primary-500 focus-visible:ring-primary-200'}`}
+          ${error
+            ? 'border-energy-red focus-visible:border-energy-red focus-visible:ring-rose-400/30'
+            : 'border-border hover:border-border-strong focus-visible:border-primary-400 focus-visible:ring-primary-100'}`}
       />
       {error ? (
         <p className="text-[11px] text-energy-red mt-1" role="alert">{error}</p>
