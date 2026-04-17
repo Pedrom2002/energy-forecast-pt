@@ -14,7 +14,7 @@
 # Pinned to minor for reproducibility; Dependabot docker ecosystem bumps
 # this monthly. Moving to SHA pin is left as a follow-up once CI has a
 # docker-compose-based integration test that catches tag drift.
-FROM node:20.19-slim AS frontend
+FROM node:25.9-slim AS frontend
 
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json ./
