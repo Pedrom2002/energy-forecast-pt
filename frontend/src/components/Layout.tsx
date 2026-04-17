@@ -225,7 +225,7 @@ export default function Layout() {
         <main
           ref={mainRef}
           id="main-content"
-          className="flex-1 px-4 sm:px-6 py-6 sm:py-8 pb-24 lg:pb-10 overflow-x-hidden"
+          className="flex-1 px-4 sm:px-6 py-6 sm:py-8 pb-8 lg:pb-10 overflow-x-hidden"
           role="main"
           tabIndex={-1}
         >
@@ -259,6 +259,27 @@ export default function Layout() {
           </span>
           <span aria-hidden="true">·</span>
           <span>{t('footer.version')}</span>
+        </footer>
+
+        {/* Mobile footer — compact single-row strip sitting above the bottom nav.
+            Only shown on < lg. Credits + version + social links inline. */}
+        <footer
+          className="lg:hidden shrink-0 flex items-center gap-2 px-4 h-10 mb-16
+            border-t border-border-subtle text-[10px] text-text-muted font-mono uppercase tracking-wider
+            whitespace-nowrap overflow-x-auto"
+          aria-label={t('layout.footerLabel')}
+        >
+          <span className="shrink-0">
+            <strong className="text-primary-300 font-semibold">Pedro Marques</strong>
+          </span>
+          <span aria-hidden="true" className="text-text-muted/60">·</span>
+          <span className="shrink-0">{t('footer.version')}</span>
+          <span className="flex-1" aria-hidden="true" />
+          <div className="flex items-center gap-0.5 shrink-0" role="group" aria-label={t('layout.externalLinks')}>
+            <IconLink href="https://github.com/Pedrom2002/energy-forecast-pt" label="GitHub" compact><Github className="w-3.5 h-3.5" /></IconLink>
+            <IconLink href="https://www.linkedin.com/in/pedro-marques-056baa366/" label="LinkedIn" compact><Linkedin className="w-3.5 h-3.5" /></IconLink>
+            <IconLink href="/docs" label={t('layout.apiDocs')} compact><BookOpen className="w-3.5 h-3.5" /></IconLink>
+          </div>
         </footer>
       </div>
 
@@ -304,7 +325,17 @@ export default function Layout() {
   );
 }
 
-function IconLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
+function IconLink({
+  href,
+  label,
+  children,
+  compact = false,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+  compact?: boolean;
+}) {
   return (
     <a
       href={href}
@@ -312,9 +343,10 @@ function IconLink({ href, label, children }: { href: string; label: string; chil
       rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
       title={label}
       aria-label={label}
-      className="inline-flex items-center justify-center w-9 h-9 rounded-lg
+      className={`inline-flex items-center justify-center rounded-lg
         text-text-muted hover:text-primary-300 hover:bg-white/[0.03] transition-colors
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400
+        ${compact ? 'w-7 h-7' : 'w-9 h-9'}`}
     >
       {children}
     </a>
