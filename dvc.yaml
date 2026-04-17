@@ -76,3 +76,18 @@ stages:
     deps:
       - data/models/metadata/training_metadata.json
       - data/models/metadata/training_metadata_no_lags.json
+
+  verify_no_leakage:
+    # Run the cross-region lag swap test immediately after training. Fails
+    # the pipeline (non-zero exit) if v6-style leakage is detected, so
+    # a bad retrain can't silently ship.
+    cmd: python scripts/verify_no_cross_region_leakage.py
+    deps:
+      - data/models/checkpoints/best_model.pkl
+      - data/models/metadata/training_metadata.json
+      - data/processed/processed_data.parquet
+      - scripts/verify_no_cross_region_leakage.py
+      - src/features/feature_engineering.py
+    outs:
+      - outputs/leakage_report.json:
+          cache: false

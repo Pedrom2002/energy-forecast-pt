@@ -85,12 +85,93 @@ except ImportError:
     _PROMETHEUS_AVAILABLE = False
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
+#
+# Two modes:
+#   * default (plain-text) — single-line human-readable format, good for
+#     tailing ``docker logs``.
+#   * ``STRUCTURED_LOGS=1`` — JSON per line with standard fields
+#     (``timestamp``, ``level``, ``logger``, ``message``, plus any record
+#     extras). Machine-readable for APM integrations (CloudWatch, Datadog,
+#     etc.) without requiring extra dependencies.
+#
+# The JSON formatter is intentionally dependency-free: the ``json`` module is
+# stdlib, so this stays opt-in without forcing ``python-json-logger`` on
+# every install. Enable via the env var at container start time.
 
 _LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, _LOG_LEVEL, logging.INFO),
-    format="%(asctime)s %(levelname)s %(name)s %(message)s",
-)
+_STRUCTURED_LOGS = os.environ.get("STRUCTURED_LOGS", "0") == "1"
+
+
+class _JsonLogFormatter(logging.Formatter):
+    """Minimal JSON log formatter — stdlib only, no new dependency.
+
+    Emits one JSON object per log record with: ``timestamp`` (ISO-8601 UTC),
+    ``level``, ``logger``, ``message``, and (when present) ``exception``
+    traceback plus any ``record.__dict__`` extras passed via ``logger.info(
+    ..., extra={...})``.
+    """
+
+    _STANDARD_FIELDS = frozenset(
+        {
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
+            "asctime",
+            "taskName",
+        }
+    )
+
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+        from datetime import datetime, timezone
+
+        payload: dict[str, object] = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        # Include any extras passed via ``logger.info(..., extra={"key": val})``.
+        for key, value in record.__dict__.items():
+            if key not in self._STANDARD_FIELDS and not key.startswith("_"):
+                payload[key] = value
+        return json.dumps(payload, default=str, ensure_ascii=False)
+
+
+if _STRUCTURED_LOGS:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(_JsonLogFormatter())
+    logging.basicConfig(
+        level=getattr(logging, _LOG_LEVEL, logging.INFO),
+        handlers=[_handler],
+        force=True,
+    )
+else:
+    logging.basicConfig(
+        level=getattr(logging, _LOG_LEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
 logger = logging.getLogger(__name__)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

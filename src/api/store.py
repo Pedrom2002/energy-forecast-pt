@@ -63,7 +63,9 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+from starlette.datastructures import State
 
+from src.api.types import ModelMetadata, OptionalPredictor
 from src.features.feature_engineering import FeatureEngineer
 
 logger = logging.getLogger(__name__)
@@ -112,9 +114,9 @@ class ModelStore:
     """
 
     # ── Loaded model objects ──────────────────────────────────────────────────
-    model_with_lags: Any = None
-    model_no_lags: Any = None
-    model_advanced: Any = None
+    model_with_lags: OptionalPredictor = None
+    model_no_lags: OptionalPredictor = None
+    model_advanced: OptionalPredictor = None
     feature_engineer: FeatureEngineer | None = None
 
     # ── Feature name lists ────────────────────────────────────────────────────
@@ -140,9 +142,9 @@ class ModelStore:
     checksums: dict | None = None
 
     # ── Cached metadata dicts (avoid per-request file I/O in /model/info) ────
-    metadata_with_lags: dict | None = None
-    metadata_no_lags: dict | None = None
-    metadata_advanced: dict | None = None
+    metadata_with_lags: ModelMetadata | None = None
+    metadata_no_lags: ModelMetadata | None = None
+    metadata_advanced: ModelMetadata | None = None
 
     # ── Conformal prediction quantiles ────────────────────────────────────────
     # 90th-percentile of |residuals| on a held-out calibration set.
@@ -442,7 +444,7 @@ def _load_models() -> ModelStore:
     return store
 
 
-def reload_models(app_state: Any) -> dict:
+def reload_models(app_state: State) -> dict:
     """Reload all models from disk and atomically replace the store.
 
     Intended for use by the ``POST /admin/reload-models`` endpoint.  Acquires
