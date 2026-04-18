@@ -23,8 +23,7 @@ class Predictor(Protocol):
     ``isinstance(obj, Predictor)`` at runtime where needed.
     """
 
-    def predict(self, X: np.ndarray | pd.DataFrame, /) -> np.ndarray:
-        ...
+    def predict(self, X: np.ndarray | pd.DataFrame, /) -> np.ndarray: ...
 
 
 #: Optional Predictor — models can be absent when loading fails gracefully.
