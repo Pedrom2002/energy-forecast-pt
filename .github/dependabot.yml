@@ -43,8 +43,15 @@ updates:
 
   # Base images for the Dockerfile — keeps node:20.19-slim and
   # python:3.11.11-slim current. Monthly cadence matches github-actions.
+  # Ignore major bumps: Python 3.11 and Node 20 are intentional LTS pins;
+  # moving to 3.14 / 25 would break wheel availability and the test matrix.
   - package-ecosystem: docker
     directory: "/"
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
