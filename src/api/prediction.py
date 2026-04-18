@@ -33,8 +33,6 @@ import os
 import weakref
 from typing import Any
 
-from src.api.types import Predictor
-
 import numpy as np
 import pandas as pd
 
@@ -47,6 +45,7 @@ from src.api.schemas import (
     SequentialForecastResponse,
 )
 from src.api.store import ModelStore
+from src.api.types import Predictor
 
 logger = logging.getLogger(__name__)
 
