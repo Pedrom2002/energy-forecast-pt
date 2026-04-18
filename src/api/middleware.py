@@ -239,7 +239,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             from src.api.metrics import metrics as prom_metrics
 
             prom_metrics.rate_limiter_redis_failures_total.inc()
-        except Exception:  # pragma: no cover — metrics init fail shouldn't break RL
+        except Exception:  # noqa: BLE001, S110 — metrics init fail shouldn't break RL
             pass
         if self._cb_failures >= self.CB_THRESHOLD:
             if not self._cb_open:
